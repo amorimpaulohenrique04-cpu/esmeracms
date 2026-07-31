@@ -61,7 +61,12 @@ export default async function Dashboard(props: AdminViewServerProps) {
               { _status: { equals: 'published' } },
             ],
           } as Where),
-          countDocs(req, 'products', { _status: { equals: 'draft' } } as Where),
+          countDocs(req, 'products', {
+            and: [
+              { _status: { equals: 'draft' } },
+              { publicationReady: { equals: false } },
+            ],
+          } as Where),
           findDocs<Product>(req, 'products', {
             sort: '-updatedAt',
             limit: 1,
@@ -152,9 +157,9 @@ export default async function Dashboard(props: AdminViewServerProps) {
               />
               <MetricCard
                 icon="draft"
-                label="Aguardando publicação"
+                label="Pendências editoriais"
                 value={site[1]}
-                meta="Documentos com status de rascunho"
+                meta="Rascunhos com problemas reais de prontidão"
               />
             </>
           ) : null}

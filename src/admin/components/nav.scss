@@ -24,13 +24,13 @@
 .esmera-nav-link.is-active { background: #4a675d; color: #fff; box-shadow: 0 6px 18px rgba(50,79,70,.12); }
 .esmera-nav-icon { width: 19px; height: 19px; flex: 0 0 auto; }
 .esmera-nav-divider { height: 1px; background: #e3e7e5; margin: 15px 7px 11px; }
-.esmera-nav-caption { padding: 0 11px 8px; color: #727975; font-size: 9px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+.esmera-nav-caption { padding: 0 11px 8px; color: #727975; font-size: 9px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
 .esmera-nav-section--technical .esmera-nav-link { color: #6a7470; font-size: 11px; }
 .esmera-nav-footer { margin-top: auto; padding-top: 18px; border-top: 1px solid #e3e7e5; }
 .esmera-user { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 9px; align-items: center; padding: 7px 8px; color: inherit; text-decoration: none; }
 .esmera-user strong { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 11px; white-space: nowrap; }
 .esmera-user small { display: block; color: #8a928f; font-size: 9px; margin-top: 2px; }
-.esmera-avatar { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #95b4a8; border-radius: 50%; background: #dcece6; color: #29473d; font-size: 10px; font-weight: 750; }
+.esmera-avatar { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #95b4a8; border-radius: 50%; background: #dcece6; color: #29473d; font-size: 10px; font-weight: 700; }
 .esmera-logout { width: 100%; margin-top: 6px; border: 0; background: transparent; color: #6b7470; text-align: left; padding: 8px; border-radius: 8px; font-size: 10px; cursor: pointer; }
 .esmera-logout:hover { background: #f0f2f1; color: #283730; }
 .esmera-login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }

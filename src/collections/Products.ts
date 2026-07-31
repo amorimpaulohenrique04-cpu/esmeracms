@@ -1,6 +1,12 @@
-import type { CollectionConfig } from 'payload'
+import { ValidationError, type CollectionConfig, type Where } from 'payload'
 
 import { publishedProductsOrAuthenticated, siteEditors } from '../access/roles'
+import {
+  getOptionDefinitionIssues,
+  getProductReadiness,
+  getVariantIssues,
+  type ProductReadinessInput,
+} from '../businessRules/products/readiness'
 import { seoField, slugify } from '../fields/common'
 
 type GalleryItem = {
@@ -23,6 +29,9 @@ type ProductSiblingData = {
   catalogStatus?: string
   optionDefinitions?: OptionDefinition[]
   gallery?: GalleryItem[]
+  priceMode?: string
+  basePriceCents?: number | null
+  variants?: VariantItem[]
 }
 
 function validateGallery(value: unknown, { siblingData }: { siblingData?: ProductSiblingData }) {
@@ -35,50 +44,11 @@ function validateGallery(value: unknown, { siblingData }: { siblingData?: Produc
 }
 
 function validateOptionDefinitions(value: unknown) {
-  const definitions = (Array.isArray(value) ? value : []) as OptionDefinition[]
-  const codes = definitions.map((item) => item.code).filter(Boolean)
-  if (new Set(codes).size !== codes.length) return 'Os códigos das opções não podem se repetir.'
-  for (const definition of definitions) {
-    const values = (definition.values || []).map((item) => item.value).filter(Boolean)
-    if (new Set(values).size !== values.length) return `Não repita valores na opção ${definition.code || ''}.`
-  }
-  return true
+  return getOptionDefinitionIssues(value)[0] || true
 }
 
 function validateVariants(value: unknown, { siblingData }: { siblingData?: ProductSiblingData }) {
-  const variants = (Array.isArray(value) ? value : []) as VariantItem[]
-  const skus = new Set<string>()
-  const combinations = new Set<string>()
-  const definitions = new Map((siblingData?.optionDefinitions || []).map((option) => [option.code, new Set((option.values || []).map((item) => item.value))]))
-  const mediaKeys = new Set((siblingData?.gallery || []).map((item) => item.mediaKey))
-
-  for (const variant of variants) {
-    if (variant.sku) {
-      if (skus.has(variant.sku)) return `O código de variante ${variant.sku} está repetido.`
-      skus.add(variant.sku)
-    }
-
-    const optionCodes = (variant.selection || []).map((item) => item.option).filter(Boolean)
-    if (new Set(optionCodes).size !== optionCodes.length) return `A variante ${variant.sku || ''} repete uma opção na combinação.`
-
-    for (const item of variant.selection || []) {
-      const allowed = definitions.get(item.option)
-      if (!allowed) return `A variante ${variant.sku || ''} usa a opção inexistente ${item.option || ''}.`
-      if (!allowed.has(item.value)) return `A variante ${variant.sku || ''} usa o valor inexistente ${item.value || ''}.`
-    }
-
-    const combination = (variant.selection || []).map((item) => `${item.option || ''}:${item.value || ''}`).sort().join('|')
-    if (combination) {
-      if (combinations.has(combination)) return `A combinação ${combination} está duplicada.`
-      combinations.add(combination)
-    }
-
-    for (const media of variant.mediaKeys || []) {
-      if (media.key && !mediaKeys.has(media.key)) return `A variante ${variant.sku || ''} aponta para a mídia inexistente ${media.key}.`
-    }
-  }
-
-  return true
+  return getVariantIssues({ ...(siblingData || {}), variants: Array.isArray(value) ? value as VariantItem[] : [] })[0] || true
 }
 
 export const Products: CollectionConfig = {
@@ -95,6 +65,7 @@ export const Products: CollectionConfig = {
     listSearchableFields: ['title', 'subtitle', 'code', 'material'],
   },
   access: {
+    admin: siteEditors,
     read: publishedProductsOrAuthenticated,
     create: siteEditors,
     update: siteEditors,
@@ -107,9 +78,79 @@ export const Products: CollectionConfig = {
   },
   hooks: {
     beforeValidate: [
-      ({ data }) => {
+      async ({ data, originalDoc, req }) => {
+        if (!data) return data
+        const id = originalDoc?.id as number | string | undefined
         if (data?.title && !data.slug) data.slug = slugify(String(data.title))
         if (data?.code) data.code = String(data.code).trim().toUpperCase()
+        if (Array.isArray(data.gallery)) {
+          data.gallery = data.gallery.map((item: GalleryItem) => ({
+            ...item,
+            mediaKey: item.mediaKey ? slugify(String(item.mediaKey)) : item.mediaKey,
+          }))
+        }
+        if (Array.isArray(data.optionDefinitions)) {
+          data.optionDefinitions = data.optionDefinitions.map((definition: OptionDefinition) => ({
+            ...definition,
+            code: definition.code ? slugify(String(definition.code)) : definition.code,
+            values: definition.values?.map((item) => ({
+              ...item,
+              value: item.value ? slugify(String(item.value)) : item.value,
+            })),
+          }))
+        }
+        if (Array.isArray(data.variants)) {
+          data.variants = data.variants.map((variant: VariantItem) => ({
+            ...variant,
+            sku: variant.sku ? String(variant.sku).trim().toUpperCase() : variant.sku,
+            selection: variant.selection?.map((item) => ({
+              ...item,
+              option: item.option ? slugify(String(item.option)) : item.option,
+              value: item.value ? slugify(String(item.value)) : item.value,
+            })),
+            mediaKeys: variant.mediaKeys?.map((item) => ({
+              ...item,
+              key: item.key ? slugify(String(item.key)) : item.key,
+            })),
+          }))
+        }
+
+        const product = { ...(originalDoc || {}), ...data } as ProductReadinessInput
+        const readiness = getProductReadiness(product)
+        data.publicationReady = readiness.ready
+        data.publicationIssues = readiness.issues.map((message) => ({ message }))
+
+        const skus = (product.variants || []).map((variant) => variant.sku).filter(Boolean) as string[]
+        if (skus.length) {
+          const conditions: Where[] = [{ 'variants.sku': { in: skus } }]
+          if (id !== undefined && id !== null) conditions.push({ id: { not_equals: id } })
+          const duplicate = await req.payload.find({
+            collection: 'products',
+            depth: 0,
+            limit: 1,
+            pagination: false,
+            overrideAccess: true,
+            req,
+            where: { and: conditions },
+          })
+          if (duplicate.docs.length) {
+            throw new ValidationError({
+              collection: 'products',
+              id: id ?? undefined,
+              req,
+              errors: [{ path: 'variants', message: 'Cada SKU deve ser único em todo o catálogo.' }],
+            })
+          }
+        }
+
+        if (product._status === 'published' && !readiness.ready) {
+          throw new ValidationError({
+            collection: 'products',
+            id: id ?? undefined,
+            req,
+            errors: readiness.issues.map((message) => ({ path: 'publicationIssues', message })),
+          })
+        }
         return data
       },
     ],
@@ -160,7 +201,7 @@ export const Products: CollectionConfig = {
               defaultValue: 'active',
               options: [
                 { label: 'Ativo', value: 'active' },
-                { label: 'Arquivado', value: 'archive' },
+                { label: 'Arquivado', value: 'archived' },
               ],
               admin: {
                 description: 'Rascunho/publicação é controlado separadamente pelo workflow do Payload.',
@@ -268,7 +309,6 @@ export const Products: CollectionConfig = {
                 { label: 'Disponível', value: 'available' },
                 { label: 'Sob encomenda', value: 'made_to_order' },
                 { label: 'Edição limitada', value: 'limited' },
-                { label: 'Arquivada', value: 'archive' },
               ],
             },
             {
@@ -293,7 +333,7 @@ export const Products: CollectionConfig = {
               },
               validate: (value: unknown, { siblingData }: { siblingData?: { priceMode?: string; variants?: Array<{ status?: string; priceMode?: string; priceCents?: number }> } }) => {
                 if (siblingData?.priceMode !== 'fixed') return true
-                if (typeof value === 'number') return true
+                if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return true
                 const hasVariantPrice = (siblingData?.variants || []).some((variant) =>
                   variant.status !== 'disabled' && variant.priceMode === 'fixed' && typeof variant.priceCents === 'number',
                 )
@@ -384,7 +424,7 @@ export const Products: CollectionConfig = {
                   min: 0,
                   admin: { condition: (_, siblingData) => siblingData?.priceMode === 'fixed' },
                   validate: (value: unknown, { siblingData }: { siblingData?: { priceMode?: string } }) =>
-                    siblingData?.priceMode !== 'fixed' || typeof value === 'number' || 'Informe o preço da variante.',
+                    siblingData?.priceMode !== 'fixed' || (typeof value === 'number' && Number.isInteger(value) && value >= 0) || 'Informe o preço da variante em centavos inteiros.',
                 },
                 {
                   name: 'status',
@@ -426,6 +466,21 @@ export const Products: CollectionConfig = {
           ],
         },
       ],
+    },
+    {
+      name: 'publicationReady',
+      type: 'checkbox',
+      label: 'Pronto para publicação',
+      defaultValue: false,
+      index: true,
+      admin: { readOnly: true, position: 'sidebar' },
+    },
+    {
+      name: 'publicationIssues',
+      type: 'array',
+      label: 'Pendências de publicação',
+      admin: { readOnly: true, position: 'sidebar' },
+      fields: [{ name: 'message', type: 'text', required: true }],
     },
   ],
 }

@@ -1,12 +1,12 @@
 import type { GlobalConfig } from 'payload'
 
-import { publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
+import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
 import { callToActionFields, imageWithAltFields, seoField } from '../fields/common'
 
 export const Contact: GlobalConfig = {
   slug: 'contact',
   label: 'Contato',
-  admin: { group: 'Site' },
+  admin: { group: 'Site', hidden: ({ user }) => !canManageSite(user) },
   access: { read: publishedGlobalOrAuthenticated, update: siteEditors, readVersions: siteEditors },
   versions: { drafts: true, max: 30 },
   fields: [

@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { commercialUsers } from '../access/roles'
+import { businessUserRelationship } from '../fields/userRelationship'
+import { applyLeadRules } from '../hooks/leads/applyLeadRules'
 
 const phoneValidation = (value: unknown, { siblingData }: { siblingData?: { email?: string } }) => {
   if (!value && !siblingData?.email) return 'Informe telefone ou e-mail.'
@@ -19,6 +21,7 @@ export const Leads: CollectionConfig = {
     listSearchableFields: ['name', 'phone', 'email', 'notes'],
   },
   access: {
+    admin: commercialUsers,
     read: commercialUsers,
     create: commercialUsers,
     update: commercialUsers,
@@ -27,17 +30,7 @@ export const Leads: CollectionConfig = {
   },
   versions: { maxPerDoc: 50 },
   hooks: {
-    beforeChange: [
-      ({ data, originalDoc }) => {
-        if (!data) return data
-        const nextStage = data.stage ?? originalDoc?.stage
-        const closed = nextStage === 'won' || nextStage === 'lost'
-        const stageChanged = data.stage !== undefined && data.stage !== originalDoc?.stage
-        if (closed && (!originalDoc?.closedAt || stageChanged)) data.closedAt = new Date().toISOString()
-        if (!closed && stageChanged && originalDoc?.closedAt) data.closedAt = null
-        return data
-      },
-    ],
+    beforeChange: [applyLeadRules],
   },
   fields: [
     {
@@ -85,7 +78,7 @@ export const Leads: CollectionConfig = {
                 { label: 'Perdido', value: 'lost' },
               ],
             },
-            { name: 'owner', type: 'text', label: 'Responsável' },
+            businessUserRelationship('owner', 'Responsável'),
             { name: 'nextAction', type: 'text', label: 'Próxima ação' },
             { name: 'nextActionAt', type: 'date', label: 'Prazo da próxima ação', admin: { date: { pickerAppearance: 'dayAndTime' } } },
             {

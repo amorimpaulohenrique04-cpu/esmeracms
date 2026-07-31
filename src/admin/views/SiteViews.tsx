@@ -21,6 +21,8 @@ type Product = {
   _status?: string | null
   categories?: unknown[] | null
   gallery?: unknown[] | null
+  publicationReady?: boolean | null
+  publicationIssues?: Array<{ message?: string | null }> | null
   updatedAt?: string
 }
 
@@ -49,9 +51,11 @@ export async function ContentView(props: AdminViewServerProps) {
         code: true,
         categories: true,
         gallery: true,
+        publicationReady: true,
+        publicationIssues: true,
       },
     })
-    const qualityIssues = drafts.docs.filter((product) => !product.title || !product.code || !product.categories?.length || !product.gallery?.length)
+    const qualityIssues = drafts.docs.filter((product) => product.publicationReady !== true)
     const pages = [
       ['Home', 'Hero, manifesto, seleção, Matter e Signature', '/admin/globals/home'],
       ['Sobre', 'Maison, visão, matéria e proveniência', '/admin/globals/about'],
@@ -69,7 +73,7 @@ export async function ContentView(props: AdminViewServerProps) {
         <section className="esmera-card">
           <div className="esmera-card-header"><h2>Qualidade editorial</h2><span className={`esmera-pill ${qualityIssues.length ? 'esmera-pill--sand' : 'esmera-pill--green'}`}>{qualityIssues.length} pendências</span></div>
           <div className="esmera-card-body">
-            {qualityIssues.length ? <div className="esmera-quality-list">{qualityIssues.slice(0, 8).map((product) => <div className="esmera-quality-item" key={String(product.id)}><div><strong>{product.title || 'Produto sem título'}</strong><div className="esmera-row-meta">{[!product.code && 'sem código', !product.categories?.length && 'sem categoria', !product.gallery?.length && 'sem imagem'].filter(Boolean).join(' · ')}</div></div><TechnicalLink href={`/admin/collections/products/${product.id}`}>Corrigir</TechnicalLink></div>)}</div> : <p className="esmera-card-copy">Nenhum rascunho incompleto foi encontrado. A consulta foi concluída com sucesso.</p>}
+            {qualityIssues.length ? <div className="esmera-quality-list">{qualityIssues.slice(0, 8).map((product) => <div className="esmera-quality-item" key={String(product.id)}><div><strong>{product.title || 'Produto sem título'}</strong><div className="esmera-row-meta">{product.publicationIssues?.map((issue) => issue.message).filter(Boolean).join(' · ') || 'Prontidão ainda não calculada'}</div></div><TechnicalLink href={`/admin/collections/products/${product.id}`}>Corrigir</TechnicalLink></div>)}</div> : <p className="esmera-card-copy">Nenhum rascunho com problemas reais de publicação foi encontrado.</p>}
           </div>
         </section>
       </ViewFrame>

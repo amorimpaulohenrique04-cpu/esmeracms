@@ -1,6 +1,6 @@
 import type { Field, GlobalConfig } from 'payload'
 
-import { publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
+import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
 
 const navigationLinkFields = (): Field[] => [
   { name: 'label', type: 'text' as const, label: 'Nome', required: true, maxLength: 40 },
@@ -17,7 +17,7 @@ const navigationLinkFields = (): Field[] => [
 export const Navigation: GlobalConfig = {
   slug: 'navigation',
   label: 'Navegação',
-  admin: { group: 'Site' },
+  admin: { group: 'Site', hidden: ({ user }) => !canManageSite(user) },
   access: { read: publishedGlobalOrAuthenticated, update: siteEditors, readVersions: siteEditors },
   versions: { drafts: true, max: 30 },
   fields: [

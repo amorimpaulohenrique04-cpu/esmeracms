@@ -16,6 +16,7 @@ export const Categories: CollectionConfig = {
     defaultColumns: ['title', 'status', 'parent', 'order', 'updatedAt'],
   },
   access: {
+    admin: siteEditors,
     read: activeCategoriesOrAuthenticated,
     create: siteEditors,
     update: siteEditors,

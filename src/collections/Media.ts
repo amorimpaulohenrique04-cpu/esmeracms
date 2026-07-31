@@ -14,6 +14,7 @@ export const Media: CollectionConfig = {
     defaultColumns: ['filename', 'alt', 'updatedAt'],
   },
   access: {
+    admin: siteEditors,
     read: () => true,
     create: siteEditors,
     update: siteEditors,

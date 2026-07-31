@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { adminField, admins, isAdmin, ownUserOrAdmin } from '../access/roles'
+import { ensureUserRole } from '../hooks/users/ensureUserRole'
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -15,20 +16,10 @@ export const Users: CollectionConfig = {
   },
   auth: true,
   hooks: {
-    beforeValidate: [
-      async ({ data, operation, originalDoc, req }) => {
-        if (!data) return data
-        if (operation === 'create') {
-          const existing = await req.payload.count({ collection: 'users', overrideAccess: true })
-          if (existing.totalDocs === 0) data.role = 'admin'
-        }
-        if (operation === 'update' && !data.role && !originalDoc?.role) data.role = 'admin'
-        return data
-      },
-    ],
+    beforeValidate: [ensureUserRole],
   },
   access: {
-    admin: ({ req }) => Boolean(req.user),
+    admin: admins,
     create: async ({ req }) => {
       if (isAdmin(req.user)) return true
       const existing = await req.payload.count({ collection: 'users', overrideAccess: true })

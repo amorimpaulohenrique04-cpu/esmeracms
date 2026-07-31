@@ -273,7 +273,7 @@ export interface Product {
   /**
    * Rascunho/publicação é controlado separadamente pelo workflow do Payload.
    */
-  catalogStatus: 'active' | 'archive';
+  catalogStatus: 'active' | 'archived';
   categories?: (number | Category)[] | null;
   material?: string | null;
   description?: {
@@ -317,7 +317,7 @@ export interface Product {
         id?: string | null;
       }[]
     | null;
-  availability: 'unique' | 'available' | 'made_to_order' | 'limited' | 'archive';
+  availability: 'unique' | 'available' | 'made_to_order' | 'limited';
   priceMode: 'fixed' | 'inquiry';
   /**
    * Exemplo: R$ 14.900,00 = 1490000.
@@ -379,6 +379,13 @@ export interface Product {
     socialImage?: (number | null) | Media;
     noIndex?: boolean | null;
   };
+  publicationReady?: boolean | null;
+  publicationIssues?:
+    | {
+        message: string;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
   deletedAt?: string | null;
@@ -395,7 +402,7 @@ export interface Lead {
   email?: string | null;
   source: 'instagram' | 'referral' | 'site' | 'architect' | 'organic' | 'whatsapp' | 'other';
   stage: 'new' | 'curation' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  owner?: string | null;
+  owner?: (number | null) | User;
   nextAction?: string | null;
   nextActionAt?: string | null;
   closedAt?: string | null;
@@ -452,7 +459,7 @@ export interface Sale {
   customer: number | Customer;
   channel: 'whatsapp' | 'instagram' | 'site' | 'referral' | 'architect' | 'other';
   status: 'draft' | 'proposal' | 'negotiation' | 'confirmed' | 'production' | 'ready' | 'delivered' | 'cancelled';
-  owner?: string | null;
+  owner?: (number | null) | User;
   confirmedAt?: string | null;
   nextAction?: string | null;
   nextActionAt?: string | null;
@@ -460,20 +467,25 @@ export interface Sale {
     product: number | Product;
     variantSku?: string | null;
     /**
-     * Snapshot obrigatório para preservar o histórico.
+     * Preenchido automaticamente a partir do produto.
      */
     snapshotTitle: string;
     snapshotSlug: string;
+    snapshotSku?: string | null;
     snapshotSelection?: string | null;
     priceMode: 'fixed' | 'inquiry';
+    /**
+     * Automático para preço fixo. Em itens sob consulta, informe apenas após o valor ser negociado.
+     */
     unitPriceCents?: number | null;
     quantity: number;
     id?: string | null;
   }[];
   discountCents?: number | null;
   shippingCents?: number | null;
+  subtotalCents?: number | null;
   /**
-   * Snapshot financeiro final da venda.
+   * Calculado automaticamente a partir dos itens, desconto e frete.
    */
   totalCents?: number | null;
   expectedDeliveryAt?: string | null;
@@ -494,7 +506,7 @@ export interface AfterSale {
   customer: number | Customer;
   status: 'open' | 'following' | 'resolved' | 'closed';
   priority: 'low' | 'normal' | 'high' | 'urgent';
-  owner?: string | null;
+  owner?: (number | null) | User;
   expectedDeliveryAt?: string | null;
   deliveredAt?: string | null;
   deliveryNotes?: string | null;
@@ -526,7 +538,7 @@ export interface Task {
   status: 'pending' | 'in_progress' | 'done' | 'cancelled';
   priority: 'low' | 'normal' | 'high' | 'urgent';
   dueAt: string;
-  assignee?: string | null;
+  assignee?: (number | null) | User;
   relatedTo?:
     | (
         | {
@@ -563,7 +575,7 @@ export interface Activity {
   occurredAt: string;
   summary: string;
   details?: string | null;
-  owner?: string | null;
+  owner?: (number | null) | User;
   relatedTo: (
     | {
         relationTo: 'leads';
@@ -895,6 +907,13 @@ export interface ProductsSelect<T extends boolean = true> {
         socialImage?: T;
         noIndex?: T;
       };
+  publicationReady?: T;
+  publicationIssues?:
+    | T
+    | {
+        message?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   deletedAt?: T;
@@ -976,6 +995,7 @@ export interface SalesSelect<T extends boolean = true> {
         variantSku?: T;
         snapshotTitle?: T;
         snapshotSlug?: T;
+        snapshotSku?: T;
         snapshotSelection?: T;
         priceMode?: T;
         unitPriceCents?: T;
@@ -984,6 +1004,7 @@ export interface SalesSelect<T extends boolean = true> {
       };
   discountCents?: T;
   shippingCents?: T;
+  subtotalCents?: T;
   totalCents?: T;
   expectedDeliveryAt?: T;
   deliveredAt?: T;

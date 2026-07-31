@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { commercialUsers } from '../access/roles'
+import { businessUserRelationship } from '../fields/userRelationship'
+import { applySaleRules } from '../hooks/sales/applySaleRules'
 
 export const eligibleSaleStatuses = ['confirmed', 'production', 'ready', 'delivered'] as const
 
@@ -12,9 +14,10 @@ export const Sales: CollectionConfig = {
     group: 'Business',
     useAsTitle: 'number',
     defaultColumns: ['number', 'customer', 'status', 'totalCents', 'expectedDeliveryAt', 'updatedAt'],
-    listSearchableFields: ['number', 'owner'],
+    listSearchableFields: ['number'],
   },
   access: {
+    admin: commercialUsers,
     read: commercialUsers,
     create: commercialUsers,
     update: commercialUsers,
@@ -23,11 +26,16 @@ export const Sales: CollectionConfig = {
   },
   versions: { maxPerDoc: 100 },
   hooks: {
+    beforeValidate: [applySaleRules],
     beforeChange: [
       ({ data, originalDoc }) => {
         if (!data) return data
-        const eligible = eligibleSaleStatuses.includes(data?.status as typeof eligibleSaleStatuses[number])
-        if (eligible && !data?.confirmedAt && !originalDoc?.confirmedAt) data.confirmedAt = new Date().toISOString()
+        const status = data.status ?? originalDoc?.status
+        const totalCents = data.totalCents ?? originalDoc?.totalCents
+        const eligible = eligibleSaleStatuses.includes(status as typeof eligibleSaleStatuses[number])
+        if (originalDoc?.confirmedAt) data.confirmedAt = originalDoc.confirmedAt
+        else if (eligible && typeof totalCents === 'number') data.confirmedAt = new Date().toISOString()
+        else data.confirmedAt = null
         return data
       },
     ],
@@ -74,7 +82,7 @@ export const Sales: CollectionConfig = {
                 { label: 'Cancelada', value: 'cancelled' },
               ],
             },
-            { name: 'owner', type: 'text', label: 'Responsável' },
+            businessUserRelationship('owner', 'Responsável'),
             {
               name: 'confirmedAt',
               type: 'date',
@@ -103,15 +111,17 @@ export const Sales: CollectionConfig = {
                   type: 'text',
                   label: 'Nome no momento da venda',
                   required: true,
-                  admin: { description: 'Snapshot obrigatório para preservar o histórico.' },
+                  admin: { readOnly: true, description: 'Preenchido automaticamente a partir do produto.' },
                 },
-                { name: 'snapshotSlug', type: 'text', label: 'Slug no momento da venda', required: true },
-                { name: 'snapshotSelection', type: 'text', label: 'Seleção no momento da venda' },
+                { name: 'snapshotSlug', type: 'text', label: 'Slug no momento da venda', required: true, admin: { readOnly: true } },
+                { name: 'snapshotSku', type: 'text', label: 'SKU no momento da venda', admin: { readOnly: true } },
+                { name: 'snapshotSelection', type: 'text', label: 'Seleção no momento da venda', admin: { readOnly: true } },
                 {
                   name: 'priceMode',
                   type: 'select',
                   label: 'Modo de preço',
                   required: true,
+                  admin: { readOnly: true },
                   options: [
                     { label: 'Preço fixo', value: 'fixed' },
                     { label: 'Sob consulta', value: 'inquiry' },
@@ -122,7 +132,9 @@ export const Sales: CollectionConfig = {
                   type: 'number',
                   label: 'Valor unitário em centavos',
                   min: 0,
-                  admin: { condition: (_, siblingData) => siblingData?.priceMode === 'fixed' },
+                  admin: {
+                    description: 'Automático para preço fixo. Em itens sob consulta, informe apenas após o valor ser negociado.',
+                  },
                 },
                 { name: 'quantity', type: 'number', label: 'Quantidade', required: true, defaultValue: 1, min: 1, admin: { step: 1 } },
               ],
@@ -130,11 +142,18 @@ export const Sales: CollectionConfig = {
             { name: 'discountCents', type: 'number', label: 'Desconto em centavos', defaultValue: 0, min: 0 },
             { name: 'shippingCents', type: 'number', label: 'Frete em centavos', defaultValue: 0, min: 0 },
             {
+              name: 'subtotalCents',
+              type: 'number',
+              label: 'Subtotal em centavos',
+              min: 0,
+              admin: { readOnly: true },
+            },
+            {
               name: 'totalCents',
               type: 'number',
               label: 'Total fechado em centavos',
               min: 0,
-              admin: { description: 'Snapshot financeiro final da venda.' },
+              admin: { readOnly: true, description: 'Calculado automaticamente a partir dos itens, desconto e frete.' },
             },
           ],
         },

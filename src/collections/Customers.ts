@@ -13,6 +13,7 @@ export const Customers: CollectionConfig = {
     listSearchableFields: ['name', 'phone', 'email', 'city', 'tags'],
   },
   access: {
+    admin: commercialUsers,
     read: commercialUsers,
     create: commercialUsers,
     update: commercialUsers,

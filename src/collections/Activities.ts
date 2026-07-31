@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { admins, commercialUsers } from '../access/roles'
+import { businessUserRelationship } from '../fields/userRelationship'
 
 export const Activities: CollectionConfig = {
   slug: 'activities',
@@ -10,9 +11,10 @@ export const Activities: CollectionConfig = {
     group: 'Business',
     useAsTitle: 'summary',
     defaultColumns: ['summary', 'kind', 'occurredAt', 'owner', 'updatedAt'],
-    listSearchableFields: ['summary', 'details', 'owner'],
+    listSearchableFields: ['summary', 'details'],
   },
   access: {
+    admin: commercialUsers,
     read: commercialUsers,
     create: commercialUsers,
     update: commercialUsers,
@@ -44,7 +46,7 @@ export const Activities: CollectionConfig = {
     },
     { name: 'summary', type: 'text', label: 'Resumo', required: true },
     { name: 'details', type: 'textarea', label: 'Detalhes' },
-    { name: 'owner', type: 'text', label: 'Responsável' },
+    businessUserRelationship('owner', 'Responsável'),
     {
       name: 'relatedTo',
       type: 'relationship',

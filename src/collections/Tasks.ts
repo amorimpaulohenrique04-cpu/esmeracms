@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { commercialUsers } from '../access/roles'
+import { businessUserRelationship } from '../fields/userRelationship'
+import { applyTaskRules } from '../hooks/tasks/applyTaskRules'
 
 export const Tasks: CollectionConfig = {
   slug: 'tasks',
@@ -12,6 +14,7 @@ export const Tasks: CollectionConfig = {
     defaultColumns: ['title', 'status', 'priority', 'dueAt', 'assignee', 'updatedAt'],
   },
   access: {
+    admin: commercialUsers,
     read: commercialUsers,
     create: commercialUsers,
     update: commercialUsers,
@@ -19,6 +22,7 @@ export const Tasks: CollectionConfig = {
     readVersions: commercialUsers,
   },
   versions: { maxPerDoc: 30 },
+  hooks: { beforeChange: [applyTaskRules] },
   fields: [
     { name: 'title', type: 'text', label: 'Tarefa', required: true },
     {
@@ -54,7 +58,7 @@ export const Tasks: CollectionConfig = {
       required: true,
       admin: { date: { pickerAppearance: 'dayAndTime' } },
     },
-    { name: 'assignee', type: 'text', label: 'Responsável' },
+    businessUserRelationship('assignee', 'Responsável'),
     {
       name: 'relatedTo',
       type: 'relationship',
@@ -67,7 +71,7 @@ export const Tasks: CollectionConfig = {
       name: 'completedAt',
       type: 'date',
       label: 'Concluída em',
-      admin: { date: { pickerAppearance: 'dayAndTime' } },
+      admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
     },
   ],
 }

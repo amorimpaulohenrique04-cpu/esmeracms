@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { commercialUsers } from '../access/roles'
+import { businessUserRelationship } from '../fields/userRelationship'
+import { applyAfterSalesRules } from '../hooks/afterSales/applyAfterSalesRules'
 
 export const AfterSales: CollectionConfig = {
   slug: 'after-sales',
@@ -12,6 +14,7 @@ export const AfterSales: CollectionConfig = {
     defaultColumns: ['customer', 'sale', 'status', 'priority', 'expectedDeliveryAt', 'updatedAt'],
   },
   access: {
+    admin: commercialUsers,
     read: commercialUsers,
     create: commercialUsers,
     update: commercialUsers,
@@ -19,6 +22,7 @@ export const AfterSales: CollectionConfig = {
     readVersions: commercialUsers,
   },
   versions: { maxPerDoc: 100 },
+  hooks: { beforeValidate: [applyAfterSalesRules] },
   fields: [
     {
       type: 'tabs',
@@ -54,7 +58,7 @@ export const AfterSales: CollectionConfig = {
                 { label: 'Urgente', value: 'urgent' },
               ],
             },
-            { name: 'owner', type: 'text', label: 'Responsável' },
+            businessUserRelationship('owner', 'Responsável'),
           ],
         },
         {
@@ -113,7 +117,7 @@ export const AfterSales: CollectionConfig = {
                   ],
                 },
                 { name: 'notes', type: 'textarea', label: 'Observações' },
-                { name: 'completedAt', type: 'date', label: 'Concluído em', admin: { date: { pickerAppearance: 'dayAndTime' } } },
+                { name: 'completedAt', type: 'date', label: 'Concluído em', admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
               ],
             },
           ],
@@ -139,6 +143,8 @@ export const AfterSales: CollectionConfig = {
               type: 'textarea',
               label: 'Descrição da ocorrência',
               admin: { condition: (_, siblingData) => Boolean(siblingData?.incidentType && siblingData.incidentType !== 'none') },
+              validate: (value: unknown, { siblingData }: { siblingData?: { incidentType?: string } }) =>
+                siblingData?.incidentType === 'none' || Boolean(String(value || '').trim()) || 'Descreva a ocorrência.',
             },
             {
               name: 'resolution',

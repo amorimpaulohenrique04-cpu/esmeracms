@@ -41,7 +41,7 @@ const technicalLinks: LinkItem[] = [
   { href: '/admin/collections/users', label: 'Usuários', icon: 'shield', area: 'admin' },
 ]
 
-function roleAllows(role: EsmeraRole, area: LinkItem['area']) {
+function roleAllows(role: EsmeraRole | null, area: LinkItem['area']) {
   if (area === 'all') return true
   if (role === 'admin') return true
   if (area === 'site') return role === 'editor'
@@ -71,7 +71,7 @@ export function EsmeraNav() {
   const pathname = usePathname()
   const auth = useAuth()
   const user = auth.user as NavUser | null
-  const role = user?.role || 'admin'
+  const role = user?.role || null
   const name = user?.name || user?.email?.split('@')[0] || 'Esméra'
 
   const isActive = (href: string) => href === '/admin' ? pathname === '/admin' : pathname.startsWith(href)
@@ -104,7 +104,7 @@ export function EsmeraNav() {
       <div className="esmera-nav-footer">
         <Link className="esmera-user" href="/admin/account">
           <span className="esmera-avatar">{name.slice(0, 2).toUpperCase()}</span>
-          <span><strong>{name}</strong><small>{role === 'admin' ? 'Administrador' : role === 'editor' ? 'Editorial' : 'Comercial'}</small></span>
+          <span><strong>{name}</strong><small>{role === 'admin' ? 'Administrador' : role === 'editor' ? 'Editorial' : role === 'commercial' ? 'Comercial' : 'Sem papel'}</small></span>
         </Link>
         <button className="esmera-logout" type="button" onClick={() => void auth.logOut()} aria-label="Sair">Sair</button>
       </div>
