@@ -57,7 +57,7 @@ export function withActiveProductCategoryValidity(
   return async (args) => {
     const source = { ...((args.originalDoc || {}) as Record<string, unknown>), ...((args.data || {}) as Record<string, unknown>) }
     const categoryIssues = await getActiveProductCategoryIssues(args.req, source as ProductState)
-    let nextData = { ...((args.data || {}) as Record<string, unknown>), categoryIssues }
+    let nextData: Record<string, unknown> = { ...((args.data || {}) as Record<string, unknown>), categoryIssues }
 
     for (const hook of baseHooks) {
       const result = await hook({ ...args, data: nextData as typeof args.data })
