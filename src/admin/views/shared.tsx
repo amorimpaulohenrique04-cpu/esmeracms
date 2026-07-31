@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import React from 'react'
 
 import { canManageBusiness, canManageSite, roleOf } from '../../access/roles'
+import { ButtonLink, EmptyState as DesignEmptyState, ErrorState } from '../design-system'
 export { countDocs, findAllDocs, findDocs } from '../../server/domain/shared/payload'
 import './views.scss'
 
@@ -80,17 +81,11 @@ export function AccessDenied({
 }
 
 export function QueryError({ title, error }: { title: string; error: unknown }) {
-  return (
-    <div className="esmera-state esmera-state--error" role="alert">
-      <strong>{title}</strong>
-      <p>{error instanceof Error ? error.message : 'Não foi possível consultar a fonte de dados.'}</p>
-      <small>Nenhum erro de consulta é convertido em zero.</small>
-    </div>
-  )
+  return <ErrorState title={title} error={error} detail="Nenhum erro de consulta é convertido em zero." />
 }
 
 export function EmptyState({ title, copy }: { title: string; copy: string }) {
-  return <div className="esmera-empty"><strong>{title}</strong><span>{copy}</span></div>
+  return <DesignEmptyState title={title} copy={copy} />
 }
 
 export function money(cents: number | null | undefined) {
@@ -121,7 +116,6 @@ export function monthStartISO() {
   }).formatToParts(now)
   const year = Number(localParts.find((part) => part.type === 'year')?.value)
   const month = Number(localParts.find((part) => part.type === 'month')?.value) - 1
-  // São Paulo is UTC-3 and Brazil currently has no daylight-saving time.
   return new Date(Date.UTC(year, month, 1, 3, 0, 0)).toISOString()
 }
 
@@ -198,5 +192,5 @@ export function MetricCard({
 }
 
 export function TechnicalLink({ href, children, primary = false }: { href: string; children: React.ReactNode; primary?: boolean }) {
-  return <a className={primary ? 'esmera-button esmera-button--primary' : 'esmera-button'} href={href}>{children}</a>
+  return <ButtonLink href={href} tone={primary ? 'primary' : 'default'}>{children}</ButtonLink>
 }
