@@ -1,0 +1,72 @@
+@layer payload {
+  html,
+  body,
+  .template-default__wrap {
+    background: var(--esm-canvas);
+  }
+
+  body {
+    color: var(--esm-text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5714;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  .app-header {
+    border-bottom: 1px solid var(--esm-line);
+    background: rgba(249, 249, 255, 0.94);
+    backdrop-filter: blur(14px);
+  }
+
+  .card,
+  .collapsible,
+  .collection-list,
+  .document-fields,
+  .render-fields {
+    border-color: var(--esm-line);
+  }
+
+  input,
+  textarea,
+  select,
+  [class*='react-select'] [class*='control'] {
+    border-radius: var(--esm-radius-input);
+  }
+
+  button,
+  .btn {
+    border-radius: var(--esm-radius-control);
+    transition:
+      background-color var(--esm-duration-hover) var(--esm-ease-standard),
+      border-color var(--esm-duration-hover) var(--esm-ease-standard),
+      color var(--esm-duration-hover) var(--esm-ease-standard);
+  }
+
+  :focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--esm-primary) 24%, transparent);
+    outline-offset: 2px;
+  }
+
+  .pill,
+  [class*='status'] {
+    border-radius: 999px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+}
