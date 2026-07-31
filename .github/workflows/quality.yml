@@ -1,0 +1,36 @@
+name: CMS quality gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [agent/plano-mestre-cms-esmera]
+
+jobs:
+  static-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: ESLint
+        run: pnpm lint --max-warnings=0
+
+      - name: Integration tests
+        run: pnpm test:int
