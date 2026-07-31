@@ -1,49 +1,204 @@
 /* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
-import type { AdminViewServerProps } from 'payload'
+import type { AdminViewServerProps, Where } from 'payload'
 
 import {
   AccessDenied,
-  EmptyState,
+  countDocs,
   ensureUser,
   findDocs,
   PageHeader,
   QueryError,
-  shortDate,
   TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
+import { CategoriesMasterList } from './CategoriesMasterList'
+import { CategoryDetailView } from './CategoryDetailView'
+import {
+  relationId,
+  type CategoryDetail,
+  type CategoryListItem,
+  type CategoryMedia,
+  type CategoryParent,
+  type CategoryTab,
+  type CategoryWorkspaceFilters,
+  type RelatedProduct,
+} from './types'
+import './categories.scss'
 
-type Category = {
-  id: string | number
-  title?: string | null
-  slug?: string | null
-  status?: string | null
-  order?: number | null
-  updatedAt?: string
+const categoryTabs: CategoryTab[] = ['general', 'media', 'products']
+
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+async function paramsOf(props: AdminViewServerProps) {
+  return await Promise.resolve(props.searchParams as unknown as Record<string, string | string[] | undefined>)
+}
+
+function filtersFrom(params: Record<string, string | string[] | undefined>): CategoryWorkspaceFilters {
+  return {
+    q: (first(params.q) || '').trim().slice(0, 100),
+    status: first(params.status) === 'archive' ? 'archive' : 'active',
+  }
+}
+
+function whereFrom(filters: CategoryWorkspaceFilters): Where {
+  const and: Where[] = [{ status: { equals: filters.status } } as Where]
+  if (filters.q) {
+    and.push({
+      or: [
+        { title: { like: filters.q } },
+        { slug: { like: filters.q } },
+        { 'searchTerms.term': { like: filters.q } },
+      ],
+    } as Where)
+  }
+  return { and } as Where
+}
+
+function hierarchyDepth(category: CategoryParent, byId: Map<string, CategoryParent>) {
+  const visited = new Set<string>([String(category.id)])
+  let depth = 0
+  let parentId = relationId(category.parent)
+  while (parentId !== null && depth < 20) {
+    const key = String(parentId)
+    if (visited.has(key)) return depth
+    visited.add(key)
+    const parent = byId.get(key)
+    if (!parent) return depth + 1
+    depth += 1
+    parentId = relationId(parent.parent)
+  }
+  return depth
+}
+
+async function selectedDetail(props: AdminViewServerProps, categoryId: string) {
+  return await props.initPageResult.req.payload.findByID({
+    collection: 'categories',
+    id: categoryId,
+    depth: 1,
+    draft: true,
+    overrideAccess: false,
+    user: props.initPageResult.req.user,
+    req: props.initPageResult.req,
+  }) as unknown as CategoryDetail
 }
 
 export async function CategoriesView(props: AdminViewServerProps) {
   const { allowed } = ensureUser(props, 'site')
   if (!allowed) return <AccessDenied props={props} area="editorial" />
 
+  const params = await paramsOf(props)
+  const filters = filtersFrom(params)
+  const categoryId = first(params.category)
+  const requestedTab = first(params.tab) as CategoryTab | undefined
+  const tab = requestedTab && categoryTabs.includes(requestedTab) ? requestedTab : 'general'
+  const req = props.initPageResult.req
+
   try {
-    const result = await findDocs<Category>(props.initPageResult.req, 'categories', {
-      sort: 'order',
-      limit: 100,
-      depth: 0,
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        status: true,
-        order: true,
-        updatedAt: true,
-      },
-    })
+    const [visibleResult, allResult] = await Promise.all([
+      findDocs<Omit<CategoryListItem, 'productCount' | 'depth'>>(req, 'categories', {
+        sort: 'order',
+        limit: 500,
+        depth: 1,
+        draft: true,
+        where: whereFrom(filters),
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          status: true,
+          order: true,
+          parent: true,
+          image: true,
+          searchTerms: true,
+          _status: true,
+          updatedAt: true,
+        },
+      }),
+      findDocs<CategoryParent & { searchTerms?: Array<{ term?: string | null }> | null }>(req, 'categories', {
+        sort: 'order',
+        limit: 500,
+        depth: 0,
+        draft: true,
+        select: { id: true, title: true, slug: true, status: true, order: true, parent: true, searchTerms: true },
+      }),
+    ])
+
+    const hierarchyMap = new Map(allResult.docs.map((category) => [String(category.id), category]))
+    const counts = await Promise.all(visibleResult.docs.map((category) => countDocs(req, 'products', { categories: { contains: category.id } } as Where)))
+    const categories: CategoryListItem[] = visibleResult.docs.map((category, index) => ({
+      ...category,
+      productCount: counts[index],
+      depth: hierarchyDepth(category as CategoryParent, hierarchyMap),
+    }))
+
+    let detail: CategoryDetail | null = null
+    let media: CategoryMedia[] = []
+    let relatedProducts: RelatedProduct[] = []
+    let relatedTotal = 0
+
+    if (categoryId) {
+      detail = await selectedDetail(props, categoryId)
+      const [mediaResult, productsResult, productsCount] = await Promise.all([
+        findDocs<CategoryMedia>(req, 'media', {
+          sort: '-updatedAt',
+          limit: 100,
+          depth: 0,
+          select: { id: true, filename: true, url: true, alt: true },
+        }),
+        findDocs<RelatedProduct>(req, 'products', {
+          sort: 'title',
+          limit: 50,
+          depth: 0,
+          draft: true,
+          where: { categories: { contains: categoryId } } as Where,
+          select: { id: true, title: true, code: true, catalogStatus: true, availability: true, _status: true },
+        }),
+        countDocs(req, 'products', { categories: { contains: categoryId } } as Where),
+      ])
+      media = mediaResult.docs
+      relatedProducts = productsResult.docs
+      relatedTotal = productsCount
+      detail.productCount = relatedTotal
+      detail.depth = hierarchyDepth(detail, hierarchyMap)
+    }
+
+    const termSuggestions = allResult.docs
+      .flatMap((category) => category.searchTerms || [])
+      .map((item) => item.term?.trim() || '')
+      .filter(Boolean)
+      .filter((term, index, terms) => terms.findIndex((candidate) => candidate.toLocaleLowerCase('pt-BR') === term.toLocaleLowerCase('pt-BR')) === index)
+      .sort((left, right) => left.localeCompare(right, 'pt-BR'))
 
     return <ViewFrame props={props}>
-      <PageHeader eyebrow="Catálogo" title="Categorias" subtitle="Estrutura editorial do catálogo, sem duplicar informações dos produtos." actions={<TechnicalLink href="/admin/collections/categories/create" primary>Nova categoria</TechnicalLink>} />
-      <section className="esmera-card"><div className="esmera-card-header"><h2>Estrutura de categorias</h2><span className="esmera-pill">{result.totalDocs} registros</span></div>{result.docs.length ? <ul className="esmera-list">{result.docs.map((category) => <li className="esmera-list-row" key={String(category.id)}><div><a className="esmera-row-title" href={`/admin/collections/categories/${category.id}`}>{category.title || 'Categoria sem título'}</a><span className="esmera-row-meta">/{category.slug || 'sem-slug'} · ordem {category.order ?? '—'} · {shortDate(category.updatedAt)}</span></div><span className={`esmera-pill ${category.status === 'active' ? 'esmera-pill--green' : ''}`}>{category.status === 'active' ? 'Ativa' : 'Arquivada'}</span></li>)}</ul> : <EmptyState title="Nenhuma categoria" copy="Crie categorias antes de publicar produtos ativos." />}</section>
+      <PageHeader
+        eyebrow="Catálogo"
+        title="Categorias"
+        subtitle="Taxonomia operacional em master-detail. Relações com produtos são derivadas; ordem e hierarquia permanecem governadas pelo Payload."
+        actions={<TechnicalLink href="/admin/collections/categories/create" primary>Nova categoria</TechnicalLink>}
+      />
+      <div className={`esmera-categories-workspace${detail ? ' has-detail' : ''}`}>
+        <CategoriesMasterList categories={categories} allOrderIds={allResult.docs.map((category) => category.id)} filters={filters} selectedId={categoryId} />
+        {detail ? (
+          <CategoryDetailView
+            category={detail}
+            tab={tab}
+            filters={filters}
+            categories={allResult.docs}
+            media={media}
+            termSuggestions={termSuggestions}
+            relatedProducts={relatedProducts}
+            relatedTotal={relatedTotal}
+          />
+        ) : (
+          <section className="esmera-category-detail esmera-category-detail--empty">
+            <span className="esmera-eyebrow">Detalhe</span>
+            <h2>Selecione uma categoria</h2>
+            <p>Abra uma linha para editar taxonomia, SEO, mídia e conferir os produtos relacionados sem sair do workspace.</p>
+          </section>
+        )}
+      </div>
     </ViewFrame>
   } catch (error) {
     return <ViewFrame props={props}><PageHeader title="Categorias" subtitle="Catálogo" /><QueryError title="Não foi possível consultar categorias" error={error} /></ViewFrame>
