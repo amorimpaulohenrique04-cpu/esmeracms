@@ -3,6 +3,13 @@ import type { CollectionConfig } from 'payload'
 import { activeCategoriesOrAuthenticated, siteEditors } from '../access/roles'
 import { seoField, slugify } from '../fields/common'
 
+type RelationValue = string | number | { id?: string | number | null } | null | undefined
+
+function relationId(value: RelationValue) {
+  if (value && typeof value === 'object') return value.id ?? null
+  return value ?? null
+}
+
 export const Categories: CollectionConfig = {
   slug: 'categories',
   trash: true,
@@ -30,6 +37,42 @@ export const Categories: CollectionConfig = {
     beforeValidate: [
       ({ data }) => {
         if (data?.title && !data.slug) data.slug = slugify(String(data.title))
+        return data
+      },
+    ],
+    beforeChange: [
+      async ({ data, originalDoc, req }) => {
+        const currentId = relationId(originalDoc?.id as RelationValue)
+        const parentValue = data?.parent !== undefined ? data.parent : originalDoc?.parent
+        let parentId = relationId(parentValue as RelationValue)
+        if (!parentId) return data
+
+        if (currentId && String(parentId) === String(currentId)) {
+          throw new Error('Uma categoria não pode ser categoria principal de si mesma.')
+        }
+
+        const visited = new Set<string>()
+        while (parentId) {
+          const key = String(parentId)
+          if (visited.has(key)) {
+            throw new Error('A hierarquia selecionada já contém um ciclo de categorias.')
+          }
+          visited.add(key)
+
+          if (currentId && key === String(currentId)) {
+            throw new Error('A categoria principal não pode ser uma descendente desta categoria.')
+          }
+
+          const parent = await req.payload.findByID({
+            collection: 'categories',
+            id: parentId,
+            depth: 0,
+            overrideAccess: false,
+            req,
+          })
+          parentId = relationId(parent?.parent as RelationValue)
+        }
+
         return data
       },
     ],
@@ -75,6 +118,9 @@ export const Categories: CollectionConfig = {
               type: 'relationship',
               relationTo: 'categories',
               label: 'Categoria principal',
+              admin: {
+                description: 'A hierarquia é validada contra autorreferência e ciclos antes de salvar.',
+              },
             },
             {
               name: 'description',
