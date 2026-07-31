@@ -1,0 +1,28 @@
+@use '../../design-system/tokens';
+
+.esmera-sales-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 var(--esmera-space-5);
+  padding: 3px;
+  border: 1px solid var(--esmera-line);
+  border-radius: var(--esmera-radius-control);
+  background: #eef1ef;
+}
+
+.esmera-sales-switch__item {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 6px;
+  color: var(--esmera-muted);
+  font-size: var(--esmera-font-ui-sm);
+  font-weight: 620;
+  text-decoration: none;
+}
+
+.esmera-sales-switch__item:hover { color: var(--esmera-text); }
+.esmera-sales-switch__item.is-active { background: var(--esmera-surface); color: var(--esmera-text); box-shadow: var(--esmera-shadow-min); }
+.esmera-sales-switch__item:focus-visible { outline: 2px solid var(--esmera-focus); outline-offset: 2px; box-shadow: var(--esmera-focus-ring); }
