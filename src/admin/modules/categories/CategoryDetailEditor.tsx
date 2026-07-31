@@ -107,6 +107,15 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
     })
   }
 
+  function addTerm(item: TermItem | null) {
+    if (!item) return
+    const value = (item.creatable || item.value).trim()
+    if (value && !terms.some((term) => term.value.toLocaleLowerCase('pt-BR') === value.toLocaleLowerCase('pt-BR'))) {
+      setTerms([...terms, { id: `${termId(value)}-${Date.now()}`, value }])
+    }
+    setQuery('')
+  }
+
   const currentImage = media.find((item) => String(item.id) === image) || (typeof category.image === 'object' && category.image ? category.image : null)
   const currentImageURL = categoryImageURL(currentImage)
 
@@ -152,36 +161,23 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
 
           <div className="esmera-category-field--wide">
             <label className="esmera-field-label" htmlFor={`category-terms-${category.id}`}>Taxonomia & sinônimos</label>
+            <div className="esmera-category-chips" aria-label="Sinônimos atuais">
+              {terms.map((item) => (
+                <span className="esmera-category-chip" key={item.id}>
+                  <span>{item.value}</span>
+                  <button className="esmera-category-chip-remove" type="button" aria-label={`Remover ${item.value}`} onClick={() => setTerms((current) => current.filter((term) => term.id !== item.id))}>×</button>
+                </span>
+              ))}
+            </div>
             <Combobox.Root
               items={allTermItems}
-              multiple
-              value={terms}
               inputValue={query}
               onInputValueChange={setQuery}
               itemToStringLabel={(item: TermItem) => item.value}
-              onValueChange={(next) => {
-                const creatable = next.find((item) => item.creatable)
-                if (creatable?.creatable) {
-                  const value = creatable.creatable.trim()
-                  if (value && !terms.some((item) => item.value.toLocaleLowerCase('pt-BR') === value.toLocaleLowerCase('pt-BR'))) {
-                    setTerms([...terms, { id: `${termId(value)}-${Date.now()}`, value }])
-                  }
-                  setQuery('')
-                  return
-                }
-                setTerms(next.filter((item) => !item.creatable))
-                setQuery('')
-              }}
+              onValueChange={addTerm}
             >
               <Combobox.InputGroup className="esmera-category-combobox">
-                <Combobox.Chips className="esmera-category-chips">
-                  <Combobox.Value>
-                    {(value: TermItem[]) => <>
-                      {value.map((item) => <Combobox.Chip key={item.id} className="esmera-category-chip" aria-label={item.value}>{item.value}<Combobox.ChipRemove className="esmera-category-chip-remove" aria-label={`Remover ${item.value}`}>×</Combobox.ChipRemove></Combobox.Chip>)}
-                      <Combobox.Input id={`category-terms-${category.id}`} className="esmera-category-combobox-input" placeholder={value.length ? 'Adicionar outro…' : 'Adicionar sinônimo…'} />
-                    </>}
-                  </Combobox.Value>
-                </Combobox.Chips>
+                <Combobox.Input id={`category-terms-${category.id}`} className="esmera-category-combobox-input" placeholder="Adicionar sinônimo…" />
               </Combobox.InputGroup>
               <Combobox.Portal>
                 <Combobox.Positioner className="esmera-combobox-positioner" sideOffset={6}>
@@ -194,7 +190,7 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
                 </Combobox.Positioner>
               </Combobox.Portal>
             </Combobox.Root>
-            <span className="esmera-field-hint">Digite um termo e escolha “Adicionar” para criar um novo sinônimo. Os chips podem ser removidos por teclado.</span>
+            <span className="esmera-field-hint">Digite um termo e escolha “Adicionar” para criar um novo sinônimo. Os chips possuem remoção explícita por teclado.</span>
           </div>
 
           <Field label="Título SEO"><input className="esmera-input" value={seoTitle} maxLength={60} onChange={(event) => setSeoTitle(event.target.value)} /></Field>
