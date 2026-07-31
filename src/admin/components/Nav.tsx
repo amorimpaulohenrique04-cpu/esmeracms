@@ -77,11 +77,15 @@ export function EsmeraNav() {
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
-    try {
-      setCollapsed(window.localStorage.getItem('esmera-nav-collapsed') === '1')
-    } catch {
-      setCollapsed(false)
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        setCollapsed(window.localStorage.getItem('esmera-nav-collapsed') === '1')
+      } catch {
+        // A navegação permanece expandida quando storage não está disponível.
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [])
 
   const toggleCollapsed = () => {
