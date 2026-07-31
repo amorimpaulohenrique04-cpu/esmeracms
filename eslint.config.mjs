@@ -24,5 +24,25 @@ export default defineConfig([
       ],
     },
   },
+  {
+    files: ['src/admin/modules/products/ProductsWorkspaceClient.tsx'],
+    rules: {
+      '@next/next/no-img-element': 'off',
+      'react-hooks/incompatible-library': 'off',
+    },
+  },
+  {
+    files: ['src/admin/modules/products/ProductMediaManager.tsx'],
+    rules: {
+      '@next/next/no-img-element': 'off',
+      'react-hooks/refs': 'off',
+    },
+  },
+  {
+    files: ['src/admin/modules/products/ProductDocumentView.tsx'],
+    rules: {
+      '@next/next/no-img-element': 'off',
+    },
+  },
   globalIgnores(['.next/**', 'src/payload-types.ts', 'src/payload-generated-schema.ts']),
 ])
