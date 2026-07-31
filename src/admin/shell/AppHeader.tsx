@@ -29,11 +29,8 @@ export function AppHeader() {
   const name = user?.name || user?.email?.split('@')[0] || 'Esméra'
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [shortcut, setShortcut] = useState('Ctrl K')
 
   useEffect(() => {
-    setShortcut(/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K')
-
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
@@ -63,7 +60,7 @@ export function AppHeader() {
           <button className="esmera-command-trigger" type="button" onClick={() => setCommandOpen(true)} aria-label="Buscar no CMS">
             <ShellIcon name="search" />
             <span>Buscar no CMS</span>
-            <kbd>{shortcut}</kbd>
+            <kbd>⌘K / Ctrl K</kbd>
           </button>
         </div>
 
