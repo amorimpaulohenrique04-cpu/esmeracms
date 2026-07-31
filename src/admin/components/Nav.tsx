@@ -95,7 +95,7 @@ export function EsmeraNav() {
       <div className="esmera-nav-caption">Admin técnico</div>
       <div className="esmera-nav-section esmera-nav-section--technical">
         {technicalLinks.filter((item) => roleAllows(role, item.area)).map((item) => (
-          <Link className="esmera-nav-link" href={item.href} key={item.href}>
+          <Link className={`esmera-nav-link${isActive(item.href) ? ' is-active' : ''}`} href={item.href} key={item.href}>
             <NavIcon name={item.icon} /><span>{item.label}</span>
           </Link>
         ))}

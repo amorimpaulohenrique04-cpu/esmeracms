@@ -69,6 +69,14 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    categories: Category;
+    products: Product;
+    leads: Lead;
+    customers: Customer;
+    sales: Sale;
+    'after-sales': AfterSale;
+    tasks: Task;
+    activities: Activity;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,17 +86,39 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    categories: CategoriesSelect<false> | CategoriesSelect<true>;
+    products: ProductsSelect<false> | ProductsSelect<true>;
+    leads: LeadsSelect<false> | LeadsSelect<true>;
+    customers: CustomersSelect<false> | CustomersSelect<true>;
+    sales: SalesSelect<false> | SalesSelect<true>;
+    'after-sales': AfterSalesSelect<false> | AfterSalesSelect<true>;
+    tasks: TasksSelect<false> | TasksSelect<true>;
+    activities: ActivitiesSelect<false> | ActivitiesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
   };
   db: {
-    defaultIDType: string;
+    defaultIDType: number;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    home: Home;
+    about: About;
+    contact: Contact;
+    'collection-page': CollectionPage;
+    navigation: Navigation;
+    'site-settings': SiteSetting;
+  };
+  globalsSelect: {
+    home: HomeSelect<false> | HomeSelect<true>;
+    about: AboutSelect<false> | AboutSelect<true>;
+    contact: ContactSelect<false> | ContactSelect<true>;
+    'collection-page': CollectionPageSelect<false> | CollectionPageSelect<true>;
+    navigation: NavigationSelect<false> | NavigationSelect<true>;
+    'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -122,7 +152,12 @@ export interface UserAuthOperations {
  * via the `definition` "users".
  */
 export interface User {
-  id: string;
+  id: number;
+  /**
+   * Controla o acesso às áreas editorial e comercial.
+   */
+  role: 'admin' | 'editor' | 'commercial';
+  name?: string | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -147,8 +182,13 @@ export interface User {
  * via the `definition` "media".
  */
 export interface Media {
-  id: string;
+  id: number;
+  /**
+   * Obrigatório para imagens informativas e acessibilidade.
+   */
   alt: string;
+  caption?: string | null;
+  credit?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -160,13 +200,402 @@ export interface Media {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+  sizes?: {
+    thumb?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    card?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    wide?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "categories".
+ */
+export interface Category {
+  id: number;
+  title: string;
+  slug: string;
+  status: 'active' | 'archive';
+  parent?: (number | null) | Category;
+  description?: string | null;
+  image?: (number | null) | Media;
+  order?: number | null;
+  searchTerms?:
+    | {
+        term: string;
+        id?: string | null;
+      }[]
+    | null;
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+    socialImage?: (number | null) | Media;
+    noIndex?: boolean | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products".
+ */
+export interface Product {
+  id: number;
+  title: string;
+  subtitle?: string | null;
+  slug: string;
+  /**
+   * Identificador interno, como OBJ-021.
+   */
+  code: string;
+  /**
+   * Rascunho/publicação é controlado separadamente pelo workflow do Payload.
+   */
+  catalogStatus: 'active' | 'archive';
+  categories?: (number | Category)[] | null;
+  material?: string | null;
+  description?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Exemplo: peça única, edição de 8 ou numerada.
+   */
+  edition?: string | null;
+  attributes?:
+    | {
+        label: string;
+        value: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * A imagem marcada como Capa é a principal.
+   */
+  gallery?:
+    | {
+        image: number | Media;
+        /**
+         * Exemplo: verde-frente. Usada por variantes.
+         */
+        mediaKey: string;
+        role: 'cover' | 'detail' | 'context' | 'scale';
+        alt: string;
+        id?: string | null;
+      }[]
+    | null;
+  availability: 'unique' | 'available' | 'made_to_order' | 'limited' | 'archive';
+  priceMode: 'fixed' | 'inquiry';
+  /**
+   * Exemplo: R$ 14.900,00 = 1490000.
+   */
+  basePriceCents?: number | null;
+  /**
+   * Cadastre Tamanho, Cor, Kit e seus valores antes das combinações.
+   */
+  optionDefinitions?:
+    | {
+        code: string;
+        label: string;
+        values: {
+          value: string;
+          label: string;
+          swatch?: string | null;
+          id?: string | null;
+        }[];
+        id?: string | null;
+      }[]
+    | null;
+  variants?:
+    | {
+        sku: string;
+        selection?:
+          | {
+              option: string;
+              value: string;
+              id?: string | null;
+            }[]
+          | null;
+        priceMode: 'inherit' | 'fixed' | 'inquiry';
+        priceCents?: number | null;
+        status: 'enabled' | 'disabled';
+        mediaKeys?:
+          | {
+              key: string;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  searchTerms?:
+    | {
+        term: string;
+        id?: string | null;
+      }[]
+    | null;
+  tags?:
+    | {
+        tag: string;
+        id?: string | null;
+      }[]
+    | null;
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+    socialImage?: (number | null) | Media;
+    noIndex?: boolean | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads".
+ */
+export interface Lead {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  source: 'instagram' | 'referral' | 'site' | 'architect' | 'organic' | 'whatsapp' | 'other';
+  stage: 'new' | 'curation' | 'proposal' | 'negotiation' | 'won' | 'lost';
+  owner?: string | null;
+  nextAction?: string | null;
+  nextActionAt?: string | null;
+  closedAt?: string | null;
+  lossReason?: string | null;
+  customer?: (number | null) | Customer;
+  interestCategories?: (number | Category)[] | null;
+  interestedProducts?: (number | Product)[] | null;
+  notes?: string | null;
+  marketingConsent?: boolean | null;
+  consentRecordedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customers".
+ */
+export interface Customer {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  city?: string | null;
+  state?: string | null;
+  sourceLead?: (number | null) | Lead;
+  preferences?:
+    | {
+        value: string;
+        id?: string | null;
+      }[]
+    | null;
+  tags?:
+    | {
+        value: string;
+        id?: string | null;
+      }[]
+    | null;
+  relationshipNotes?: string | null;
+  marketingConsent?: boolean | null;
+  consentRecordedAt?: string | null;
+  dataHandlingNotes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sales".
+ */
+export interface Sale {
+  id: number;
+  number: string;
+  customer: number | Customer;
+  channel: 'whatsapp' | 'instagram' | 'site' | 'referral' | 'architect' | 'other';
+  status: 'draft' | 'proposal' | 'negotiation' | 'confirmed' | 'production' | 'ready' | 'delivered' | 'cancelled';
+  owner?: string | null;
+  confirmedAt?: string | null;
+  nextAction?: string | null;
+  nextActionAt?: string | null;
+  items: {
+    product: number | Product;
+    variantSku?: string | null;
+    /**
+     * Snapshot obrigatório para preservar o histórico.
+     */
+    snapshotTitle: string;
+    snapshotSlug: string;
+    snapshotSelection?: string | null;
+    priceMode: 'fixed' | 'inquiry';
+    unitPriceCents?: number | null;
+    quantity: number;
+    id?: string | null;
+  }[];
+  discountCents?: number | null;
+  shippingCents?: number | null;
+  /**
+   * Snapshot financeiro final da venda.
+   */
+  totalCents?: number | null;
+  expectedDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+  deliveryMode?: ('carrier' | 'pickup' | 'own_delivery') | null;
+  deliveryNotes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "after-sales".
+ */
+export interface AfterSale {
+  id: number;
+  sale: number | Sale;
+  customer: number | Customer;
+  status: 'open' | 'following' | 'resolved' | 'closed';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  owner?: string | null;
+  expectedDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+  deliveryNotes?: string | null;
+  followUps?:
+    | {
+        moment: 'd3' | 'd15' | 'd90' | 'custom';
+        dueAt: string;
+        purpose: 'receipt' | 'satisfaction' | 'testimonial' | 'maintenance' | 'curation' | 'other';
+        status: 'pending' | 'done' | 'cancelled';
+        notes?: string | null;
+        completedAt?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  incidentType?: ('none' | 'damage' | 'adjustment' | 'maintenance' | 'other') | null;
+  incidentDetails?: string | null;
+  resolution?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tasks".
+ */
+export interface Task {
+  id: number;
+  title: string;
+  status: 'pending' | 'in_progress' | 'done' | 'cancelled';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  dueAt: string;
+  assignee?: string | null;
+  relatedTo?:
+    | (
+        | {
+            relationTo: 'leads';
+            value: number | Lead;
+          }
+        | {
+            relationTo: 'customers';
+            value: number | Customer;
+          }
+        | {
+            relationTo: 'sales';
+            value: number | Sale;
+          }
+        | {
+            relationTo: 'after-sales';
+            value: number | AfterSale;
+          }
+      )[]
+    | null;
+  notes?: string | null;
+  completedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activities".
+ */
+export interface Activity {
+  id: number;
+  kind: 'contact' | 'message' | 'proposal' | 'stage_change' | 'note' | 'delivery' | 'follow_up';
+  occurredAt: string;
+  summary: string;
+  details?: string | null;
+  owner?: string | null;
+  relatedTo: (
+    | {
+        relationTo: 'leads';
+        value: number | Lead;
+      }
+    | {
+        relationTo: 'customers';
+        value: number | Customer;
+      }
+    | {
+        relationTo: 'sales';
+        value: number | Sale;
+      }
+    | {
+        relationTo: 'after-sales';
+        value: number | AfterSale;
+      }
+    | {
+        relationTo: 'tasks';
+        value: number | Task;
+      }
+  )[];
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
-  id: string;
+  id: number;
   key: string;
   data:
     | {
@@ -183,20 +612,52 @@ export interface PayloadKv {
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
-  id: string;
+  id: number;
   document?:
     | ({
         relationTo: 'users';
-        value: string | User;
+        value: number | User;
       } | null)
     | ({
         relationTo: 'media';
-        value: string | Media;
+        value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'categories';
+        value: number | Category;
+      } | null)
+    | ({
+        relationTo: 'products';
+        value: number | Product;
+      } | null)
+    | ({
+        relationTo: 'leads';
+        value: number | Lead;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: number | Customer;
+      } | null)
+    | ({
+        relationTo: 'sales';
+        value: number | Sale;
+      } | null)
+    | ({
+        relationTo: 'after-sales';
+        value: number | AfterSale;
+      } | null)
+    | ({
+        relationTo: 'tasks';
+        value: number | Task;
+      } | null)
+    | ({
+        relationTo: 'activities';
+        value: number | Activity;
       } | null);
   globalSlug?: string | null;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   updatedAt: string;
   createdAt: string;
@@ -206,10 +667,10 @@ export interface PayloadLockedDocument {
  * via the `definition` "payload-preferences".
  */
 export interface PayloadPreference {
-  id: string;
+  id: number;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   key?: string | null;
   value?:
@@ -229,7 +690,7 @@ export interface PayloadPreference {
  * via the `definition` "payload-migrations".
  */
 export interface PayloadMigration {
-  id: string;
+  id: number;
   name?: string | null;
   batch?: number | null;
   updatedAt: string;
@@ -240,6 +701,8 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  role?: T;
+  name?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -263,6 +726,8 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  caption?: T;
+  credit?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -274,6 +739,322 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+  sizes?:
+    | T
+    | {
+        thumb?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        card?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        wide?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+      };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "categories_select".
+ */
+export interface CategoriesSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  status?: T;
+  parent?: T;
+  description?: T;
+  image?: T;
+  order?: T;
+  searchTerms?:
+    | T
+    | {
+        term?: T;
+        id?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        socialImage?: T;
+        noIndex?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products_select".
+ */
+export interface ProductsSelect<T extends boolean = true> {
+  title?: T;
+  subtitle?: T;
+  slug?: T;
+  code?: T;
+  catalogStatus?: T;
+  categories?: T;
+  material?: T;
+  description?: T;
+  edition?: T;
+  attributes?:
+    | T
+    | {
+        label?: T;
+        value?: T;
+        id?: T;
+      };
+  gallery?:
+    | T
+    | {
+        image?: T;
+        mediaKey?: T;
+        role?: T;
+        alt?: T;
+        id?: T;
+      };
+  availability?: T;
+  priceMode?: T;
+  basePriceCents?: T;
+  optionDefinitions?:
+    | T
+    | {
+        code?: T;
+        label?: T;
+        values?:
+          | T
+          | {
+              value?: T;
+              label?: T;
+              swatch?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  variants?:
+    | T
+    | {
+        sku?: T;
+        selection?:
+          | T
+          | {
+              option?: T;
+              value?: T;
+              id?: T;
+            };
+        priceMode?: T;
+        priceCents?: T;
+        status?: T;
+        mediaKeys?:
+          | T
+          | {
+              key?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  searchTerms?:
+    | T
+    | {
+        term?: T;
+        id?: T;
+      };
+  tags?:
+    | T
+    | {
+        tag?: T;
+        id?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        socialImage?: T;
+        noIndex?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads_select".
+ */
+export interface LeadsSelect<T extends boolean = true> {
+  name?: T;
+  phone?: T;
+  email?: T;
+  source?: T;
+  stage?: T;
+  owner?: T;
+  nextAction?: T;
+  nextActionAt?: T;
+  closedAt?: T;
+  lossReason?: T;
+  customer?: T;
+  interestCategories?: T;
+  interestedProducts?: T;
+  notes?: T;
+  marketingConsent?: T;
+  consentRecordedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customers_select".
+ */
+export interface CustomersSelect<T extends boolean = true> {
+  name?: T;
+  phone?: T;
+  email?: T;
+  city?: T;
+  state?: T;
+  sourceLead?: T;
+  preferences?:
+    | T
+    | {
+        value?: T;
+        id?: T;
+      };
+  tags?:
+    | T
+    | {
+        value?: T;
+        id?: T;
+      };
+  relationshipNotes?: T;
+  marketingConsent?: T;
+  consentRecordedAt?: T;
+  dataHandlingNotes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sales_select".
+ */
+export interface SalesSelect<T extends boolean = true> {
+  number?: T;
+  customer?: T;
+  channel?: T;
+  status?: T;
+  owner?: T;
+  confirmedAt?: T;
+  nextAction?: T;
+  nextActionAt?: T;
+  items?:
+    | T
+    | {
+        product?: T;
+        variantSku?: T;
+        snapshotTitle?: T;
+        snapshotSlug?: T;
+        snapshotSelection?: T;
+        priceMode?: T;
+        unitPriceCents?: T;
+        quantity?: T;
+        id?: T;
+      };
+  discountCents?: T;
+  shippingCents?: T;
+  totalCents?: T;
+  expectedDeliveryAt?: T;
+  deliveredAt?: T;
+  deliveryMode?: T;
+  deliveryNotes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "after-sales_select".
+ */
+export interface AfterSalesSelect<T extends boolean = true> {
+  sale?: T;
+  customer?: T;
+  status?: T;
+  priority?: T;
+  owner?: T;
+  expectedDeliveryAt?: T;
+  deliveredAt?: T;
+  deliveryNotes?: T;
+  followUps?:
+    | T
+    | {
+        moment?: T;
+        dueAt?: T;
+        purpose?: T;
+        status?: T;
+        notes?: T;
+        completedAt?: T;
+        id?: T;
+      };
+  incidentType?: T;
+  incidentDetails?: T;
+  resolution?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tasks_select".
+ */
+export interface TasksSelect<T extends boolean = true> {
+  title?: T;
+  status?: T;
+  priority?: T;
+  dueAt?: T;
+  assignee?: T;
+  relatedTo?: T;
+  notes?: T;
+  completedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activities_select".
+ */
+export interface ActivitiesSelect<T extends boolean = true> {
+  kind?: T;
+  occurredAt?: T;
+  summary?: T;
+  details?: T;
+  owner?: T;
+  relatedTo?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -314,6 +1095,768 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "home".
+ */
+export interface Home {
+  id: number;
+  heroMode: 'single' | 'carousel';
+  heroSlides: {
+    desktopImage: {
+      image: number | Media;
+      /**
+       * Descreva a imagem para pessoas que usam leitores de tela.
+       */
+      alt: string;
+      caption?: string | null;
+    };
+    mobileImage: {
+      image: number | Media;
+      /**
+       * Descreva a imagem para pessoas que usam leitores de tela.
+       */
+      alt: string;
+      caption?: string | null;
+    };
+    statement: string;
+    callToAction?: {
+      label?: string | null;
+      destinationType?: ('internal' | 'external' | 'whatsapp') | null;
+      /**
+       * Exemplo: /colecao
+       */
+      path?: string | null;
+      url?: string | null;
+    };
+    active?: boolean | null;
+    id?: string | null;
+  }[];
+  autoplay?: boolean | null;
+  autoplaySeconds?: number | null;
+  manifestoEyebrow?: string | null;
+  manifestoTitle: string;
+  manifestoCopy?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  manifestoPrimaryImage?: {
+    image?: (number | null) | Media;
+    /**
+     * Descreva a imagem para pessoas que usam leitores de tela.
+     */
+    alt?: string | null;
+    caption?: string | null;
+  };
+  manifestoSecondaryImage?: {
+    image?: (number | null) | Media;
+    /**
+     * Descreva a imagem para pessoas que usam leitores de tela.
+     */
+    alt?: string | null;
+    caption?: string | null;
+  };
+  /**
+   * Nenhum dado do produto é copiado aqui.
+   */
+  selectedProducts: (number | Product)[];
+  matterPanels?:
+    | {
+        category: number | Category;
+        image: {
+          image: number | Media;
+          /**
+           * Descreva a imagem para pessoas que usam leitores de tela.
+           */
+          alt: string;
+          caption?: string | null;
+        };
+        eyebrow?: string | null;
+        headline: string;
+        copy?: string | null;
+        callToAction?: {
+          label?: string | null;
+          destinationType?: ('internal' | 'external' | 'whatsapp') | null;
+          /**
+           * Exemplo: /colecao
+           */
+          path?: string | null;
+          url?: string | null;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  signatureSlides?:
+    | {
+        product: number | Product;
+        eyebrow?: string | null;
+        headline?: string | null;
+        copy?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  provenanceTitle?: string | null;
+  provenanceCopy?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  provenanceImage?: {
+    image?: (number | null) | Media;
+    /**
+     * Descreva a imagem para pessoas que usam leitores de tela.
+     */
+    alt?: string | null;
+    caption?: string | null;
+  };
+  provenanceSteps?:
+    | {
+        title: string;
+        copy?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  provenanceCallToAction?: {
+    label?: string | null;
+    destinationType?: ('internal' | 'external' | 'whatsapp') | null;
+    /**
+     * Exemplo: /colecao
+     */
+    path?: string | null;
+    url?: string | null;
+  };
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+    socialImage?: (number | null) | Media;
+    noIndex?: boolean | null;
+  };
+  _status?: ('draft' | 'published') | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "about".
+ */
+export interface About {
+  id: number;
+  title: string;
+  intro?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  heroImage?: {
+    image?: (number | null) | Media;
+    /**
+     * Descreva a imagem para pessoas que usam leitores de tela.
+     */
+    alt?: string | null;
+    caption?: string | null;
+  };
+  maisonTitle?: string | null;
+  maisonCopy?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  maisonImage?: {
+    image?: (number | null) | Media;
+    /**
+     * Descreva a imagem para pessoas que usam leitores de tela.
+     */
+    alt?: string | null;
+    caption?: string | null;
+  };
+  visionTitle?: string | null;
+  visionCopy?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  visionImage?: {
+    image?: (number | null) | Media;
+    /**
+     * Descreva a imagem para pessoas que usam leitores de tela.
+     */
+    alt?: string | null;
+    caption?: string | null;
+  };
+  provenanceTitle?: string | null;
+  provenanceCopy?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  provenanceImage?: {
+    image?: (number | null) | Media;
+    /**
+     * Descreva a imagem para pessoas que usam leitores de tela.
+     */
+    alt?: string | null;
+    caption?: string | null;
+  };
+  callToAction?: {
+    label?: string | null;
+    destinationType?: ('internal' | 'external' | 'whatsapp') | null;
+    /**
+     * Exemplo: /colecao
+     */
+    path?: string | null;
+    url?: string | null;
+  };
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+    socialImage?: (number | null) | Media;
+    noIndex?: boolean | null;
+  };
+  _status?: ('draft' | 'published') | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contact".
+ */
+export interface Contact {
+  id: number;
+  title: string;
+  intro?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  useOfficialChannels?: boolean | null;
+  channels?:
+    | {
+        label: string;
+        kind: 'instagram' | 'email' | 'phone' | 'whatsapp' | 'website' | 'other';
+        value: string;
+        url?: string | null;
+        active?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  serviceHours?: string | null;
+  callToAction?: {
+    label?: string | null;
+    destinationType?: ('internal' | 'external' | 'whatsapp') | null;
+    /**
+     * Exemplo: /colecao
+     */
+    path?: string | null;
+    url?: string | null;
+  };
+  image?: {
+    image?: (number | null) | Media;
+    /**
+     * Descreva a imagem para pessoas que usam leitores de tela.
+     */
+    alt?: string | null;
+    caption?: string | null;
+  };
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+    socialImage?: (number | null) | Media;
+    noIndex?: boolean | null;
+  };
+  _status?: ('draft' | 'published') | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-page".
+ */
+export interface CollectionPage {
+  id: number;
+  title: string;
+  intro?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  visibleFilters?: ('category' | 'material' | 'availability' | 'price')[] | null;
+  allLabel?: string | null;
+  inquiryLabel?: string | null;
+  emptyStateTitle: string;
+  emptyStateCopy?: string | null;
+  emptyStateCallToAction?: {
+    label?: string | null;
+    destinationType?: ('internal' | 'external' | 'whatsapp') | null;
+    /**
+     * Exemplo: /colecao
+     */
+    path?: string | null;
+    url?: string | null;
+  };
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+    socialImage?: (number | null) | Media;
+    noIndex?: boolean | null;
+  };
+  _status?: ('draft' | 'published') | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "navigation".
+ */
+export interface Navigation {
+  id: number;
+  mainLinks: {
+    label: string;
+    path: string;
+    active?: boolean | null;
+    id?: string | null;
+  }[];
+  categoryLinks?: (number | Category)[] | null;
+  utilityLinks?:
+    | {
+        label: string;
+        path: string;
+        active?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  _status?: ('draft' | 'published') | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings".
+ */
+export interface SiteSetting {
+  id: number;
+  siteName?: string | null;
+  defaultSeoTitle?: string | null;
+  defaultSeoDescription?: string | null;
+  officialChannels?:
+    | {
+        label: string;
+        kind: 'instagram' | 'email' | 'phone' | 'whatsapp' | 'website' | 'other';
+        value: string;
+        url?: string | null;
+        active?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Exemplo: https://esmera.com.br
+   */
+  frontendURL?: string | null;
+  /**
+   * Apenas sinaliza integração real. O CMS não inventa métricas de tráfego.
+   */
+  analyticsConfigured?: boolean | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "home_select".
+ */
+export interface HomeSelect<T extends boolean = true> {
+  heroMode?: T;
+  heroSlides?:
+    | T
+    | {
+        desktopImage?:
+          | T
+          | {
+              image?: T;
+              alt?: T;
+              caption?: T;
+            };
+        mobileImage?:
+          | T
+          | {
+              image?: T;
+              alt?: T;
+              caption?: T;
+            };
+        statement?: T;
+        callToAction?:
+          | T
+          | {
+              label?: T;
+              destinationType?: T;
+              path?: T;
+              url?: T;
+            };
+        active?: T;
+        id?: T;
+      };
+  autoplay?: T;
+  autoplaySeconds?: T;
+  manifestoEyebrow?: T;
+  manifestoTitle?: T;
+  manifestoCopy?: T;
+  manifestoPrimaryImage?:
+    | T
+    | {
+        image?: T;
+        alt?: T;
+        caption?: T;
+      };
+  manifestoSecondaryImage?:
+    | T
+    | {
+        image?: T;
+        alt?: T;
+        caption?: T;
+      };
+  selectedProducts?: T;
+  matterPanels?:
+    | T
+    | {
+        category?: T;
+        image?:
+          | T
+          | {
+              image?: T;
+              alt?: T;
+              caption?: T;
+            };
+        eyebrow?: T;
+        headline?: T;
+        copy?: T;
+        callToAction?:
+          | T
+          | {
+              label?: T;
+              destinationType?: T;
+              path?: T;
+              url?: T;
+            };
+        id?: T;
+      };
+  signatureSlides?:
+    | T
+    | {
+        product?: T;
+        eyebrow?: T;
+        headline?: T;
+        copy?: T;
+        id?: T;
+      };
+  provenanceTitle?: T;
+  provenanceCopy?: T;
+  provenanceImage?:
+    | T
+    | {
+        image?: T;
+        alt?: T;
+        caption?: T;
+      };
+  provenanceSteps?:
+    | T
+    | {
+        title?: T;
+        copy?: T;
+        id?: T;
+      };
+  provenanceCallToAction?:
+    | T
+    | {
+        label?: T;
+        destinationType?: T;
+        path?: T;
+        url?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        socialImage?: T;
+        noIndex?: T;
+      };
+  _status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "about_select".
+ */
+export interface AboutSelect<T extends boolean = true> {
+  title?: T;
+  intro?: T;
+  heroImage?:
+    | T
+    | {
+        image?: T;
+        alt?: T;
+        caption?: T;
+      };
+  maisonTitle?: T;
+  maisonCopy?: T;
+  maisonImage?:
+    | T
+    | {
+        image?: T;
+        alt?: T;
+        caption?: T;
+      };
+  visionTitle?: T;
+  visionCopy?: T;
+  visionImage?:
+    | T
+    | {
+        image?: T;
+        alt?: T;
+        caption?: T;
+      };
+  provenanceTitle?: T;
+  provenanceCopy?: T;
+  provenanceImage?:
+    | T
+    | {
+        image?: T;
+        alt?: T;
+        caption?: T;
+      };
+  callToAction?:
+    | T
+    | {
+        label?: T;
+        destinationType?: T;
+        path?: T;
+        url?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        socialImage?: T;
+        noIndex?: T;
+      };
+  _status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contact_select".
+ */
+export interface ContactSelect<T extends boolean = true> {
+  title?: T;
+  intro?: T;
+  useOfficialChannels?: T;
+  channels?:
+    | T
+    | {
+        label?: T;
+        kind?: T;
+        value?: T;
+        url?: T;
+        active?: T;
+        id?: T;
+      };
+  serviceHours?: T;
+  callToAction?:
+    | T
+    | {
+        label?: T;
+        destinationType?: T;
+        path?: T;
+        url?: T;
+      };
+  image?:
+    | T
+    | {
+        image?: T;
+        alt?: T;
+        caption?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        socialImage?: T;
+        noIndex?: T;
+      };
+  _status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-page_select".
+ */
+export interface CollectionPageSelect<T extends boolean = true> {
+  title?: T;
+  intro?: T;
+  visibleFilters?: T;
+  allLabel?: T;
+  inquiryLabel?: T;
+  emptyStateTitle?: T;
+  emptyStateCopy?: T;
+  emptyStateCallToAction?:
+    | T
+    | {
+        label?: T;
+        destinationType?: T;
+        path?: T;
+        url?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        socialImage?: T;
+        noIndex?: T;
+      };
+  _status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "navigation_select".
+ */
+export interface NavigationSelect<T extends boolean = true> {
+  mainLinks?:
+    | T
+    | {
+        label?: T;
+        path?: T;
+        active?: T;
+        id?: T;
+      };
+  categoryLinks?: T;
+  utilityLinks?:
+    | T
+    | {
+        label?: T;
+        path?: T;
+        active?: T;
+        id?: T;
+      };
+  _status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings_select".
+ */
+export interface SiteSettingsSelect<T extends boolean = true> {
+  siteName?: T;
+  defaultSeoTitle?: T;
+  defaultSeoDescription?: T;
+  officialChannels?:
+    | T
+    | {
+        label?: T;
+        kind?: T;
+        value?: T;
+        url?: T;
+        active?: T;
+        id?: T;
+      };
+  frontendURL?: T;
+  analyticsConfigured?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

@@ -1,9 +1,11 @@
+/* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
 import type { AdminViewServerProps, Where } from 'payload'
 import { eligibleSaleStatuses } from '../../collections/Sales'
 import {
   AccessDenied,
   EmptyState,
   ensureUser,
+  findAllDocs,
   findDocs,
   money,
   monthStartISO,
@@ -44,7 +46,12 @@ export async function CustomersView(props: AdminViewServerProps) {
   const { allowed } = ensureUser(props, 'business')
   if (!allowed) return <AccessDenied props={props} area="comercial" />
   try {
-    const result = await findDocs<Customer>(props.initPageResult.req, 'customers', { sort: '-updatedAt', limit: 200, depth: 0 })
+    const result = await findDocs<Customer>(props.initPageResult.req, 'customers', {
+      sort: '-updatedAt',
+      limit: 100,
+      depth: 0,
+      select: { id: true, name: true, phone: true, email: true, city: true, state: true, updatedAt: true },
+    })
     return <ViewFrame props={props}>
       <PageHeader eyebrow="Business" title="Clientes" subtitle="Relacionamento, preferências e histórico comercial em uma fonte autenticada." actions={<TechnicalLink href="/admin/collections/customers/create" primary>Novo cliente</TechnicalLink>} />
       <section className="esmera-card"><div className="esmera-card-header"><h2>Base de clientes</h2><span className="esmera-pill esmera-pill--green">{result.totalDocs} clientes</span></div>{result.docs.length ? <ul className="esmera-list">{result.docs.map((customer) => <li className="esmera-list-row" key={String(customer.id)}><div><a className="esmera-row-title" href={`/admin/collections/customers/${customer.id}`}>{customer.name || 'Cliente sem nome'}</a><span className="esmera-row-meta">{customer.phone || customer.email || 'Sem contato'} · {[customer.city, customer.state].filter(Boolean).join(' / ') || 'Local não informado'}</span></div><span className="esmera-pill">{shortDate(customer.updatedAt)}</span></li>)}</ul> : <EmptyState title="Nenhum cliente" copy="A consulta foi concluída e a base ainda está vazia." />}</section>
@@ -56,7 +63,20 @@ export async function SalesView(props: AdminViewServerProps) {
   const { allowed } = ensureUser(props, 'business')
   if (!allowed) return <AccessDenied props={props} area="comercial" />
   try {
-    const result = await findDocs<Sale>(props.initPageResult.req, 'sales', { sort: '-createdAt', limit: 200, depth: 1 })
+    const result = await findDocs<Sale>(props.initPageResult.req, 'sales', {
+      sort: '-createdAt',
+      limit: 100,
+      depth: 1,
+      select: {
+        id: true,
+        number: true,
+        status: true,
+        totalCents: true,
+        channel: true,
+        customer: true,
+        expectedDeliveryAt: true,
+      },
+    })
     return <ViewFrame props={props}>
       <PageHeader eyebrow="Business" title="Vendas" subtitle="Pedidos, valores registrados e entrega. Rascunhos e cancelamentos não entram nas métricas de receita." actions={<TechnicalLink href="/admin/collections/sales/create" primary>Nova venda</TechnicalLink>} />
       <section className="esmera-card"><div className="esmera-card-header"><h2>Vendas</h2><span className="esmera-pill">{result.totalDocs} registros</span></div>{result.docs.length ? <ul className="esmera-list">{result.docs.map((sale) => <li className="esmera-list-row" key={String(sale.id)}><div><a className="esmera-row-title" href={`/admin/collections/sales/${sale.id}`}>Venda #{sale.number || '—'} · {customerName(sale.customer)}</a><span className="esmera-row-meta">{channelLabels[sale.channel || ''] || sale.channel || 'canal não informado'} · entrega {shortDate(sale.expectedDeliveryAt)}</span></div><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><span className={`esmera-pill ${eligibleSaleStatuses.includes((sale.status || '') as typeof eligibleSaleStatuses[number]) ? 'esmera-pill--green' : sale.status === 'cancelled' ? 'esmera-pill--red' : 'esmera-pill--sand'}`}>{sale.status || '—'}</span><strong style={{ fontSize: 12 }}>{money(sale.totalCents)}</strong></div></li>)}</ul> : <EmptyState title="Nenhuma venda" copy="A consulta foi concluída e ainda não existem vendas." />}</section>
@@ -68,7 +88,13 @@ export async function PipelineView(props: AdminViewServerProps) {
   const { allowed } = ensureUser(props, 'business')
   if (!allowed) return <AccessDenied props={props} area="comercial" />
   try {
-    const result = await findDocs<Lead>(props.initPageResult.req, 'leads', { where: { stage: { in: ['new', 'curation', 'proposal', 'negotiation', 'won'] } } as Where, sort: 'nextActionAt', limit: 500, depth: 0 })
+    const result = await findDocs<Lead>(props.initPageResult.req, 'leads', {
+      where: { stage: { in: ['new', 'curation', 'proposal', 'negotiation', 'won'] } } as Where,
+      sort: 'nextActionAt',
+      limit: 200,
+      depth: 0,
+      select: { id: true, name: true, stage: true, nextAction: true, nextActionAt: true },
+    })
     const stages = ['new', 'curation', 'proposal', 'negotiation', 'won']
     return <ViewFrame props={props}>
       <PageHeader eyebrow="Business" title="Pipeline comercial" subtitle="Etapas reais dos leads. O quadro não contém cards demonstrativos." actions={<TechnicalLink href="/admin/collections/leads/create" primary>Novo lead</TechnicalLink>} />
@@ -87,15 +113,29 @@ export async function AfterSalesView(props: AdminViewServerProps) {
   const { allowed } = ensureUser(props, 'business')
   if (!allowed) return <AccessDenied props={props} area="comercial" />
   try {
-    const result = await findDocs<AfterSale>(props.initPageResult.req, 'after-sales', { sort: '-updatedAt', limit: 300, depth: 1 })
+    const allCases = await findAllDocs<AfterSale>(props.initPageResult.req, 'after-sales', {
+      sort: '-updatedAt',
+      depth: 1,
+      select: {
+        id: true,
+        status: true,
+        priority: true,
+        customer: true,
+        followUps: true,
+        deliveredAt: true,
+        incidentType: true,
+      },
+    })
+    const visibleCases = allCases.slice(0, 100)
+    const result = { docs: visibleCases, totalDocs: allCases.length }
     const now = new Date()
     const dateKey = (value: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(value)
     const today = dateKey(now)
-    const followups = result.docs.flatMap((item) => item.followUps || [])
+    const followups = allCases.flatMap((item) => item.followUps || [])
     const todayCount = followups.filter((follow) => follow.status === 'pending' && follow.dueAt && dateKey(new Date(follow.dueAt)) === today).length
     const overdue = followups.filter((follow) => follow.status === 'pending' && follow.dueAt && new Date(follow.dueAt) < now).length
-    const incidents = result.docs.filter((item) => item.incidentType && item.incidentType !== 'none' && !['resolved', 'closed'].includes(item.status || '')).length
-    const deliveries = result.docs.filter((item) => !item.deliveredAt && !['resolved', 'closed'].includes(item.status || '')).length
+    const incidents = allCases.filter((item) => item.incidentType && item.incidentType !== 'none' && !['resolved', 'closed'].includes(item.status || '')).length
+    const deliveries = allCases.filter((item) => !item.deliveredAt && !['resolved', 'closed'].includes(item.status || '')).length
     return <ViewFrame props={props}>
       <PageHeader eyebrow="Business" title="Pós-venda" subtitle="Entregas, follow-ups e ocorrências com contagens semânticas explícitas." actions={<TechnicalLink href="/admin/collections/after-sales/create" primary>Novo acompanhamento</TechnicalLink>} />
       <div className="esmera-metric-grid">
@@ -115,11 +155,36 @@ export async function ReportsView(props: AdminViewServerProps) {
   try {
     const req = props.initPageResult.req
     const from = monthStartISO()
-    const [leadResult, closedLeadResult, saleResult] = await Promise.all([
-      findDocs<Lead>(req, 'leads', { where: { createdAt: { greater_than_equal: from } } as Where, limit: 1000, depth: 0 }),
-      findDocs<Lead>(req, 'leads', { where: { and: [{ closedAt: { greater_than_equal: from } }, { stage: { in: ['won', 'lost'] } }] } as Where, limit: 1000, depth: 0 }),
-      findDocs<Sale>(req, 'sales', { where: { and: [{ confirmedAt: { greater_than_equal: from } }, { status: { in: [...eligibleSaleStatuses] } }] } as Where, limit: 1000, depth: 0 }),
+    const [leadDocs, closedLeadDocs, saleDocs] = await Promise.all([
+      findAllDocs<Lead>(req, 'leads', {
+        where: { createdAt: { greater_than_equal: from } } as Where,
+        depth: 0,
+        select: { id: true, source: true },
+      }),
+      findAllDocs<Lead>(req, 'leads', {
+        where: {
+          and: [
+            { closedAt: { greater_than_equal: from } },
+            { stage: { in: ['won', 'lost'] } },
+          ],
+        } as Where,
+        depth: 0,
+        select: { id: true, stage: true },
+      }),
+      findAllDocs<Sale>(req, 'sales', {
+        where: {
+          and: [
+            { confirmedAt: { greater_than_equal: from } },
+            { status: { in: [...eligibleSaleStatuses] } },
+          ],
+        } as Where,
+        depth: 0,
+        select: { id: true, totalCents: true, channel: true },
+      }),
     ])
+    const leadResult = { docs: leadDocs, totalDocs: leadDocs.length }
+    const closedLeadResult = { docs: closedLeadDocs, totalDocs: closedLeadDocs.length }
+    const saleResult = { docs: saleDocs, totalDocs: saleDocs.length }
     const revenue = saleResult.docs.reduce((sum, sale) => sum + (sale.totalCents || 0), 0)
     const won = closedLeadResult.docs.filter((lead) => lead.stage === 'won').length
     const lost = closedLeadResult.docs.filter((lead) => lead.stage === 'lost').length

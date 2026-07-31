@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
 import type { AdminViewServerProps, Where } from 'payload'
 import {
   AccessDenied,
@@ -37,7 +38,19 @@ export async function ContentView(props: AdminViewServerProps) {
   if (!allowed) return <AccessDenied props={props} area="editorial" />
   try {
     const req = props.initPageResult.req
-    const drafts = await findDocs<Product>(req, 'products', { where: { _status: { equals: 'draft' } } as Where, limit: 500, depth: 0, draft: true })
+    const drafts = await findDocs<Product>(req, 'products', {
+      where: { _status: { equals: 'draft' } } as Where,
+      limit: 200,
+      depth: 0,
+      draft: true,
+      select: {
+        id: true,
+        title: true,
+        code: true,
+        categories: true,
+        gallery: true,
+      },
+    })
     const qualityIssues = drafts.docs.filter((product) => !product.title || !product.code || !product.categories?.length || !product.gallery?.length)
     const pages = [
       ['Home', 'Hero, manifesto, seleção, Matter e Signature', '/admin/globals/home'],
@@ -70,7 +83,20 @@ export async function ProductsView(props: AdminViewServerProps) {
   const { allowed } = ensureUser(props, 'site')
   if (!allowed) return <AccessDenied props={props} area="editorial" />
   try {
-    const result = await findDocs<Product>(props.initPageResult.req, 'products', { sort: '-updatedAt', limit: 200, depth: 1 })
+    const result = await findDocs<Product>(props.initPageResult.req, 'products', {
+      sort: '-updatedAt',
+      limit: 100,
+      depth: 0,
+      select: {
+        id: true,
+        title: true,
+        code: true,
+        catalogStatus: true,
+        availability: true,
+        _status: true,
+        updatedAt: true,
+      },
+    })
     return <ViewFrame props={props}>
       <PageHeader eyebrow="Catálogo" title="Produtos" subtitle="Catálogo operacional. Os formulários completos, drafts e versões ficam no Admin técnico." actions={<TechnicalLink href="/admin/collections/products/create" primary>Novo produto</TechnicalLink>} />
       <section className="esmera-card"><div className="esmera-card-header"><h2>Catálogo</h2><span className="esmera-pill esmera-pill--green">{result.totalDocs} registros</span></div>{result.docs.length ? <ul className="esmera-list">{result.docs.map((product) => <li className="esmera-list-row" key={String(product.id)}><div><a className="esmera-row-title" href={`/admin/collections/products/${product.id}`}>{product.title || 'Produto sem título'}</a><span className="esmera-row-meta">{product.code || 'Sem código'} · {product.availability || 'sem disponibilidade'} · atualizado {shortDate(product.updatedAt)}</span></div><div style={{ display: 'flex', gap: 6 }}><span className={`esmera-pill ${product.catalogStatus === 'active' ? 'esmera-pill--green' : ''}`}>{product.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</span><span className="esmera-pill">{product._status === 'published' ? 'Publicado' : 'Rascunho'}</span></div></li>)}</ul> : <EmptyState title="Nenhum produto" copy="Crie o primeiro produto para iniciar o catálogo." />}</section>
@@ -82,7 +108,19 @@ export async function CategoriesView(props: AdminViewServerProps) {
   const { allowed } = ensureUser(props, 'site')
   if (!allowed) return <AccessDenied props={props} area="editorial" />
   try {
-    const result = await findDocs<Category>(props.initPageResult.req, 'categories', { sort: 'order', limit: 200, depth: 1 })
+    const result = await findDocs<Category>(props.initPageResult.req, 'categories', {
+      sort: 'order',
+      limit: 100,
+      depth: 0,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        status: true,
+        order: true,
+        updatedAt: true,
+      },
+    })
     return <ViewFrame props={props}>
       <PageHeader eyebrow="Catálogo" title="Categorias" subtitle="Estrutura editorial do catálogo, sem duplicar informações dos produtos." actions={<TechnicalLink href="/admin/collections/categories/create" primary>Nova categoria</TechnicalLink>} />
       <section className="esmera-card"><div className="esmera-card-header"><h2>Estrutura de categorias</h2><span className="esmera-pill">{result.totalDocs} registros</span></div>{result.docs.length ? <ul className="esmera-list">{result.docs.map((category) => <li className="esmera-list-row" key={String(category.id)}><div><a className="esmera-row-title" href={`/admin/collections/categories/${category.id}`}>{category.title || 'Categoria sem título'}</a><span className="esmera-row-meta">/{category.slug || 'sem-slug'} · ordem {category.order ?? '—'} · {shortDate(category.updatedAt)}</span></div><span className={`esmera-pill ${category.status === 'active' ? 'esmera-pill--green' : ''}`}>{category.status === 'active' ? 'Ativa' : 'Arquivada'}</span></li>)}</ul> : <EmptyState title="Nenhuma categoria" copy="Crie categorias antes de publicar produtos ativos." />}</section>

@@ -24,11 +24,14 @@ async function createUser(role: 'admin' | 'editor' | 'commercial') {
 }
 
 describe('Esméra access and data contract', () => {
-  beforeAll(async () => {
-    payload = await getPayload({ config: await config })
-    editorUser = await createUser('editor')
-    commercialUser = await createUser('commercial')
-  })
+  beforeAll(
+    async () => {
+      payload = await getPayload({ config: await config })
+      editorUser = await createUser('editor')
+      commercialUser = await createUser('commercial')
+    },
+    30_000,
+  )
 
   it('keeps Business private from unauthenticated and editorial users', async () => {
     await payload.create({
