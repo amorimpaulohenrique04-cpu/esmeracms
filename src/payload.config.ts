@@ -6,7 +6,7 @@ import { pt } from 'payload/i18n/pt'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
-import { enforceActiveProductCategories } from './businessRules/products/categoryValidity'
+import { withActiveProductCategoryValidity } from './businessRules/products/categoryValidity'
 import { Activities } from './collections/Activities'
 import { AfterSales } from './collections/AfterSales'
 import { Categories } from './collections/Categories'
@@ -31,10 +31,7 @@ const OperationalProducts = {
   ...Products,
   hooks: {
     ...Products.hooks,
-    beforeValidate: [
-      enforceActiveProductCategories,
-      ...(Products.hooks?.beforeValidate || []),
-    ],
+    beforeValidate: [withActiveProductCategoryValidity(Products.hooks?.beforeValidate || [])],
   },
 } satisfies CollectionConfig
 
