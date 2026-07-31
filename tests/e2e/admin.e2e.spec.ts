@@ -99,6 +99,32 @@ test.describe('Admin Panel', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
   })
 
+  test('keeps every operational workspace inside the document viewport on tablet and mobile', async () => {
+    const routes = [
+      '/admin',
+      '/admin/products',
+      '/admin/categories',
+      '/admin/customers',
+      '/admin/sales?view=list',
+      '/admin/sales?view=pipeline',
+      '/admin/after-sales',
+      '/admin/reports',
+      '/admin/settings',
+    ]
+
+    for (const viewport of [{ width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport)
+      for (const route of routes) {
+        await page.goto(`http://localhost:3000${route}`)
+        await expect(page.locator('.esmera-view')).toBeVisible()
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+        expect(overflow, `${route} should not create document-level horizontal overflow at ${viewport.width}px`).toBeLessThanOrEqual(1)
+      }
+    }
+
+    await page.setViewportSize({ width: 1440, height: 900 })
+  })
+
   test('can navigate to the technical users list', async () => {
     await page.goto('http://localhost:3000/admin/collections/users')
     await expect(page).toHaveURL('http://localhost:3000/admin/collections/users')
