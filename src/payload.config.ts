@@ -43,6 +43,7 @@ export default buildConfig({
     },
     components: {
       Nav: '/admin/components/Nav#EsmeraNav',
+      header: ['/admin/shell/AppHeader#AppHeader'],
       graphics: {
         Icon: '/admin/components/Brand#EsmeraIcon',
         Logo: '/admin/components/Brand#EsmeraLogo',
@@ -50,10 +51,6 @@ export default buildConfig({
       views: {
         dashboard: {
           Component: '/admin/modules/dashboard/DashboardView',
-        },
-        content: {
-          Component: '/admin/modules/content/ContentView#ContentView',
-          path: '/content',
         },
         products: {
           Component: '/admin/modules/products/ProductsView#ProductsView',
@@ -68,11 +65,11 @@ export default buildConfig({
           path: '/customers',
         },
         sales: {
-          Component: '/admin/modules/sales/SalesViews#SalesView',
+          Component: '/admin/modules/sales/SalesViews#SalesWorkspace',
           path: '/sales',
         },
-        pipeline: {
-          Component: '/admin/modules/sales/SalesViews#PipelineView',
+        pipelineRedirect: {
+          Component: '/admin/modules/sales/SalesViews#PipelineRedirect',
           path: '/pipeline',
         },
         afterSales: {
