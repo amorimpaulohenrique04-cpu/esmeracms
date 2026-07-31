@@ -39,7 +39,6 @@ export const enforceActiveProductCategories: CollectionBeforeValidateHook = asyn
     overrideAccess: true,
     req,
     where,
-    select: { id: true },
   })
 
   const validIds = new Set(valid.docs.map((category) => String(category.id)))
