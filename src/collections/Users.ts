@@ -16,13 +16,19 @@ export const Users: CollectionConfig = {
   auth: true,
   hooks: {
     beforeValidate: [
-      async ({ data, operation, originalDoc, req }) => {
+      async ({ data, operation, req }) => {
         if (!data) return data
+
         if (operation === 'create') {
           const existing = await req.payload.count({ collection: 'users', overrideAccess: true })
-          if (existing.totalDocs === 0) data.role = 'admin'
+
+          if (existing.totalDocs === 0) {
+            data.role = 'admin'
+          } else if (!data.role) {
+            data.role = 'editor'
+          }
         }
-        if (operation === 'update' && !data.role && !originalDoc?.role) data.role = 'admin'
+
         return data
       },
     ],
