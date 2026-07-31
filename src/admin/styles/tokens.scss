@@ -1,0 +1,42 @@
+:root {
+  --esm-canvas: #f9f9ff;
+  --esm-surface: #ffffff;
+  --esm-surface-muted: #f2f5f3;
+  --esm-surface-subtle: #f6f7f6;
+  --esm-text: #17231f;
+  --esm-text-muted: #68726e;
+  --esm-line: #dee4e0;
+  --esm-line-strong: #c7d0cb;
+
+  --esm-primary: #324f46;
+  --esm-primary-hover: #263f37;
+  --esm-primary-soft: #e4efea;
+
+  --esm-info: #52637a;
+  --esm-info-soft: #e8eef8;
+  --esm-success: #2d654d;
+  --esm-success-soft: #e1f1e8;
+  --esm-warning: #7b6031;
+  --esm-warning-soft: #f5ebcd;
+  --esm-error: #a83e39;
+  --esm-error-soft: #fbe7e5;
+
+  --esm-radius-input: 8px;
+  --esm-radius-button: 8px;
+  --esm-radius-panel: 12px;
+  --esm-radius-drawer: 16px;
+
+  --esm-space-1: 4px;
+  --esm-space-2: 8px;
+  --esm-space-3: 12px;
+  --esm-space-4: 16px;
+  --esm-space-5: 20px;
+  --esm-space-6: 24px;
+  --esm-space-7: 32px;
+  --esm-space-8: 40px;
+  --esm-space-9: 48px;
+  --esm-space-10: 64px;
+
+  --esm-focus: 0 0 0 3px rgb(50 79 70 / 18%);
+  --esm-shadow-popover: 0 10px 30px rgb(25 43 36 / 8%);
+}
