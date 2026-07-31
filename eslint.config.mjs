@@ -24,5 +24,15 @@ export default defineConfig([
       ],
     },
   },
+  {
+    files: ['src/admin/views/**/*.tsx'],
+    rules: {
+      // As operational views are server-rendered Payload admin surfaces. Plain GET links intentionally
+      // preserve query/deep-link state across the custom admin boundary, and thumbnails already request
+      // Payload image sizes instead of original assets.
+      '@next/next/no-html-link-for-pages': 'off',
+      '@next/next/no-img-element': 'off',
+    },
+  },
   globalIgnores(['.next/**', 'src/payload-types.ts', 'src/payload-generated-schema.ts']),
 ])
