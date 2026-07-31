@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, Where } from 'payload'
 
@@ -68,8 +69,8 @@ async function salesMode(props: AdminViewServerProps): Promise<SalesMode> {
 function ViewSwitch({ mode }: { mode: SalesMode }) {
   return (
     <div className="esmera-sales-switch" aria-label="Visualização de vendas">
-      <a className={`esmera-sales-switch__item${mode === 'list' ? ' is-active' : ''}`} href="/admin/sales?view=list" aria-current={mode === 'list' ? 'page' : undefined}>Lista</a>
-      <a className={`esmera-sales-switch__item${mode === 'pipeline' ? ' is-active' : ''}`} href="/admin/sales?view=pipeline" aria-current={mode === 'pipeline' ? 'page' : undefined}>Pipeline</a>
+      <Link className={`esmera-sales-switch__item${mode === 'list' ? ' is-active' : ''}`} href="/admin/sales?view=list" aria-current={mode === 'list' ? 'page' : undefined}>Lista</Link>
+      <Link className={`esmera-sales-switch__item${mode === 'pipeline' ? ' is-active' : ''}`} href="/admin/sales?view=pipeline" aria-current={mode === 'pipeline' ? 'page' : undefined}>Pipeline</Link>
     </div>
   )
 }
