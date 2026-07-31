@@ -8,6 +8,7 @@ import { canManageBusiness, canManageSite, roleOf } from '../../access/roles'
 import './views.scss'
 
 export type OperationalArea = 'all' | 'site' | 'business'
+export type SearchParams = Record<string, string | string[] | undefined>
 
 type FindOptions = {
   where?: Where
@@ -20,7 +21,7 @@ type FindOptions = {
 }
 
 export function hasAreaAccess(user: unknown, area: OperationalArea) {
-  if (area === 'all') return Boolean(user)
+  if (area === 'all') return Boolean(user) && Boolean(roleOf(user))
   if (area === 'site') return canManageSite(user)
   return canManageBusiness(user)
 }
@@ -33,6 +34,36 @@ export function ensureUser(props: AdminViewServerProps, area: OperationalArea = 
     role: roleOf(user),
     allowed: hasAreaAccess(user, area),
   }
+}
+
+export async function resolveSearchParams(props: AdminViewServerProps): Promise<SearchParams> {
+  const raw = await Promise.resolve(props.searchParams as SearchParams | Promise<SearchParams>)
+  return raw || {}
+}
+
+export function paramValue(params: SearchParams, key: string, fallback = '') {
+  const value = params[key]
+  if (Array.isArray(value)) return value[0] || fallback
+  return value || fallback
+}
+
+export function positiveInt(value: string, fallback = 1) {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+export function hrefWithParams(path: string, params: SearchParams, updates: Record<string, string | number | null | undefined>) {
+  const search = new URLSearchParams()
+  for (const [key, raw] of Object.entries(params)) {
+    const value = Array.isArray(raw) ? raw[0] : raw
+    if (value) search.set(key, value)
+  }
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === null || value === undefined || value === '') search.delete(key)
+    else search.set(key, String(value))
+  }
+  const query = search.toString()
+  return query ? `${path}?${query}` : path
 }
 
 export function ViewFrame({
@@ -106,7 +137,7 @@ export async function findDocs<T>(req: PayloadRequest, collection: string, optio
   const result = await req.payload.find({
     collection: collection as never,
     depth: options.depth ?? 1,
-    limit: options.limit ?? 100,
+    limit: options.limit ?? 25,
     page: options.page,
     sort: options.sort as never,
     where: options.where,
@@ -119,6 +150,7 @@ export async function findDocs<T>(req: PayloadRequest, collection: string, optio
   return result as unknown as {
     docs: T[]
     hasNextPage: boolean
+    hasPrevPage: boolean
     limit: number
     page: number
     totalDocs: number
@@ -126,21 +158,25 @@ export async function findDocs<T>(req: PayloadRequest, collection: string, optio
   }
 }
 
+/**
+ * Use apenas em agregações dedicadas que realmente precisam percorrer todos os registros.
+ * Listagens operacionais devem usar findDocs com paginação server-side.
+ */
 export async function findAllDocs<T>(
   req: PayloadRequest,
   collection: string,
   options: Omit<FindOptions, 'limit' | 'page'> = {},
 ) {
-  const firstPage = await findDocs<T>(req, collection, { ...options, limit: 500, page: 1 })
-  if (!firstPage.hasNextPage) return firstPage.docs
-
-  const remainingPages = await Promise.all(
-    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
-      findDocs<T>(req, collection, { ...options, limit: 500, page: index + 2 }),
-    ),
-  )
-
-  return [firstPage, ...remainingPages].flatMap((result) => result.docs)
+  const docs: T[] = []
+  let page = 1
+  let hasNextPage = true
+  while (hasNextPage) {
+    const result = await findDocs<T>(req, collection, { ...options, limit: 250, page })
+    docs.push(...result.docs)
+    hasNextPage = result.hasNextPage
+    page += 1
+  }
+  return docs
 }
 
 export async function countDocs(req: PayloadRequest, collection: string, where?: Where) {
@@ -182,7 +218,6 @@ export function monthStartISO() {
   }).formatToParts(now)
   const year = Number(localParts.find((part) => part.type === 'year')?.value)
   const month = Number(localParts.find((part) => part.type === 'month')?.value) - 1
-  // São Paulo is UTC-3 and Brazil currently has no daylight-saving time.
   return new Date(Date.UTC(year, month, 1, 3, 0, 0)).toISOString()
 }
 
@@ -255,6 +290,45 @@ export function MetricCard({
       <strong className="esmera-metric-value">{value}</strong>
       <small>{meta}</small>
     </article>
+  )
+}
+
+export function StatusBadge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'green' | 'blue' | 'red' | 'sand' }) {
+  const suffix = tone === 'neutral' ? '' : ` esmera-pill--${tone}`
+  return <span className={`esmera-pill${suffix}`}>{children}</span>
+}
+
+export function MasterDetailLayout({ master, detail }: { master: React.ReactNode; detail: React.ReactNode }) {
+  return <section className="esmera-master-detail"><div className="esmera-master-pane">{master}</div><aside className="esmera-detail-pane">{detail}</aside></section>
+}
+
+export function Pagination({
+  path,
+  params,
+  page,
+  totalPages,
+  totalDocs,
+}: {
+  path: string
+  params: SearchParams
+  page: number
+  totalPages: number
+  totalDocs: number
+}) {
+  if (totalPages <= 1) return <div className="esmera-pagination"><span>{totalDocs} registro{totalDocs === 1 ? '' : 's'}</span></div>
+  const pages = Array.from({ length: Math.min(5, totalPages) }, (_, index) => {
+    const start = Math.max(1, Math.min(page - 2, totalPages - 4))
+    return start + index
+  }).filter((value) => value <= totalPages)
+  return (
+    <nav className="esmera-pagination" aria-label="Paginação">
+      <span>{totalDocs} registros · página {page} de {totalPages}</span>
+      <div className="esmera-pagination-actions">
+        {page > 1 ? <a href={hrefWithParams(path, params, { page: page - 1, selected: null })} aria-label="Página anterior">←</a> : null}
+        {pages.map((value) => <a key={value} href={hrefWithParams(path, params, { page: value, selected: null })} aria-current={value === page ? 'page' : undefined}>{value}</a>)}
+        {page < totalPages ? <a href={hrefWithParams(path, params, { page: page + 1, selected: null })} aria-label="Próxima página">→</a> : null}
+      </div>
+    </nav>
   )
 }
 
