@@ -23,7 +23,7 @@ body {
   display: none;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .template-default {
     grid-template-columns: minmax(0, 1fr) !important;
   }
@@ -37,5 +37,69 @@ body {
     grid-column: 1 !important;
     width: 100%;
     min-width: 0;
+  }
+}
+
+/* The master plan defines 1024–1279px as the compact rail range. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .template-default {
+    grid-template-columns: 72px minmax(0, 1fr) !important;
+  }
+
+  .template-default__nav {
+    display: block !important;
+  }
+
+  .template-default__nav-toggler-wrapper {
+    display: none !important;
+  }
+
+  .template-default__wrap {
+    grid-column: auto !important;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .esmera-nav {
+    display: flex !important;
+    padding: 14px 8px 12px;
+  }
+
+  .esmera-nav-brand {
+    justify-content: center;
+    padding: 2px 0 20px;
+  }
+
+  .esmera-nav-brand > div,
+  .esmera-nav-link > span,
+  .esmera-nav-caption,
+  .esmera-user-copy,
+  .esmera-logout {
+    display: none;
+  }
+
+  .esmera-nav-link {
+    min-height: 42px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .esmera-nav-link .esmera-nav-icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .esmera-nav-divider {
+    margin: 14px 5px 10px;
+  }
+
+  .esmera-user {
+    display: flex;
+    justify-content: center;
+    padding: 6px 0;
+  }
+
+  .esmera-shell-mobile-trigger {
+    display: none !important;
   }
 }
