@@ -8,13 +8,13 @@ type RoleUser = {
 }
 
 /**
- * Existing users created before RBAC was introduced have no role saved.
- * They are treated as administrators for backwards compatibility.
+ * A role ausente nunca concede privilégio implicitamente.
+ * Usuários legados devem ser migrados para um papel explícito antes de operar o CMS.
  */
 export function roleOf(user: unknown): EsmeraRole | null {
   if (!user || typeof user !== 'object') return null
   const role = (user as RoleUser).role
-  return role || 'admin'
+  return role === 'admin' || role === 'editor' || role === 'commercial' ? role : null
 }
 
 export function canManageSite(user: unknown) {
