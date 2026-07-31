@@ -2,42 +2,39 @@ version: '3'
 
 services:
   payload:
-    image: node:20-alpine
+    image: node:22-alpine
     ports:
       - '3000:3000'
     volumes:
       - .:/home/node/app
       - node_modules:/home/node/app/node_modules
     working_dir: /home/node/app/
-    command: sh -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm dev"
+    command: sh -c "corepack enable && corepack prepare pnpm@10 --activate && pnpm install && pnpm dev"
     depends_on:
-      - mongo
-      # - postgres
-    env_file:
-      - .env
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/esmera
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET:-local-development-secret-change-me}
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
-  # Ensure your DATABASE_URL uses 'mongo' as the hostname ie. mongodb://mongo/my-db-name
-  mongo:
-    image: mongo:latest
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
     ports:
-      - '27017:27017'
-    command:
-      - --storageEngine=wiredTiger
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: esmera
     volumes:
-      - data:/data/db
-    logging:
-      driver: none
-
-  # Uncomment the following to use postgres
-  # postgres:
-  #   restart: always
-  #   image: postgres:latest
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d esmera']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  data:
-  # pgdata:
+  pgdata:
   node_modules:
