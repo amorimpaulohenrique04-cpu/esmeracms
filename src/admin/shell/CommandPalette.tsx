@@ -31,13 +31,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const [activeIndex, setActiveIndex] = useState(0)
 
   useEffect(() => {
-    if (!open) {
-      setQuery('')
-      setResults([])
-      setError(null)
-      setActiveIndex(0)
-      return
-    }
+    if (!open) return
 
     const controller = new AbortController()
     const timer = window.setTimeout(async () => {
@@ -84,9 +78,22 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     return Array.from(groups.entries())
   }, [results])
 
+  const reset = () => {
+    setQuery('')
+    setResults([])
+    setLoading(false)
+    setError(null)
+    setActiveIndex(0)
+  }
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) reset()
+    onOpenChange(nextOpen)
+  }
+
   const goTo = (result: CommandResult | undefined) => {
     if (!result) return
-    onOpenChange(false)
+    handleOpenChange(false)
     router.push(result.href)
   }
 
@@ -106,7 +113,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   let flatIndex = -1
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Backdrop className="esmera-command-backdrop" />
         <Dialog.Viewport className="esmera-command-viewport">
