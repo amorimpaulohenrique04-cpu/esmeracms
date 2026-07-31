@@ -16,12 +16,11 @@ const viewports = [
 
 const routes = [
   { name: 'dashboard', url: '/admin' },
-  { name: 'content', url: '/admin/content' },
   { name: 'products', url: '/admin/products' },
   { name: 'categories', url: '/admin/categories' },
   { name: 'customers', url: '/admin/customers' },
-  { name: 'sales', url: '/admin/sales' },
-  { name: 'pipeline', url: '/admin/pipeline' },
+  { name: 'sales-list', url: '/admin/sales?view=list' },
+  { name: 'sales-pipeline', url: '/admin/sales?view=pipeline' },
   { name: 'after-sales', url: '/admin/after-sales' },
   { name: 'reports', url: '/admin/reports' },
   { name: 'settings', url: '/admin/settings' },
