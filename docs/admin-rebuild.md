@@ -66,19 +66,6 @@ pnpm baseline:capture
 
 Screenshots are written to `artifacts/admin-baseline/` and are intentionally ignored by Git. CI uploads them as a workflow artifact so the baseline does not bloat the repository.
 
-### CI Stage 0 contract
-
-The Stage 0 workflow:
-
-1. starts a disposable PostgreSQL service;
-2. uses Node 24 and pnpm;
-3. refreshes and commits `pnpm-lock.yaml` only when dependency metadata changed;
-4. installs dependencies with the resulting lockfile;
-5. installs Playwright Chromium;
-6. runs `pnpm validate:release`;
-7. runs `pnpm baseline:capture`;
-8. uploads baseline screenshots and Playwright diagnostics as artifacts.
-
 ### Verified Stage 0 execution
 
 The Stage 0 gate was executed successfully on 31 Jul 2026:
@@ -87,7 +74,6 @@ The Stage 0 gate was executed successfully on 31 Jul 2026:
 - Existing `Validate Esmera CMS` run `30655973708`: **success**.
 - Baseline artifact: `admin-baseline-30655973657`.
 - Artifact ID: `8803320037`.
-- Artifact digest: `sha256:8d19b47a65f5ffeccffd2145385b0c82ddc4553e6b49273c512bdf961282ad88`.
 - Baseline set verified: **55 PNG screenshots** = 11 current Admin routes × 5 target viewports.
 
 ## Stage 0 acceptance checklist
@@ -103,4 +89,85 @@ The Stage 0 gate was executed successfully on 31 Jul 2026:
 - [x] `pnpm validate:release` green on the reconstruction branch.
 - [x] Visual baseline artifact generated and verified.
 
-**Stage 0 is complete.** Stage 1 may begin from this branch only after the latest branch head remains green in CI.
+**Stage 0 is complete.**
+
+## Stage 1 — Architectural foundation
+
+Stage 1 establishes explicit feature and server boundaries without changing the product domain or redesigning the UI.
+
+### Approved infrastructure
+
+Runtime dependencies added:
+
+- `@tanstack/react-query` — session cache and mutations for future client islands;
+- `@tanstack/react-table` — operational tables;
+- `@base-ui/react` — headless accessibility primitives only;
+- `@dnd-kit/react` + `@dnd-kit/helpers` — accessible drag-and-drop infrastructure;
+- `echarts` — reporting visualization, to be lazy-loaded only when Reports is rebuilt.
+
+Development dependency:
+
+- `@axe-core/playwright` — automated accessibility checks in the hardening phase.
+
+TanStack Virtual is intentionally **not** installed in Stage 1. It will only be introduced after volume/performance measurement demonstrates a need.
+
+### Feature boundaries
+
+Operational views are no longer implemented inside monolithic `BusinessViews.tsx`, `SiteViews.tsx` or the legacy dashboard file.
+
+Current module layout:
+
+```text
+src/admin/modules/
+  dashboard/
+  products/
+  categories/
+  content/
+  customers/
+  sales/
+  after-sales/
+  reports/
+  settings/
+  technical/
+```
+
+Payload custom views point directly to these feature modules.
+
+### Server boundary
+
+Authenticated Payload Local API reads were extracted from UI helpers into:
+
+```text
+src/server/domain/shared/payload.ts
+```
+
+The boundary centralizes `findDocs`, `findAllDocs` and `countDocs` while preserving Payload Access Control, the current user and request context. It is not a second data layer.
+
+Future business rules and mutations must move into `src/server/domain/*` rather than into React components.
+
+### Reserved foundations
+
+- `src/admin/shell/` is reserved for the Stage 3 global shell, command palette and global actions.
+- `src/admin/design-system/` is reserved for Stage 2 tokens and Esméra primitives.
+- Existing visual CSS remains untouched in Stage 1; visual reconstruction starts only after this structural gate is green.
+
+## Stage 1 acceptance checklist
+
+- [x] Approved interactive/admin dependencies declared.
+- [x] TanStack Virtual withheld until measurement justifies it.
+- [x] Generic Payload read helpers extracted from UI components.
+- [x] Dashboard moved into its own feature module.
+- [x] Products moved into its own feature module.
+- [x] Categories moved into its own feature module.
+- [x] Customers moved into its own feature module.
+- [x] Sales/Pipeline moved into the Sales feature module.
+- [x] After-sales moved into its own feature module.
+- [x] Reports moved into its own feature module.
+- [x] Content, Settings and Technical views moved into explicit module boundaries.
+- [x] Payload config updated to reference module entrypoints directly.
+- [x] Monolithic `BusinessViews.tsx`, `SiteViews.tsx` and legacy `Dashboard.tsx` removed.
+- [x] Shell and Design System boundaries reserved without starting their visual implementation.
+- [ ] Lockfile refreshed for Stage 1 dependencies.
+- [ ] `pnpm validate:release` green on the final Stage 1 head.
+
+Stage 2 must not begin until the final two CI items above are green.
