@@ -67,6 +67,38 @@ test.describe('Admin Panel', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
   })
 
+  test('lets operational workspaces use available width and respond to their own container', async () => {
+    await page.setViewportSize({ width: 1920, height: 1000 })
+    await page.goto('http://localhost:3000/admin')
+
+    const desktopWorkspace = await page.locator('.esmera-view').evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        width: element.getBoundingClientRect().width,
+        maxWidth: style.maxWidth,
+        containerType: style.containerType,
+      }
+    })
+
+    expect(desktopWorkspace.width).toBeGreaterThan(1500)
+    expect(desktopWorkspace.maxWidth).toBe('none')
+    expect(desktopWorkspace.containerType).toBe('inline-size')
+
+    await page.setViewportSize({ width: 768, height: 1024 })
+    await page.goto('http://localhost:3000/admin')
+    const tabletColumns = await page.locator('.esmera-metric-grid').evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length)
+    expect(tabletColumns).toBe(2)
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('http://localhost:3000/admin')
+    const mobileColumns = await page.locator('.esmera-metric-grid').evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length)
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    expect(mobileColumns).toBe(1)
+    expect(overflow).toBeLessThanOrEqual(1)
+
+    await page.setViewportSize({ width: 1440, height: 900 })
+  })
+
   test('can navigate to the technical users list', async () => {
     await page.goto('http://localhost:3000/admin/collections/users')
     await expect(page).toHaveURL('http://localhost:3000/admin/collections/users')
