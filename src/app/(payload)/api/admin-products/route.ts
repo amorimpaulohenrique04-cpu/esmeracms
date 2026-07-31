@@ -6,16 +6,19 @@ import { canManageSite } from '../../../../access/roles'
 
 export const dynamic = 'force-dynamic'
 
-type ProductAction = 'publish' | 'unpublish' | 'archive' | 'restore' | 'add-category' | 'save-draft' | 'reorder-gallery'
+type ProductAction = 'publish' | 'unpublish' | 'archive' | 'restore' | 'add-category' | 'set-availability' | 'save-draft' | 'reorder-gallery'
 
 type RequestBody = {
   action?: ProductAction
   ids?: Array<string | number>
   id?: string | number
   categoryId?: string | number
+  availability?: string
   data?: Record<string, unknown>
   gallery?: Array<Record<string, unknown>>
 }
+
+const availabilities = new Set(['unique', 'available', 'made_to_order', 'limited'])
 
 function relationID(value: unknown): string | number | null {
   if (typeof value === 'string' || typeof value === 'number') return value
@@ -93,6 +96,7 @@ export async function POST(request: Request) {
     const ids = Array.from(new Set((body.ids || []).filter((id): id is string | number => typeof id === 'string' || typeof id === 'number'))).slice(0, 100)
     if (!ids.length) return NextResponse.json({ error: 'Selecione ao menos um produto.' }, { status: 400 })
     if (action === 'add-category' && (body.categoryId === undefined || body.categoryId === null || body.categoryId === '')) return NextResponse.json({ error: 'Categoria não informada.' }, { status: 400 })
+    if (action === 'set-availability' && (!body.availability || !availabilities.has(body.availability))) return NextResponse.json({ error: 'Disponibilidade inválida.' }, { status: 400 })
 
     let updated = 0
     const errors: Array<{ id: string | number; message: string }> = []
@@ -130,6 +134,15 @@ export async function POST(request: Request) {
             collection: 'products',
             id,
             data: { categories } as never,
+            draft: (current as { _status?: string })._status !== 'published',
+            overrideAccess: false,
+            user,
+          })
+        } else if (action === 'set-availability') {
+          await payload.update({
+            collection: 'products',
+            id,
+            data: { availability: body.availability } as never,
             draft: (current as { _status?: string })._status !== 'published',
             overrideAccess: false,
             user,
