@@ -33,6 +33,27 @@ test('capture current admin visual baseline', async ({ page }) => {
   })
   expect(login.ok(), `Baseline admin login failed: HTTP ${login.status()} ${await login.text()}`).toBeTruthy()
 
+  const createCategory = await page.request.post(`${baseURL}/api/categories?draft=true`, {
+    data: {
+      title: 'Objetos Baseline',
+      slug: `objetos-baseline-${Date.now()}`,
+      status: 'active',
+      order: 100,
+      description: 'Categoria usada para validar o workspace master-detail.',
+      searchTerms: [{ term: 'objetos especiais' }, { term: 'curadoria' }],
+      seo: {
+        title: 'Objetos Baseline · Esméra',
+        description: 'Seleção editorial de objetos Esméra para o baseline visual.',
+        noIndex: false,
+      },
+      _status: 'draft',
+    },
+  })
+  expect(createCategory.ok(), `Baseline category create failed: HTTP ${createCategory.status()} ${await createCategory.text()}`).toBeTruthy()
+  const categoryBody = await createCategory.json() as { id?: string | number; doc?: { id?: string | number } }
+  const categoryId = categoryBody.id ?? categoryBody.doc?.id
+  expect(categoryId).toBeTruthy()
+
   const createProduct = await page.request.post(`${baseURL}/api/products?draft=true`, {
     data: {
       title: 'Objeto Baseline Esméra',
@@ -42,6 +63,7 @@ test('capture current admin visual baseline', async ({ page }) => {
       priceMode: 'inquiry',
       material: 'Esmeralda bruta',
       edition: 'Peça única',
+      categories: [categoryId],
       _status: 'draft',
     },
   })
@@ -56,7 +78,10 @@ test('capture current admin visual baseline', async ({ page }) => {
     { name: 'products-grid', url: '/admin/products?view=grid' },
     { name: 'product-overview', url: `/admin/products?product=${productId}&tab=overview` },
     { name: 'product-media', url: `/admin/products?product=${productId}&tab=media` },
-    { name: 'categories', url: '/admin/categories' },
+    { name: 'categories-list', url: '/admin/categories?status=active' },
+    { name: 'category-general', url: `/admin/categories?status=active&category=${categoryId}&tab=general` },
+    { name: 'category-media-seo', url: `/admin/categories?status=active&category=${categoryId}&tab=media` },
+    { name: 'category-products', url: `/admin/categories?status=active&category=${categoryId}&tab=products` },
     { name: 'customers', url: '/admin/customers' },
     { name: 'sales-list', url: '/admin/sales?view=list' },
     { name: 'sales-pipeline', url: '/admin/sales?view=pipeline' },
