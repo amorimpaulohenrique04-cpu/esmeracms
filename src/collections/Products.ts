@@ -1,11 +1,16 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, PayloadRequest } from 'payload'
 
 import { publishedProductsOrAuthenticated, siteEditors } from '../access/roles'
 import { seoField, slugify } from '../fields/common'
 
+type RelationValue = string | number | { id?: string | number | null; alt?: string | null } | null | undefined
+
 type GalleryItem = {
+  image?: RelationValue
   mediaKey?: string | null
   role?: string | null
+  alt?: string | null
+  altOverride?: string | null
 }
 
 type OptionDefinition = {
@@ -15,19 +20,35 @@ type OptionDefinition = {
 
 type VariantItem = {
   sku?: string | null
+  status?: string | null
+  priceMode?: string | null
+  priceCents?: number | null
   selection?: Array<{ option?: string | null; value?: string | null }> | null
   mediaKeys?: Array<{ key?: string | null }> | null
 }
 
 type ProductSiblingData = {
-  catalogStatus?: string
-  optionDefinitions?: OptionDefinition[]
-  gallery?: GalleryItem[]
+  _status?: string | null
+  title?: string | null
+  slug?: string | null
+  code?: string | null
+  catalogStatus?: string | null
+  categories?: unknown[] | null
+  gallery?: GalleryItem[] | null
+  availability?: string | null
+  priceMode?: string | null
+  basePriceCents?: number | null
+  optionDefinitions?: OptionDefinition[] | null
+  variants?: VariantItem[] | null
 }
 
-function validateGallery(value: unknown, { siblingData }: { siblingData?: ProductSiblingData }) {
+function relationId(value: RelationValue) {
+  if (value && typeof value === 'object') return value.id ?? null
+  return value ?? null
+}
+
+function validateGallery(value: unknown) {
   const items = (Array.isArray(value) ? value : []) as GalleryItem[]
-  if (siblingData?.catalogStatus === 'active' && items.length === 0) return 'Um produto ativo precisa ter pelo menos uma imagem.'
   const keys = items.map((item) => item.mediaKey).filter(Boolean)
   if (new Set(keys).size !== keys.length) return 'As chaves de mídia não podem se repetir.'
   if (items.filter((item) => item.role === 'cover').length > 1) return 'Defina no máximo uma imagem como capa.'
@@ -81,6 +102,55 @@ function validateVariants(value: unknown, { siblingData }: { siblingData?: Produ
   return true
 }
 
+async function hasResolvedAlt(item: GalleryItem, req: PayloadRequest) {
+  if (String(item.altOverride || item.alt || '').trim()) return true
+  if (item.image && typeof item.image === 'object' && String(item.image.alt || '').trim()) return true
+  const id = relationId(item.image)
+  if (!id) return false
+  try {
+    const media = await req.payload.findByID({
+      collection: 'media',
+      id,
+      depth: 0,
+      overrideAccess: false,
+      req,
+    })
+    return Boolean(String(media?.alt || '').trim())
+  } catch {
+    return false
+  }
+}
+
+async function getPublishReadinessIssues(product: ProductSiblingData, req: PayloadRequest) {
+  const issues: string[] = []
+  const gallery = product.gallery || []
+  const activeVariants = (product.variants || []).filter((variant) => variant.status !== 'disabled')
+
+  if (!String(product.title || '').trim()) issues.push('título')
+  if (!String(product.slug || '').trim() || !/^[a-z0-9-]+$/.test(String(product.slug))) issues.push('slug válido')
+  if (!String(product.code || '').trim()) issues.push('código')
+  if (!product.availability || product.availability === 'archive') issues.push('disponibilidade')
+
+  if (product.catalogStatus === 'active') {
+    if (!product.categories?.length) issues.push('pelo menos uma categoria')
+    if (!gallery.length) issues.push('pelo menos uma imagem')
+    if (gallery.length && gallery.filter((item) => item.role === 'cover').length !== 1) issues.push('uma imagem definida como capa')
+  }
+
+  if (product.priceMode === 'fixed') {
+    const hasBasePrice = typeof product.basePriceCents === 'number'
+    const hasVariantPrice = activeVariants.some((variant) => variant.priceMode === 'fixed' && typeof variant.priceCents === 'number')
+    if (!hasBasePrice && !hasVariantPrice) issues.push('preço base ou preço de variante')
+  }
+
+  if (gallery.length) {
+    const altChecks = await Promise.all(gallery.map((item) => hasResolvedAlt(item, req)))
+    if (altChecks.some((valid) => !valid)) issues.push('texto alternativo nas imagens')
+  }
+
+  return issues
+}
+
 export const Products: CollectionConfig = {
   slug: 'products',
   trash: true,
@@ -102,7 +172,9 @@ export const Products: CollectionConfig = {
     readVersions: siteEditors,
   },
   versions: {
-    drafts: true,
+    drafts: {
+      validate: false,
+    },
     maxPerDoc: 50,
   },
   hooks: {
@@ -110,6 +182,21 @@ export const Products: CollectionConfig = {
       ({ data }) => {
         if (data?.title && !data.slug) data.slug = slugify(String(data.title))
         if (data?.code) data.code = String(data.code).trim().toUpperCase()
+        if (data?.availability === 'archive') {
+          data.catalogStatus = 'archive'
+          data.availability = 'available'
+        }
+        return data
+      },
+    ],
+    beforeChange: [
+      async ({ data, originalDoc, req }) => {
+        const next = { ...(originalDoc || {}), ...(data || {}) } as ProductSiblingData
+        if (next._status !== 'published') return data
+        const issues = await getPublishReadinessIssues(next, req)
+        if (issues.length) {
+          throw new Error(`Produto não está pronto para publicar: ${issues.join(', ')}.`)
+        }
         return data
       },
     ],
@@ -172,15 +259,17 @@ export const Products: CollectionConfig = {
               relationTo: 'categories',
               hasMany: true,
               label: 'Categorias',
-              validate: (value: unknown, { siblingData }: { siblingData?: { catalogStatus?: string } }) => {
-                const values = Array.isArray(value) ? value : []
-                return siblingData?.catalogStatus !== 'active' || values.length > 0 || 'Um produto ativo precisa ter categoria.'
+              admin: {
+                description: 'Pode ficar vazio durante o rascunho; produto ativo precisa de categoria para publicar.',
               },
             },
             {
               name: 'material',
               type: 'text',
               label: 'Material',
+              admin: {
+                description: 'Mantido como texto até existir uma taxonomia de materiais aprovada; não é usado como facet crítico.',
+              },
             },
             {
               name: 'description',
@@ -213,7 +302,7 @@ export const Products: CollectionConfig = {
               label: 'Galeria',
               maxRows: 12,
               validate: validateGallery,
-              admin: { description: 'A imagem marcada como Capa é a principal.' },
+              admin: { description: 'A imagem marcada como Capa é a principal. Em rascunho a galeria pode permanecer incompleta.' },
               fields: [
                 {
                   name: 'image',
@@ -244,11 +333,21 @@ export const Products: CollectionConfig = {
                   ],
                 },
                 {
+                  name: 'altOverride',
+                  type: 'text',
+                  label: 'Texto alternativo contextual',
+                  maxLength: 180,
+                  admin: { description: 'Opcional. Quando vazio, o frontend deve usar o alt padrão da Mídia.' },
+                },
+                {
                   name: 'alt',
                   type: 'text',
-                  label: 'Texto alternativo',
-                  required: true,
+                  label: 'Texto alternativo legado',
                   maxLength: 180,
+                  admin: {
+                    hidden: true,
+                    description: 'Compatibilidade temporária para registros existentes; será removido após migração de dados.',
+                  },
                 },
               ],
             },
@@ -268,8 +367,8 @@ export const Products: CollectionConfig = {
                 { label: 'Disponível', value: 'available' },
                 { label: 'Sob encomenda', value: 'made_to_order' },
                 { label: 'Edição limitada', value: 'limited' },
-                { label: 'Arquivada', value: 'archive' },
               ],
+              admin: { description: 'Arquivamento pertence exclusivamente ao Status de catálogo.' },
             },
             {
               name: 'priceMode',
@@ -289,15 +388,7 @@ export const Products: CollectionConfig = {
               min: 0,
               admin: {
                 condition: (_, siblingData) => siblingData?.priceMode === 'fixed',
-                description: 'Exemplo: R$ 14.900,00 = 1490000.',
-              },
-              validate: (value: unknown, { siblingData }: { siblingData?: { priceMode?: string; variants?: Array<{ status?: string; priceMode?: string; priceCents?: number }> } }) => {
-                if (siblingData?.priceMode !== 'fixed') return true
-                if (typeof value === 'number') return true
-                const hasVariantPrice = (siblingData?.variants || []).some((variant) =>
-                  variant.status !== 'disabled' && variant.priceMode === 'fixed' && typeof variant.priceCents === 'number',
-                )
-                return hasVariantPrice || 'Informe o preço base ou um preço próprio em uma variante ativa.'
+                description: 'Storage em centavos. A UI monetária dedicada será a camada de apresentação deste valor.',
               },
             },
           ],
@@ -382,9 +473,10 @@ export const Products: CollectionConfig = {
                   type: 'number',
                   label: 'Preço em centavos',
                   min: 0,
-                  admin: { condition: (_, siblingData) => siblingData?.priceMode === 'fixed' },
-                  validate: (value: unknown, { siblingData }: { siblingData?: { priceMode?: string } }) =>
-                    siblingData?.priceMode !== 'fixed' || typeof value === 'number' || 'Informe o preço da variante.',
+                  admin: {
+                    condition: (_, siblingData) => siblingData?.priceMode === 'fixed',
+                    description: 'A completude de preço é verificada no publish, não durante o trabalho em draft.',
+                  },
                 },
                 {
                   name: 'status',
