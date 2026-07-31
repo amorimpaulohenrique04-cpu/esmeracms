@@ -65,7 +65,7 @@
   .template-default__nav-toggler-wrapper { display: none !important; }
 }
 
-@media (min-width: 1025px) and (max-width: 1279px) {
+@media (min-width: 1024px) and (max-width: 1279px) {
   .template-default { grid-template-columns: 72px minmax(0, 1fr) !important; }
   .template-default__nav-toggler-wrapper { display: none !important; }
   .esmera-nav { padding: 14px 8px 12px; }
@@ -81,7 +81,7 @@
   .esmera-user { display: flex; justify-content: center; padding: 6px 0; }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .esmera-nav { display: none; }
 }
 
