@@ -1,5 +1,4 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
-import { Gutter } from '@payloadcms/ui'
 import type { AdminViewServerProps } from 'payload'
 import { redirect } from 'next/navigation'
 import React from 'react'
@@ -38,9 +37,9 @@ export function ViewFrame({
 }) {
   const { initPageResult, params, searchParams } = props
   const content = (
-    <Gutter>
+    <div className="esmera-workspace-frame">
       <main className="esmera-view">{children}</main>
-    </Gutter>
+    </div>
   )
 
   if (!withTemplate) return content
@@ -136,7 +135,7 @@ export function PageHeader({
 }) {
   return (
     <header className="esmera-page-header">
-      <div>
+      <div className="esmera-page-header__copy">
         {eyebrow ? <span className="esmera-eyebrow">{eyebrow}</span> : null}
         <h1>{title}</h1>
         <p>{subtitle}</p>
