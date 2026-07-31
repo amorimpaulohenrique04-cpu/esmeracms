@@ -32,5 +32,5 @@ jobs:
       - name: ESLint
         run: pnpm lint --max-warnings=0
 
-      - name: Integration tests
-        run: pnpm test:int
+      - name: RBAC regression tests
+        run: pnpm exec vitest run tests/int/roles.int.spec.ts --config ./vitest.config.mts
