@@ -44,6 +44,16 @@ test.describe('Admin Panel', () => {
     await expect(page.getByRole('link', { name: 'Pipeline', exact: true })).toHaveAttribute('aria-current', 'page')
   })
 
+  test('uses a compact navigation rail at the 1024px boundary', async () => {
+    await page.setViewportSize({ width: 1024, height: 768 })
+    await page.goto('http://localhost:3000/admin')
+    await expect(page.getByTestId('esmera-nav')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Abrir navegação' })).toBeHidden()
+    const navWidth = await page.getByTestId('esmera-nav').evaluate((element) => Math.round(element.getBoundingClientRect().width))
+    expect(navWidth).toBeLessThanOrEqual(72)
+    await page.setViewportSize({ width: 1440, height: 900 })
+  })
+
   test('uses the Esmera mobile drawer instead of leaving the sidebar behind content', async () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('http://localhost:3000/admin')
