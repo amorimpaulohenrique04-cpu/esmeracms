@@ -8,13 +8,17 @@ type RoleUser = {
 }
 
 /**
- * Existing users created before RBAC was introduced have no role saved.
- * They are treated as administrators for backwards compatibility.
+ * Role resolution must fail closed.
+ * Legacy users without an explicit role are migrated separately and never
+ * receive administrator privileges through application fallback logic.
  */
 export function roleOf(user: unknown): EsmeraRole | null {
   if (!user || typeof user !== 'object') return null
+
   const role = (user as RoleUser).role
-  return role || 'admin'
+  if (role === 'admin' || role === 'editor' || role === 'commercial') return role
+
+  return null
 }
 
 export function canManageSite(user: unknown) {
