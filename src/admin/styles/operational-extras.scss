@@ -1,0 +1,87 @@
+.esmera-master-row--thumb {
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+}
+
+.esmera-thumb {
+  width: 40px;
+  height: 48px;
+  display: block;
+  object-fit: cover;
+  border: 1px solid var(--esm-line);
+  border-radius: 8px;
+  background: var(--esm-surface-muted);
+}
+.esmera-thumb--empty { position: relative; }
+.esmera-thumb--empty::after { position: absolute; inset: 0; display: grid; place-items: center; color: var(--esm-text-muted); content: "·"; }
+
+.esmera-content-grid { display: grid; }
+.esmera-content-row {
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--esm-line);
+}
+.esmera-content-row:last-child { border-bottom: 0; }
+.esmera-content-row > div:first-child strong { display: block; font-size: 13px; font-weight: 600; }
+.esmera-content-row > div:first-child span { display: block; margin-top: 4px; color: var(--esm-text-muted); font-size: 11px; line-height: 16px; }
+.esmera-content-row-actions { display: flex; align-items: center; gap: 10px; }
+.esmera-content-row-actions small { min-width: 80px; color: var(--esm-text-muted); font-size: 10px; text-align: right; }
+
+.esmera-detail-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 24px;
+  padding-bottom: 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--esm-line);
+}
+.esmera-detail-tabs a { min-height: 34px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 8px; color: var(--esm-text-muted); font-size: 11px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.esmera-detail-tabs a:hover { background: var(--esm-surface-muted); color: var(--esm-text); }
+.esmera-detail-tabs a.is-active { background: var(--esm-primary-soft); color: var(--esm-primary); }
+
+.esmera-sale-progress {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 26px;
+}
+.esmera-sale-progress::before { position: absolute; top: 15px; right: 10%; left: 10%; height: 1px; background: var(--esm-line-strong); content: ""; }
+.esmera-sale-step { position: relative; z-index: 1; display: grid; justify-items: center; gap: 7px; color: var(--esm-text-muted); text-align: center; }
+.esmera-sale-step span { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--esm-line-strong); border-radius: 999px; background: #fff; font-size: 10px; }
+.esmera-sale-step strong { font-size: 10px; font-weight: 600; }
+.esmera-sale-step.is-complete { color: var(--esm-primary); }
+.esmera-sale-step.is-complete span { border-color: var(--esm-primary); background: var(--esm-primary); color: #fff; }
+
+.esmera-pipeline-card a { color: var(--esm-text); text-decoration: none; }
+.esmera-pipeline-card a:hover { color: var(--esm-primary); }
+.esmera-pipeline-move { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 7px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--esm-line); }
+.esmera-pipeline-move label { color: var(--esm-text-muted); font-size: 9px; }
+.esmera-pipeline-move select { min-height: 30px; min-width: 0; padding: 0 7px; border: 1px solid var(--esm-line); border-radius: 7px; background: #fff; color: var(--esm-text); font-size: 10px; }
+.esmera-pipeline-card[draggable="true"] { cursor: grab; }
+.esmera-pipeline-card[draggable="true"]:active { cursor: grabbing; }
+.esmera-pipeline-empty { padding: 16px 8px; color: var(--esm-text-muted); font-size: 10px; text-align: center; }
+.esmera-pipeline-more { display: block; padding: 8px 4px 0; color: var(--esm-text-muted); font-size: 9px; }
+
+.esmera-report-stage-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.esmera-report-stage-grid > div { min-height: 78px; display: flex; flex-direction: column; justify-content: space-between; padding: 12px; border: 1px solid var(--esm-line); border-radius: 10px; background: var(--esm-surface-subtle); }
+.esmera-report-stage-grid span { color: var(--esm-text-muted); font-size: 10px; }
+.esmera-report-stage-grid strong { font-size: 20px; font-weight: 600; }
+
+@media (max-width: 1180px) {
+  .esmera-report-stage-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 767px) {
+  .esmera-master-row--thumb { grid-template-columns: 44px minmax(0, 1fr); }
+  .esmera-master-row--thumb .esmera-master-row-meta { grid-column: 2; }
+  .esmera-content-row { grid-template-columns: 1fr; gap: 10px; }
+  .esmera-content-row-actions { flex-wrap: wrap; }
+  .esmera-content-row-actions small { text-align: left; }
+  .esmera-report-stage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .esmera-sale-progress { min-width: 420px; }
+  .esmera-detail-inner:has(.esmera-sale-progress) { overflow-x: auto; }
+}
