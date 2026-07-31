@@ -30,6 +30,7 @@ export type ProductReadinessInput = {
   slug?: string | null
   code?: string | null
   categories?: RelationshipValue[] | null
+  categoryIssues?: string[] | null
   gallery?: GalleryItem[] | null
   catalogStatus?: string | null
   availability?: string | null
@@ -148,6 +149,7 @@ export function getProductReadiness(product: ProductReadinessInput): ProductRead
   if (!product.slug?.trim()) issues.push('Slug não definido.')
   if (!product.code?.trim()) issues.push('Código não definido.')
   if (!categories.length) issues.push('Categoria não definida.')
+  issues.push(...(product.categoryIssues || []))
   if (!catalogStatuses.includes(product.catalogStatus as (typeof catalogStatuses)[number])) issues.push('Status de catálogo inválido.')
   if (!productAvailabilities.includes(product.availability as (typeof productAvailabilities)[number])) issues.push('Disponibilidade não definida.')
 
