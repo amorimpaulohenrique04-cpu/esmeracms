@@ -9,8 +9,8 @@ export const Activities: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'summary',
-    defaultColumns: ['summary', 'kind', 'occurredAt', 'owner', 'updatedAt'],
-    listSearchableFields: ['summary', 'details', 'owner'],
+    defaultColumns: ['summary', 'kind', 'occurredAt', 'ownerUser', 'updatedAt'],
+    listSearchableFields: ['summary', 'details'],
   },
   access: {
     read: commercialUsers,
@@ -44,7 +44,21 @@ export const Activities: CollectionConfig = {
     },
     { name: 'summary', type: 'text', label: 'Resumo', required: true },
     { name: 'details', type: 'textarea', label: 'Detalhes' },
-    { name: 'owner', type: 'text', label: 'Responsável' },
+    {
+      name: 'ownerUser',
+      type: 'relationship',
+      relationTo: 'users',
+      label: 'Responsável',
+      filterOptions: {
+        or: [{ role: { equals: 'admin' } }, { role: { equals: 'commercial' } }],
+      },
+    },
+    {
+      name: 'owner',
+      type: 'text',
+      label: 'Responsável legado',
+      admin: { hidden: true, description: 'Compatibilidade temporária até a migração dos valores antigos para Users.' },
+    },
     {
       name: 'relatedTo',
       type: 'relationship',
