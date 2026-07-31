@@ -1,51 +1,144 @@
 /* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
-import type { AdminViewServerProps } from 'payload'
+import type { AdminViewServerProps, Where } from 'payload'
 
 import {
   AccessDenied,
-  EmptyState,
   ensureUser,
   findDocs,
   PageHeader,
   QueryError,
-  shortDate,
   TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
+import { ProductDocumentView } from './ProductDocumentView'
+import { ProductsWorkspaceClient } from './ProductsWorkspaceClient'
+import type {
+  ProductCategory,
+  ProductDetail,
+  ProductDocumentTab,
+  ProductListItem,
+  ProductsViewMode,
+  ProductWorkspaceFilters,
+} from './types'
+import './products.scss'
 
-type Product = {
-  id: string | number
-  title?: string | null
-  code?: string | null
-  catalogStatus?: string | null
-  availability?: string | null
-  _status?: string | null
-  updatedAt?: string
+const documentTabs: ProductDocumentTab[] = ['overview', 'media', 'commercial', 'variants', 'technical', 'seo', 'history']
+
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+async function paramsOf(props: AdminViewServerProps) {
+  return await Promise.resolve(props.searchParams as unknown as Record<string, string | string[] | undefined>)
+}
+
+function integer(value: string | undefined, fallback: number) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function filtersFrom(params: Record<string, string | string[] | undefined>): ProductWorkspaceFilters {
+  const limitValue = integer(first(params.limit), 50)
+  const viewValue = first(params.view)
+  return {
+    q: (first(params.q) || '').trim().slice(0, 100),
+    status: first(params.status) || 'all',
+    availability: first(params.availability) || 'all',
+    publication: first(params.publication) || 'all',
+    category: first(params.category) || 'all',
+    page: integer(first(params.page), 1),
+    limit: limitValue === 100 ? 100 : 50,
+    view: viewValue === 'grid' ? 'grid' : 'list' as ProductsViewMode,
+  }
+}
+
+function whereFrom(filters: ProductWorkspaceFilters): Where | undefined {
+  const and: Where[] = []
+  if (filters.q) {
+    and.push({
+      or: [
+        { title: { like: filters.q } },
+        { subtitle: { like: filters.q } },
+        { code: { like: filters.q } },
+        { slug: { like: filters.q } },
+        { material: { like: filters.q } },
+      ],
+    } as Where)
+  }
+  if (filters.status !== 'all') and.push({ catalogStatus: { equals: filters.status } } as Where)
+  if (filters.availability !== 'all') and.push({ availability: { equals: filters.availability } } as Where)
+  if (filters.category !== 'all') and.push({ categories: { contains: filters.category } } as Where)
+  if (filters.publication === 'published' || filters.publication === 'draft') and.push({ _status: { equals: filters.publication } } as Where)
+  if (filters.publication === 'ready') and.push({ publicationReady: { equals: true } } as Where)
+  if (filters.publication === 'issues') and.push({ publicationReady: { equals: false } } as Where)
+  return and.length ? ({ and } as Where) : undefined
+}
+
+async function productDetail(props: AdminViewServerProps, id: string) {
+  return await props.initPageResult.req.payload.findByID({
+    collection: 'products',
+    id,
+    depth: 1,
+    draft: true,
+    overrideAccess: false,
+    user: props.initPageResult.req.user,
+    req: props.initPageResult.req,
+  }) as unknown as ProductDetail
 }
 
 export async function ProductsView(props: AdminViewServerProps) {
   const { allowed } = ensureUser(props, 'site')
   if (!allowed) return <AccessDenied props={props} area="editorial" />
 
+  const params = await paramsOf(props)
+  const productId = first(params.product)
+
   try {
-    const result = await findDocs<Product>(props.initPageResult.req, 'products', {
-      sort: '-updatedAt',
-      limit: 100,
-      depth: 0,
-      select: {
-        id: true,
-        title: true,
-        code: true,
-        catalogStatus: true,
-        availability: true,
-        _status: true,
-        updatedAt: true,
-      },
-    })
+    if (productId) {
+      const requestedTab = first(params.tab) as ProductDocumentTab | undefined
+      const tab = requestedTab && documentTabs.includes(requestedTab) ? requestedTab : 'overview'
+      const product = await productDetail(props, productId)
+      return <ViewFrame props={props}><ProductDocumentView product={product} tab={tab} searchParams={params} /></ViewFrame>
+    }
+
+    const filters = filtersFrom(params)
+    const [result, categoryResult] = await Promise.all([
+      findDocs<ProductListItem>(props.initPageResult.req, 'products', {
+        sort: '-updatedAt',
+        limit: filters.limit,
+        page: filters.page,
+        depth: 1,
+        draft: true,
+        where: whereFrom(filters),
+        select: {
+          id: true,
+          title: true,
+          subtitle: true,
+          slug: true,
+          code: true,
+          catalogStatus: true,
+          availability: true,
+          _status: true,
+          publicationReady: true,
+          publicationIssues: true,
+          categories: true,
+          gallery: true,
+          priceMode: true,
+          basePriceCents: true,
+          updatedAt: true,
+        },
+      }),
+      findDocs<ProductCategory>(props.initPageResult.req, 'categories', {
+        sort: 'order',
+        limit: 200,
+        depth: 0,
+        select: { id: true, title: true, slug: true },
+      }),
+    ])
 
     return <ViewFrame props={props}>
-      <PageHeader eyebrow="Catálogo" title="Produtos" subtitle="Catálogo operacional. Os formulários completos, drafts e versões ficam no Admin técnico." actions={<TechnicalLink href="/admin/collections/products/create" primary>Novo produto</TechnicalLink>} />
-      <section className="esmera-card"><div className="esmera-card-header"><h2>Catálogo</h2><span className="esmera-pill esmera-pill--green">{result.totalDocs} registros</span></div>{result.docs.length ? <ul className="esmera-list">{result.docs.map((product) => <li className="esmera-list-row" key={String(product.id)}><div><a className="esmera-row-title" href={`/admin/collections/products/${product.id}`}>{product.title || 'Produto sem título'}</a><span className="esmera-row-meta">{product.code || 'Sem código'} · {product.availability || 'sem disponibilidade'} · atualizado {shortDate(product.updatedAt)}</span></div><div style={{ display: 'flex', gap: 6 }}><span className={`esmera-pill ${product.catalogStatus === 'active' ? 'esmera-pill--green' : ''}`}>{product.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</span><span className="esmera-pill">{product._status === 'published' ? 'Publicado' : 'Rascunho'}</span></div></li>)}</ul> : <EmptyState title="Nenhum produto" copy="Crie o primeiro produto para iniciar o catálogo." />}</section>
+      <PageHeader eyebrow="Catálogo" title="Produtos" subtitle="Operação do catálogo com filtros, prontidão, publicação, grid, ações em lote e acesso ao documento editorial completo." actions={<TechnicalLink href="/admin/collections/products/create" primary>Novo produto</TechnicalLink>} />
+      <ProductsWorkspaceClient products={result.docs} categories={categoryResult.docs} filters={filters} totalDocs={result.totalDocs} totalPages={result.totalPages} />
     </ViewFrame>
   } catch (error) {
     return <ViewFrame props={props}><PageHeader title="Produtos" subtitle="Catálogo" /><QueryError title="Não foi possível consultar produtos" error={error} /></ViewFrame>
