@@ -1,9 +1,9 @@
 'use client'
 
+import { useAuth } from '@payloadcms/ui'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import React from 'react'
-import { useAuth } from '@payloadcms/ui'
+import React, { useEffect, useState } from 'react'
 
 import type { EsmeraRole } from '../../access/roles'
 import { EsmeraIcon } from './Brand'
@@ -25,7 +25,7 @@ type LinkItem = {
 
 const operationalLinks: LinkItem[] = [
   { href: '/admin', label: 'Dashboard', icon: 'grid', area: 'all' },
-  { href: '/admin/content', label: 'Conteúdo do site', icon: 'page', area: 'site' },
+  { href: '/admin/content', label: 'Conteúdo', icon: 'page', area: 'site' },
   { href: '/admin/products', label: 'Produtos', icon: 'box', area: 'site' },
   { href: '/admin/categories', label: 'Categorias', icon: 'tag', area: 'site' },
   { href: '/admin/customers', label: 'Clientes', icon: 'users', area: 'business' },
@@ -41,7 +41,8 @@ const technicalLinks: LinkItem[] = [
   { href: '/admin/collections/users', label: 'Usuários', icon: 'shield', area: 'admin' },
 ]
 
-function roleAllows(role: EsmeraRole, area: LinkItem['area']) {
+function roleAllows(role: EsmeraRole | null, area: LinkItem['area']) {
+  if (!role) return false
   if (area === 'all') return true
   if (role === 'admin') return true
   if (area === 'site') return role === 'editor'
@@ -64,49 +65,91 @@ function NavIcon({ name }: { name: string }) {
     database: <><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></>,
     shield: <path d="M12 3 20 6v6c0 5-3.4 8-8 10-4.6-2-8-5-8-10V6z"/>,
   }
-  return <svg className="esmera-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" aria-hidden="true">{paths[name]}</svg>
+  return <svg className="esmera-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.65" aria-hidden="true">{paths[name]}</svg>
 }
 
 export function EsmeraNav() {
   const pathname = usePathname()
   const auth = useAuth()
   const user = auth.user as NavUser | null
-  const role = user?.role || 'admin'
+  const role = user?.role ?? null
   const name = user?.name || user?.email?.split('@')[0] || 'Esméra'
+  const [collapsed, setCollapsed] = useState(false)
+
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem('esmera-nav-collapsed') === '1')
+    } catch {
+      setCollapsed(false)
+    }
+  }, [])
+
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current
+      try {
+        window.localStorage.setItem('esmera-nav-collapsed', next ? '1' : '0')
+      } catch {
+        // Persistência é um refinamento; a navegação continua funcional sem localStorage.
+      }
+      return next
+    })
+  }
 
   const isActive = (href: string) => href === '/admin' ? pathname === '/admin' : pathname.startsWith(href)
+  const roleLabel = role === 'admin' ? 'Administrador' : role === 'editor' ? 'Editorial' : role === 'commercial' ? 'Comercial' : 'Papel pendente'
 
   return (
-    <nav className="esmera-nav" data-testid="esmera-nav" aria-label="Navegação principal">
+    <nav className="esmera-nav" data-collapsed={collapsed ? 'true' : 'false'} data-testid="esmera-nav" aria-label="Navegação principal">
       <div className="esmera-nav-brand">
         <EsmeraIcon />
-        <div><strong>Esméra CMS</strong><span>Management Portal</span></div>
+        <div className="esmera-nav-brand-copy"><strong>Esméra CMS</strong><span>Operational Hub</span></div>
+        <button
+          className="esmera-nav-collapse"
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Expandir navegação' : 'Recolher navegação'}
+          aria-pressed={collapsed}
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+            <path d={collapsed ? 'm7 5 5 5-5 5' : 'm13 5-5 5 5 5'} />
+          </svg>
+        </button>
       </div>
+
+      {!role ? (
+        <div className="esmera-nav-role-warning" role="status">
+          <strong>Papel pendente</strong>
+          <span>Peça a um administrador para atribuir Editorial, Comercial ou Administrador.</span>
+        </div>
+      ) : null}
 
       <div className="esmera-nav-section" aria-label="Portal operacional">
         {operationalLinks.filter((item) => roleAllows(role, item.area)).map((item) => (
-          <Link className={`esmera-nav-link${isActive(item.href) ? ' is-active' : ''}`} href={item.href} key={item.href}>
+          <Link title={collapsed ? item.label : undefined} className={`esmera-nav-link${isActive(item.href) ? ' is-active' : ''}`} href={item.href} key={item.href}>
             <NavIcon name={item.icon} /><span>{item.label}</span>
           </Link>
         ))}
       </div>
 
-      <div className="esmera-nav-divider" />
-      <div className="esmera-nav-caption">Admin técnico</div>
-      <div className="esmera-nav-section esmera-nav-section--technical">
-        {technicalLinks.filter((item) => roleAllows(role, item.area)).map((item) => (
-          <Link className={`esmera-nav-link${isActive(item.href) ? ' is-active' : ''}`} href={item.href} key={item.href}>
-            <NavIcon name={item.icon} /><span>{item.label}</span>
-          </Link>
-        ))}
-      </div>
+      {role ? <>
+        <div className="esmera-nav-divider" />
+        <div className="esmera-nav-caption">Sistema</div>
+        <div className="esmera-nav-section esmera-nav-section--technical">
+          {technicalLinks.filter((item) => roleAllows(role, item.area)).map((item) => (
+            <Link title={collapsed ? item.label : undefined} className={`esmera-nav-link${isActive(item.href) ? ' is-active' : ''}`} href={item.href} key={item.href}>
+              <NavIcon name={item.icon} /><span>{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      </> : null}
 
       <div className="esmera-nav-footer">
-        <Link className="esmera-user" href="/admin/account">
+        <Link className="esmera-user" href="/admin/account" title={collapsed ? name : undefined}>
           <span className="esmera-avatar">{name.slice(0, 2).toUpperCase()}</span>
-          <span><strong>{name}</strong><small>{role === 'admin' ? 'Administrador' : role === 'editor' ? 'Editorial' : 'Comercial'}</small></span>
+          <span className="esmera-user-copy"><strong>{name}</strong><small>{roleLabel}</small></span>
         </Link>
-        <button className="esmera-logout" type="button" onClick={() => void auth.logOut()} aria-label="Sair">Sair</button>
+        <button className="esmera-logout" type="button" onClick={() => void auth.logOut()} aria-label="Sair"><span>Sair</span></button>
       </div>
     </nav>
   )
