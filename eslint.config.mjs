@@ -42,6 +42,16 @@ export default defineConfig([
     files: ['src/admin/modules/products/ProductDocumentView.tsx'],
     rules: {
       '@next/next/no-img-element': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          vars: 'all',
+          args: 'after-used',
+          varsIgnorePattern: '^(relationId|roleLabels)$',
+          argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^(_|ignore)',
+        },
+      ],
     },
   },
   globalIgnores(['.next/**', 'src/payload-types.ts', 'src/payload-generated-schema.ts']),
