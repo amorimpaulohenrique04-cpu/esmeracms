@@ -15,7 +15,7 @@ export const Leads: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'name',
-    defaultColumns: ['name', 'stage', 'source', 'owner', 'nextActionAt', 'updatedAt'],
+    defaultColumns: ['name', 'stage', 'source', 'ownerUser', 'nextActionAt', 'updatedAt'],
     listSearchableFields: ['name', 'phone', 'email', 'notes'],
   },
   access: {
@@ -85,9 +85,24 @@ export const Leads: CollectionConfig = {
                 { label: 'Perdido', value: 'lost' },
               ],
             },
-            { name: 'owner', type: 'text', label: 'Responsável' },
+            {
+              name: 'ownerUser',
+              type: 'relationship',
+              relationTo: 'users',
+              label: 'Responsável',
+              index: true,
+              filterOptions: {
+                or: [{ role: { equals: 'admin' } }, { role: { equals: 'commercial' } }],
+              },
+            },
+            {
+              name: 'owner',
+              type: 'text',
+              label: 'Responsável legado',
+              admin: { hidden: true, description: 'Compatibilidade temporária até a migração dos valores antigos para Users.' },
+            },
             { name: 'nextAction', type: 'text', label: 'Próxima ação' },
-            { name: 'nextActionAt', type: 'date', label: 'Prazo da próxima ação', admin: { date: { pickerAppearance: 'dayAndTime' } } },
+            { name: 'nextActionAt', type: 'date', label: 'Prazo da próxima ação', index: true, admin: { date: { pickerAppearance: 'dayAndTime' } } },
             {
               name: 'closedAt',
               type: 'date',
