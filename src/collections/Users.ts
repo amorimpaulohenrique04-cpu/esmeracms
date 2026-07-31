@@ -16,13 +16,13 @@ export const Users: CollectionConfig = {
   auth: true,
   hooks: {
     beforeValidate: [
-      async ({ data, operation, originalDoc, req }) => {
+      async ({ data, operation, req }) => {
         if (!data) return data
+        // Bootstrap seguro: apenas o primeiro usuário de uma instalação vazia nasce admin.
         if (operation === 'create') {
           const existing = await req.payload.count({ collection: 'users', overrideAccess: true })
           if (existing.totalDocs === 0) data.role = 'admin'
         }
-        if (operation === 'update' && !data.role && !originalDoc?.role) data.role = 'admin'
         return data
       },
     ],
@@ -56,7 +56,7 @@ export const Users: CollectionConfig = {
       },
       admin: {
         position: 'sidebar',
-        description: 'Controla o acesso às áreas editorial e comercial.',
+        description: 'Controla o acesso às áreas editorial e comercial. Usuários sem papel explícito não recebem privilégios.',
       },
     },
     {
