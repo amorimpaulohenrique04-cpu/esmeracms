@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/admin-operational-rebuild
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -64,6 +67,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Commit refreshed lockfile when required
+        if: github.event_name == 'push'
         shell: bash
         run: |
           if git diff --quiet -- pnpm-lock.yaml; then
