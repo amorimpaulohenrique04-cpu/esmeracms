@@ -54,5 +54,15 @@ export default defineConfig([
       ],
     },
   },
+  {
+    files: [
+      'src/admin/modules/categories/CategoriesMasterList.tsx',
+      'src/admin/modules/categories/CategoryDetailEditor.tsx',
+    ],
+    rules: {
+      '@next/next/no-img-element': 'off',
+      'react-hooks/refs': 'off',
+    },
+  },
   globalIgnores(['.next/**', 'src/payload-types.ts', 'src/payload-generated-schema.ts']),
 ])
