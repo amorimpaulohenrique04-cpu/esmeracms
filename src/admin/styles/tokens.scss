@@ -1,0 +1,57 @@
+:root {
+  --esm-canvas: #f9f9ff;
+  --esm-surface: #ffffff;
+  --esm-surface-muted: #f2f5f3;
+  --esm-surface-subtle: #f6f7f6;
+  --esm-text: #17231f;
+  --esm-text-muted: #68726e;
+  --esm-line: #dee4e0;
+  --esm-line-strong: #c7d0cb;
+
+  --esm-primary: #324f46;
+  --esm-primary-hover: #263f37;
+  --esm-primary-soft: #e4efea;
+
+  --esm-info: #52637a;
+  --esm-info-soft: #e8eef8;
+  --esm-success: #2d654d;
+  --esm-success-soft: #e1f1e8;
+  --esm-warning: #7b6031;
+  --esm-warning-soft: #f5ebcd;
+  --esm-error: #a83e39;
+  --esm-error-soft: #fbe7e5;
+
+  --esm-space-1: 4px;
+  --esm-space-2: 8px;
+  --esm-space-3: 12px;
+  --esm-space-4: 16px;
+  --esm-space-5: 20px;
+  --esm-space-6: 24px;
+  --esm-space-8: 32px;
+  --esm-space-10: 40px;
+  --esm-space-12: 48px;
+  --esm-space-16: 64px;
+
+  --esm-radius-input: 8px;
+  --esm-radius-control: 8px;
+  --esm-radius-popover: 10px;
+  --esm-radius-panel: 12px;
+  --esm-radius-overlay: 16px;
+
+  --esm-shadow-structural: 0 1px 2px rgba(20, 33, 29, 0.025);
+  --esm-shadow-popover: 0 10px 30px rgba(25, 43, 36, 0.08);
+
+  --esm-duration-hover: 140ms;
+  --esm-duration-popover: 170ms;
+  --esm-duration-drawer: 220ms;
+  --esm-ease-standard: cubic-bezier(.2, .8, .2, 1);
+
+  --esmera-primary: var(--esm-primary);
+  --esmera-primary-strong: var(--esm-primary-hover);
+  --esmera-primary-container: var(--esm-primary);
+  --esmera-primary-soft: var(--esm-primary-soft);
+  --esmera-surface: var(--esm-surface);
+  --esmera-text: var(--esm-text);
+  --esmera-muted: var(--esm-text-muted);
+  --esmera-line: var(--esm-line);
+}
