@@ -179,6 +179,112 @@ test.describe('Admin Panel', () => {
     await expect(page.getByText('Galeria vazia')).toBeVisible()
   })
 
+  test('operates Categories as hierarchy-safe master-detail with derived products', async () => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const stamp = Date.now()
+    const parentTitle = `Categoria Pai ${stamp}`
+    const childTitle = `Categoria Filha ${stamp}`
+    const synonym = `sinonimo-${stamp}`
+
+    const parentCreate = await page.request.post('http://localhost:3000/api/categories?draft=true', {
+      data: {
+        title: parentTitle,
+        slug: `categoria-pai-${stamp}`,
+        status: 'active',
+        order: 100,
+        _status: 'draft',
+      },
+    })
+    expect(parentCreate.ok(), `parent category create failed: ${parentCreate.status()} ${await parentCreate.text()}`).toBeTruthy()
+    const parentBody = await parentCreate.json() as { id?: string | number; doc?: { id?: string | number } }
+    const parentId = parentBody.id ?? parentBody.doc?.id
+    expect(parentId).toBeTruthy()
+
+    const childCreate = await page.request.post('http://localhost:3000/api/categories?draft=true', {
+      data: {
+        title: childTitle,
+        slug: `categoria-filha-${stamp}`,
+        status: 'active',
+        order: 200,
+        parent: parentId,
+        description: 'Descrição inicial da categoria filha.',
+        searchTerms: [{ term: synonym }],
+        seo: { title: `${childTitle} · Esméra`, description: 'SEO operacional da categoria.', noIndex: false },
+        _status: 'draft',
+      },
+    })
+    expect(childCreate.ok(), `child category create failed: ${childCreate.status()} ${await childCreate.text()}`).toBeTruthy()
+    const childBody = await childCreate.json() as { id?: string | number; doc?: { id?: string | number } }
+    const childId = childBody.id ?? childBody.doc?.id
+    expect(childId).toBeTruthy()
+
+    const productTitle = `Produto Categoria ${stamp}`
+    const relatedCreate = await page.request.post('http://localhost:3000/api/products?draft=true', {
+      data: {
+        title: productTitle,
+        code: `CAT-${stamp}`,
+        catalogStatus: 'archived',
+        availability: 'available',
+        priceMode: 'inquiry',
+        categories: [childId],
+        _status: 'draft',
+      },
+    })
+    expect(relatedCreate.ok(), `related product create failed: ${relatedCreate.status()} ${await relatedCreate.text()}`).toBeTruthy()
+
+    await page.goto('http://localhost:3000/admin/categories?status=active')
+    await expect(page.getByRole('heading', { name: 'Categorias' }).first()).toBeVisible()
+    await expect(page.getByRole('link', { name: parentTitle })).toBeVisible()
+    await expect(page.getByRole('link', { name: childTitle })).toBeVisible()
+    await expect(page.getByText('1 prod.')).toBeVisible()
+
+    await page.goto(`http://localhost:3000/admin/categories?status=active&q=${encodeURIComponent(synonym)}`)
+    await expect(page.getByRole('link', { name: childTitle })).toBeVisible()
+    await expect(page.getByRole('link', { name: parentTitle })).toHaveCount(0)
+
+    await page.goto('http://localhost:3000/admin/categories?status=active')
+    const moveSelect = page.getByLabel(`Mover ${childTitle} para posição`)
+    await moveSelect.selectOption('1')
+    await expect(page.getByText('Ordem editorial salva.')).toBeVisible({ timeout: 10_000 })
+
+    await page.goto(`http://localhost:3000/admin/categories?status=active&category=${childId}&tab=general`)
+    await expect(page.getByRole('heading', { name: childTitle })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Mídia & SEO' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Produtos relacionados' })).toBeVisible()
+    await page.getByLabel('Descrição').fill('Descrição atualizada no workspace operacional.')
+    await page.getByRole('button', { name: 'Salvar rascunho' }).click()
+    await expect(page.getByText('Rascunho salvo.')).toBeVisible({ timeout: 10_000 })
+
+    const cycle = await page.request.patch(`http://localhost:3000/api/categories/${parentId}?draft=true`, {
+      data: { parent: childId, _status: 'draft' },
+    })
+    expect(cycle.ok()).toBeFalsy()
+    expect((await cycle.text()).toLocaleLowerCase('pt-BR')).toMatch(/ciclo|principal/)
+
+    const publishParent = await page.request.post('http://localhost:3000/api/admin-categories', { data: { action: 'publish', id: parentId } })
+    expect(publishParent.ok(), `parent category publish failed: ${publishParent.status()} ${await publishParent.text()}`).toBeTruthy()
+    const publishChild = await page.request.post('http://localhost:3000/api/admin-categories', { data: { action: 'publish', id: childId } })
+    expect(publishChild.ok(), `child category publish failed: ${publishChild.status()} ${await publishChild.text()}`).toBeTruthy()
+
+    await page.goto(`http://localhost:3000/admin/categories?status=active&category=${childId}&tab=media`)
+    await expect(page.getByText('Taxonomia & sinônimos')).toBeVisible()
+    await expect(page.getByText(synonym, { exact: true })).toBeVisible()
+    await expect(page.getByLabel('Preview básico de snippet')).toBeVisible()
+
+    await page.goto(`http://localhost:3000/admin/categories?status=active&category=${childId}&tab=products`)
+    await expect(page.getByRole('table', { name: 'Produtos relacionados à categoria' })).toBeVisible()
+    await expect(page.getByRole('link', { name: productTitle })).toBeVisible()
+    await expect(page.getByText('Esta lista vem de')).toBeVisible()
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`http://localhost:3000/admin/categories?status=active&category=${childId}&tab=general`)
+    await expect(page.getByRole('link', { name: '← Categorias' })).toBeVisible()
+    await expect(page.locator('.esmera-category-master')).toBeHidden()
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    expect(overflow).toBeLessThanOrEqual(1)
+    await page.setViewportSize({ width: 1440, height: 900 })
+  })
+
   test('can navigate to the technical users list', async () => {
     await page.goto('http://localhost:3000/admin/collections/users')
     await expect(page).toHaveURL('http://localhost:3000/admin/collections/users')
