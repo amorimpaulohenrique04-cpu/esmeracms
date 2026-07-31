@@ -9,7 +9,7 @@ export const Tasks: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'title',
-    defaultColumns: ['title', 'status', 'priority', 'dueAt', 'assignee', 'updatedAt'],
+    defaultColumns: ['title', 'status', 'priority', 'dueAt', 'assigneeUser', 'updatedAt'],
   },
   access: {
     read: commercialUsers,
@@ -19,6 +19,22 @@ export const Tasks: CollectionConfig = {
     readVersions: commercialUsers,
   },
   versions: { maxPerDoc: 30 },
+  hooks: {
+    beforeChange: [
+      ({ data, originalDoc }) => {
+        if (!data) return data
+        const nextStatus = data.status ?? originalDoc?.status
+        const changed = data.status !== undefined && data.status !== originalDoc?.status
+        if (nextStatus === 'done' && (!originalDoc?.completedAt || changed)) {
+          data.completedAt = new Date().toISOString()
+        }
+        if (nextStatus !== 'done' && changed && originalDoc?.completedAt) {
+          data.completedAt = null
+        }
+        return data
+      },
+    ],
+  },
   fields: [
     { name: 'title', type: 'text', label: 'Tarefa', required: true },
     {
@@ -27,6 +43,7 @@ export const Tasks: CollectionConfig = {
       label: 'Status',
       required: true,
       defaultValue: 'pending',
+      index: true,
       options: [
         { label: 'Pendente', value: 'pending' },
         { label: 'Em andamento', value: 'in_progress' },
@@ -52,9 +69,25 @@ export const Tasks: CollectionConfig = {
       type: 'date',
       label: 'Prazo',
       required: true,
+      index: true,
       admin: { date: { pickerAppearance: 'dayAndTime' } },
     },
-    { name: 'assignee', type: 'text', label: 'Responsável' },
+    {
+      name: 'assigneeUser',
+      type: 'relationship',
+      relationTo: 'users',
+      label: 'Responsável',
+      index: true,
+      filterOptions: {
+        or: [{ role: { equals: 'admin' } }, { role: { equals: 'commercial' } }],
+      },
+    },
+    {
+      name: 'assignee',
+      type: 'text',
+      label: 'Responsável legado',
+      admin: { hidden: true, description: 'Compatibilidade temporária até a migração dos valores antigos para Users.' },
+    },
     {
       name: 'relatedTo',
       type: 'relationship',
@@ -67,7 +100,7 @@ export const Tasks: CollectionConfig = {
       name: 'completedAt',
       type: 'date',
       label: 'Concluída em',
-      admin: { date: { pickerAppearance: 'dayAndTime' } },
+      admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
     },
   ],
 }
