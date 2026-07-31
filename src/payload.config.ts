@@ -1,11 +1,12 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
-import { buildConfig } from 'payload'
+import { buildConfig, type CollectionConfig } from 'payload'
 import { pt } from 'payload/i18n/pt'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
+import { enforceActiveProductCategories } from './businessRules/products/categoryValidity'
 import { Activities } from './collections/Activities'
 import { AfterSales } from './collections/AfterSales'
 import { Categories } from './collections/Categories'
@@ -25,6 +26,17 @@ import { SiteSettings } from './globals/SiteSettings'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+
+const OperationalProducts = {
+  ...Products,
+  hooks: {
+    ...Products.hooks,
+    beforeValidate: [
+      enforceActiveProductCategories,
+      ...(Products.hooks?.beforeValidate || []),
+    ],
+  },
+} satisfies CollectionConfig
 
 export default buildConfig({
   i18n: {
@@ -95,7 +107,7 @@ export default buildConfig({
     Users,
     Media,
     Categories,
-    Products,
+    OperationalProducts,
     Leads,
     Customers,
     Sales,
