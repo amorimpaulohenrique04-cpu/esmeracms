@@ -16,6 +16,7 @@ import {
   Button,
   DataTable,
   DrawerPanel,
+  EmptyState,
   Status,
 } from '../../design-system'
 import {
@@ -35,7 +36,7 @@ type WorkspaceProps = {
   totalPages: number
 }
 
-type MutationAction = 'publish' | 'unpublish' | 'archive' | 'restore' | 'add-category'
+type MutationAction = 'publish' | 'unpublish' | 'archive' | 'restore' | 'add-category' | 'set-availability'
 
 function money(cents: number | null | undefined) {
   if (typeof cents !== 'number') return 'Sob consulta'
@@ -120,6 +121,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState('')
+  const [bulkAvailability, setBulkAvailability] = useState('')
 
   const columns = useMemo<ColumnDef<ProductListItem>[]>(() => [
     {
@@ -191,6 +193,10 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
       setFeedback('Escolha uma categoria antes de aplicar.')
       return
     }
+    if (action === 'set-availability' && !bulkAvailability) {
+      setFeedback('Escolha uma disponibilidade antes de aplicar.')
+      return
+    }
     setBusy(true)
     setFeedback(null)
     try {
@@ -198,7 +204,12 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ action, ids: selectedIds, categoryId: categoryId || undefined }),
+        body: JSON.stringify({
+          action,
+          ids: selectedIds,
+          categoryId: categoryId || undefined,
+          availability: bulkAvailability || undefined,
+        }),
       })
       const body = await response.json() as { updated?: number; errors?: Array<{ id: string | number; message: string }>; error?: string }
       if (!response.ok) throw new Error(body.error || 'Não foi possível atualizar os produtos.')
@@ -238,7 +249,9 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
       {feedback ? <div className="esmera-products-feedback" role="status" aria-live="polite">{feedback}</div> : null}
 
-      {filters.view === 'list' ? (
+      {!products.length ? (
+        <EmptyState title="Nenhum produto encontrado" copy="Ajuste os filtros ou crie um novo produto para iniciar o catálogo." action={<Link className="esmera-button esmera-button--primary" href="/admin/collections/products/create">Novo produto</Link>} />
+      ) : filters.view === 'list' ? (
         <DataTable label="Produtos do catálogo">
           <thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead>
           <tbody>{table.getRowModel().rows.map((row) => <tr key={row.id}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody>
@@ -272,6 +285,8 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
           <Button disabled={busy} onClick={() => void mutate('restore')}>Restaurar</Button>
           <label className="esmera-products-bulk-category"><span>Categoria</span><select className="esmera-input" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Escolher…</option>{categories.map((category) => <option key={String(category.id)} value={String(category.id)}>{category.title || category.slug || category.id}</option>)}</select></label>
           <Button disabled={busy || !categoryId} onClick={() => void mutate('add-category')}>Adicionar categoria</Button>
+          <label className="esmera-products-bulk-category"><span>Disponibilidade</span><select className="esmera-input" value={bulkAvailability} onChange={(event) => setBulkAvailability(event.target.value)}><option value="">Escolher…</option>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <Button disabled={busy || !bulkAvailability} onClick={() => void mutate('set-availability')}>Aplicar disponibilidade</Button>
         </BulkActionBar>
       ) : null}
     </>
