@@ -45,6 +45,7 @@ export const callToActionFields = (name = 'callToAction', label = 'Chamada para 
     },
     {
       name: 'destinationType',
+      dbName: 'dest_type',
       type: 'select',
       label: 'Destino',
       defaultValue: 'internal',
