@@ -14,19 +14,6 @@ const viewports = [
   { name: 'mobile-390x844', width: 390, height: 844 },
 ] as const
 
-const routes = [
-  { name: 'dashboard', url: '/admin' },
-  { name: 'products', url: '/admin/products' },
-  { name: 'categories', url: '/admin/categories' },
-  { name: 'customers', url: '/admin/customers' },
-  { name: 'sales-list', url: '/admin/sales?view=list' },
-  { name: 'sales-pipeline', url: '/admin/sales?view=pipeline' },
-  { name: 'after-sales', url: '/admin/after-sales' },
-  { name: 'reports', url: '/admin/reports' },
-  { name: 'settings', url: '/admin/settings' },
-  { name: 'technical', url: '/admin/technical' },
-] as const
-
 test('capture current admin visual baseline', async ({ page }) => {
   const createUser = await page.request.post(`${baseURL}/api/users`, {
     data: {
@@ -45,6 +32,39 @@ test('capture current admin visual baseline', async ({ page }) => {
     data: { email, password },
   })
   expect(login.ok(), `Baseline admin login failed: HTTP ${login.status()} ${await login.text()}`).toBeTruthy()
+
+  const createProduct = await page.request.post(`${baseURL}/api/products?draft=true`, {
+    data: {
+      title: 'Objeto Baseline Esméra',
+      code: `BASE-${Date.now()}`,
+      catalogStatus: 'archived',
+      availability: 'unique',
+      priceMode: 'inquiry',
+      material: 'Esmeralda bruta',
+      edition: 'Peça única',
+      _status: 'draft',
+    },
+  })
+  expect(createProduct.ok(), `Baseline product create failed: HTTP ${createProduct.status()} ${await createProduct.text()}`).toBeTruthy()
+  const productBody = await createProduct.json() as { id?: string | number; doc?: { id?: string | number } }
+  const productId = productBody.id ?? productBody.doc?.id
+  expect(productId).toBeTruthy()
+
+  const routes = [
+    { name: 'dashboard', url: '/admin' },
+    { name: 'products-list', url: '/admin/products' },
+    { name: 'products-grid', url: '/admin/products?view=grid' },
+    { name: 'product-overview', url: `/admin/products?product=${productId}&tab=overview` },
+    { name: 'product-media', url: `/admin/products?product=${productId}&tab=media` },
+    { name: 'categories', url: '/admin/categories' },
+    { name: 'customers', url: '/admin/customers' },
+    { name: 'sales-list', url: '/admin/sales?view=list' },
+    { name: 'sales-pipeline', url: '/admin/sales?view=pipeline' },
+    { name: 'after-sales', url: '/admin/after-sales' },
+    { name: 'reports', url: '/admin/reports' },
+    { name: 'settings', url: '/admin/settings' },
+    { name: 'technical', url: '/admin/technical' },
+  ] as const
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
 
