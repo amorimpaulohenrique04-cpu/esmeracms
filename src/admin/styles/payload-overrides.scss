@@ -1,0 +1,58 @@
+@layer payload {
+  html,
+  body {
+    background: var(--esm-canvas);
+  }
+
+  body {
+    color: var(--esm-text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .template-default__wrap {
+    background: var(--esm-canvas);
+  }
+
+  .app-header {
+    border-bottom: 1px solid var(--esm-line);
+    background: rgb(249 249 255 / 92%);
+    backdrop-filter: blur(14px);
+  }
+
+  .btn,
+  button:not(.esmera-nav-collapse):not(.esmera-logout) {
+    border-radius: var(--esm-radius-button);
+  }
+
+  input,
+  textarea,
+  select {
+    border-radius: var(--esm-radius-input);
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  button:focus-visible,
+  a:focus-visible {
+    outline-color: var(--esm-primary);
+  }
+
+  .card,
+  .upload__card,
+  .relationship__wrap,
+  .array-field__row {
+    border-radius: var(--esm-radius-panel);
+  }
+
+  .pill,
+  .status {
+    border-radius: 999px;
+  }
+
+  body:has(.esmera-view) .app-header__step-nav-wrapper {
+    visibility: hidden;
+  }
+}
