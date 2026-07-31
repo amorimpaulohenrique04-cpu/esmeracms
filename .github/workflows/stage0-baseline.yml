@@ -1,0 +1,110 @@
+name: Stage 0 - Security and Baseline
+
+on:
+  push:
+    branches:
+      - feat/admin-operational-rebuild
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stage0-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: esmera_stage0
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d esmera_stage0"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      CI: true
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/esmera_stage0
+      PAYLOAD_SECRET: stage0-ci-only-secret-change-before-production-2026
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      BASELINE_BASE_URL: http://127.0.0.1:3000
+      BASELINE_ADMIN_EMAIL: baseline.admin@esmera.local
+      BASELINE_ADMIN_PASSWORD: EsmeraBaseline-2026!
+
+    steps:
+      - name: Checkout reconstruction branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Refresh dependency lock
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Commit refreshed lockfile when required
+        shell: bash
+        run: |
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "pnpm-lock.yaml already matches package.json"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "chore(stage0): refresh lockfile [skip ci]"
+          git push origin HEAD:${GITHUB_REF_NAME}
+
+      - name: Verify frozen install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Validate release gate
+        run: pnpm validate:release
+
+      - name: Capture current admin visual baseline
+        run: pnpm baseline:capture
+
+      - name: Upload admin baseline screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-baseline-${{ github.run_id }}
+          path: artifacts/admin-baseline/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Playwright diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage0-playwright-diagnostics-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
