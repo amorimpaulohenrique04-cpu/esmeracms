@@ -125,6 +125,60 @@ test.describe('Admin Panel', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
   })
 
+  test('operates Products as list/grid workspace with draft autosave and server readiness', async () => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const stamp = Date.now()
+    const title = `Produto E2E ${stamp}`
+    const create = await page.request.post('http://localhost:3000/api/products?draft=true', {
+      data: {
+        title,
+        code: `E2E-${stamp}`,
+        catalogStatus: 'archived',
+        availability: 'available',
+        priceMode: 'inquiry',
+        _status: 'draft',
+      },
+    })
+    expect(create.ok(), `draft product create failed: ${create.status()} ${await create.text()}`).toBeTruthy()
+    const created = await create.json() as { id?: string | number; doc?: { id?: string | number } }
+    const productId = created.id ?? created.doc?.id
+    expect(productId).toBeTruthy()
+
+    await page.goto('http://localhost:3000/admin/products')
+    await expect(page.getByRole('heading', { name: 'Produtos' }).first()).toBeVisible()
+    await expect(page.getByRole('table', { name: 'Produtos do catálogo' })).toBeVisible()
+    await expect(page.getByRole('link', { name: title }).first()).toBeVisible()
+
+    await page.getByRole('link', { name: 'Grid', exact: true }).click()
+    await expect(page).toHaveURL(/view=grid/)
+    await expect(page.getByRole('link', { name: title }).first()).toBeVisible()
+
+    await page.goto(`http://localhost:3000/admin/products?product=${productId}&tab=overview`)
+    await expect(page.getByRole('heading', { name: title }).first()).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Mídia', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Comercial', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Variantes', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Ficha técnica', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'SEO', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Histórico', exact: true })).toBeVisible()
+    await expect(page.getByText('Com pendências').first()).toBeVisible()
+
+    await page.getByLabel('Subtítulo').fill('Rascunho salvo automaticamente')
+    await expect(page.getByText('Rascunho salvo', { exact: true })).toBeVisible({ timeout: 10_000 })
+
+    const publish = await page.request.post('http://localhost:3000/api/admin-products', {
+      data: { action: 'publish', ids: [productId] },
+    })
+    expect(publish.status()).toBe(422)
+    const publishBody = await publish.json() as { updated?: number; errors?: Array<{ message?: string }> }
+    expect(publishBody.updated).toBe(0)
+    expect(publishBody.errors?.length).toBeGreaterThan(0)
+
+    await page.goto(`http://localhost:3000/admin/products?product=${productId}&tab=media`)
+    await expect(page.getByRole('heading', { name: 'Galeria' })).toBeVisible()
+    await expect(page.getByText('Galeria vazia')).toBeVisible()
+  })
+
   test('can navigate to the technical users list', async () => {
     await page.goto('http://localhost:3000/admin/collections/users')
     await expect(page).toHaveURL('http://localhost:3000/admin/collections/users')
