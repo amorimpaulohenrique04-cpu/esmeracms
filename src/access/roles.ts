@@ -1,4 +1,4 @@
-import type { Access, FieldAccess } from 'payload'
+import type { Access, FieldAccess, Where } from 'payload'
 
 export type EsmeraRole = 'admin' | 'editor' | 'commercial'
 
@@ -51,27 +51,40 @@ export const adminField: FieldAccess = ({ req }) => isAdmin(req.user)
 
 export const publishedProductsOrAuthenticated: Access = ({ req }) => {
   if (canManageSite(req.user)) return true
-  if (req.user) return { _status: { equals: 'published' } }
-  return {
+
+  if (req.user) {
+    const publishedOnly: Where = { _status: { equals: 'published' } }
+    return publishedOnly
+  }
+
+  const publicCatalog: Where = {
     and: [
       { _status: { equals: 'published' } },
       { catalogStatus: { equals: 'active' } },
     ],
   }
+  return publicCatalog
 }
 
 export const activeCategoriesOrAuthenticated: Access = ({ req }) => {
   if (canManageSite(req.user)) return true
-  if (req.user) return { _status: { equals: 'published' } }
-  return {
+
+  if (req.user) {
+    const publishedOnly: Where = { _status: { equals: 'published' } }
+    return publishedOnly
+  }
+
+  const publicCategories: Where = {
     and: [
       { _status: { equals: 'published' } },
       { status: { equals: 'active' } },
     ],
   }
+  return publicCategories
 }
 
 export const publishedGlobalOrAuthenticated = ({ req }: RequestLikeArgs) => {
   if (req.user) return true
-  return { _status: { equals: 'published' } }
+  const publishedOnly: Where = { _status: { equals: 'published' } }
+  return publishedOnly
 }
