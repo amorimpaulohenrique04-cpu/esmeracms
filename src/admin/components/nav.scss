@@ -7,35 +7,140 @@
   flex-direction: column;
   overflow: hidden;
   padding: 22px 14px 16px;
-  background: #f9f9ff;
-  border-right: 1px solid #dfe5e2;
-  color: #111c2d;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   box-sizing: border-box;
+  border-right: 1px solid var(--esm-line);
+  background: var(--esm-canvas);
+  color: var(--esm-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-.esmera-nav-brand { display: flex; align-items: center; gap: 11px; padding: 2px 10px 28px; }
-.esmera-nav-brand strong { display: block; font-size: 15px; letter-spacing: -.015em; }
-.esmera-nav-brand span { display: block; color: #727975; font-size: 9px; margin-top: 3px; letter-spacing: .04em; }
-.esmera-brand-icon { width: 36px; height: 36px; display: inline-grid; place-items: center; border-radius: 10px; background: #4a675d; color: #fff; flex: 0 0 auto; }
+
+.esmera-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 2px 10px 28px;
+}
+
+.esmera-nav-brand strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -.015em;
+}
+
+.esmera-nav-brand span {
+  display: block;
+  margin-top: 3px;
+  color: var(--esm-text-muted);
+  font-size: 9px;
+  letter-spacing: .04em;
+}
+
+.esmera-brand-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--esm-radius-popover);
+  background: var(--esm-primary);
+  color: #fff;
+}
+
 .esmera-brand-icon svg { width: 22px; height: 22px; }
 .esmera-nav-section { display: grid; gap: 5px; }
-.esmera-nav-link { min-height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 10px; color: #414845; font-size: 12px; font-weight: 600; text-decoration: none; transition: background-color .16s ease, color .16s ease; }
-.esmera-nav-link:hover { background: #eef3f1; color: #24342e; }
-.esmera-nav-link.is-active { background: #4a675d; color: #fff; box-shadow: 0 6px 18px rgba(50,79,70,.12); }
+
+.esmera-nav-link {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: var(--esm-radius-control);
+  color: #414845;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color var(--esm-duration-hover) var(--esm-ease-standard),
+    color var(--esm-duration-hover) var(--esm-ease-standard);
+}
+
+.esmera-nav-link:hover {
+  background: var(--esm-surface-muted);
+  color: var(--esm-primary-hover);
+}
+
+.esmera-nav-link.is-active {
+  background: var(--esm-primary);
+  color: #fff;
+}
+
 .esmera-nav-icon { width: 19px; height: 19px; flex: 0 0 auto; }
-.esmera-nav-divider { height: 1px; background: #e3e7e5; margin: 15px 7px 11px; }
-.esmera-nav-caption { padding: 0 11px 8px; color: #727975; font-size: 9px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+.esmera-nav-divider { height: 1px; margin: 15px 7px 11px; background: var(--esm-line); }
+
+.esmera-nav-caption {
+  padding: 0 11px 8px;
+  color: var(--esm-text-muted);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
 .esmera-nav-section--technical .esmera-nav-link { color: #6a7470; font-size: 11px; }
-.esmera-nav-footer { margin-top: auto; padding-top: 18px; border-top: 1px solid #e3e7e5; }
-.esmera-user { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 9px; align-items: center; padding: 7px 8px; color: inherit; text-decoration: none; }
-.esmera-user strong { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 11px; white-space: nowrap; }
-.esmera-user small { display: block; color: #8a928f; font-size: 9px; margin-top: 2px; }
-.esmera-avatar { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #95b4a8; border-radius: 50%; background: #dcece6; color: #29473d; font-size: 10px; font-weight: 750; }
-.esmera-logout { width: 100%; margin-top: 6px; border: 0; background: transparent; color: #6b7470; text-align: left; padding: 8px; border-radius: 8px; font-size: 10px; cursor: pointer; }
-.esmera-logout:hover { background: #f0f2f1; color: #283730; }
+.esmera-nav-footer { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--esm-line); }
+
+.esmera-user {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  padding: 7px 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.esmera-user strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.esmera-user small { display: block; margin-top: 2px; color: var(--esm-text-muted); font-size: 9px; }
+
+.esmera-avatar {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #95b4a8;
+  border-radius: 50%;
+  background: var(--esm-primary-soft);
+  color: var(--esm-primary-hover);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.esmera-logout {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--esm-radius-control);
+  background: transparent;
+  color: var(--esm-text-muted);
+  text-align: left;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.esmera-logout:hover { background: var(--esm-surface-muted); color: var(--esm-primary-hover); }
 .esmera-login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .esmera-login-logo strong { display: block; font-size: 18px; }
-.esmera-login-logo span { display: block; color: #78817d; font-size: 10px; margin-top: 2px; }
+.esmera-login-logo span { display: block; margin-top: 2px; color: var(--esm-text-muted); font-size: 10px; }
 
 @media (max-width: 1024px) {
   .esmera-nav { width: 100%; }
