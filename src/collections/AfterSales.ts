@@ -2,6 +2,12 @@ import type { CollectionConfig } from 'payload'
 
 import { commercialUsers } from '../access/roles'
 
+type FollowUp = {
+  status?: string | null
+  completedAt?: string | null
+  [key: string]: unknown
+}
+
 export const AfterSales: CollectionConfig = {
   slug: 'after-sales',
   trash: true,
@@ -9,7 +15,7 @@ export const AfterSales: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'id',
-    defaultColumns: ['customer', 'sale', 'status', 'priority', 'expectedDeliveryAt', 'updatedAt'],
+    defaultColumns: ['customer', 'sale', 'status', 'priority', 'ownerUser', 'updatedAt'],
   },
   access: {
     read: commercialUsers,
@@ -19,6 +25,23 @@ export const AfterSales: CollectionConfig = {
     readVersions: commercialUsers,
   },
   versions: { maxPerDoc: 100 },
+  hooks: {
+    beforeChange: [
+      ({ data }) => {
+        if (!data || !Array.isArray(data.followUps)) return data
+        data.followUps = (data.followUps as FollowUp[]).map((followUp) => {
+          if (followUp.status === 'done' && !followUp.completedAt) {
+            return { ...followUp, completedAt: new Date().toISOString() }
+          }
+          if (followUp.status !== 'done' && followUp.completedAt) {
+            return { ...followUp, completedAt: null }
+          }
+          return followUp
+        })
+        return data
+      },
+    ],
+  },
   fields: [
     {
       type: 'tabs',
@@ -54,15 +77,49 @@ export const AfterSales: CollectionConfig = {
                 { label: 'Urgente', value: 'urgent' },
               ],
             },
-            { name: 'owner', type: 'text', label: 'Responsável' },
+            {
+              name: 'ownerUser',
+              type: 'relationship',
+              relationTo: 'users',
+              label: 'Responsável',
+              index: true,
+              filterOptions: {
+                or: [{ role: { equals: 'admin' } }, { role: { equals: 'commercial' } }],
+              },
+            },
+            {
+              name: 'owner',
+              type: 'text',
+              label: 'Responsável legado',
+              admin: { hidden: true, description: 'Compatibilidade temporária até a migração dos valores antigos para Users.' },
+            },
           ],
         },
         {
           label: 'Entrega',
           fields: [
-            { name: 'expectedDeliveryAt', type: 'date', label: 'Entrega prevista', admin: { date: { pickerAppearance: 'dayAndTime' } } },
-            { name: 'deliveredAt', type: 'date', label: 'Entrega realizada', admin: { date: { pickerAppearance: 'dayAndTime' } } },
-            { name: 'deliveryNotes', type: 'textarea', label: 'Observações da entrega' },
+            {
+              type: 'ui',
+              name: 'deliverySourceInfo',
+              admin: {
+                components: {
+                  Field: '/admin/components/DeliverySourceNote#DeliverySourceNote',
+                },
+              },
+            },
+            {
+              name: 'expectedDeliveryAt',
+              type: 'date',
+              label: 'Entrega prevista (legado)',
+              admin: { hidden: true, description: 'A venda relacionada é a fonte de verdade da entrega prevista.' },
+            },
+            {
+              name: 'deliveredAt',
+              type: 'date',
+              label: 'Entrega realizada (legado)',
+              admin: { hidden: true, description: 'A venda relacionada é a fonte de verdade da entrega realizada.' },
+            },
+            { name: 'deliveryNotes', type: 'textarea', label: 'Observações de monitoramento do pós-venda' },
           ],
         },
         {
@@ -113,7 +170,7 @@ export const AfterSales: CollectionConfig = {
                   ],
                 },
                 { name: 'notes', type: 'textarea', label: 'Observações' },
-                { name: 'completedAt', type: 'date', label: 'Concluído em', admin: { date: { pickerAppearance: 'dayAndTime' } } },
+                { name: 'completedAt', type: 'date', label: 'Concluído em', admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
               ],
             },
           ],
