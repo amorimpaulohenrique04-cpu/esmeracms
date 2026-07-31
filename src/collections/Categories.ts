@@ -61,6 +61,7 @@ export const Categories: CollectionConfig = {
             {
               name: 'status',
               type: 'select',
+              dbName: 'category_state',
               label: 'Status',
               required: true,
               defaultValue: 'active',
