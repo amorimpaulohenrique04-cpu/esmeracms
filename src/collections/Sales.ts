@@ -1,8 +1,144 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, PayloadRequest } from 'payload'
 
 import { commercialUsers } from '../access/roles'
 
 export const eligibleSaleStatuses = ['confirmed', 'production', 'ready', 'delivered'] as const
+
+type RelationValue = string | number | { id?: string | number | null } | null | undefined
+
+type SaleItem = {
+  product?: RelationValue
+  variantSku?: string | null
+  snapshotTitle?: string | null
+  snapshotSlug?: string | null
+  snapshotSelection?: string | null
+  referencePriceCents?: number | null
+  priceMode?: 'fixed' | 'inquiry' | string | null
+  unitPriceCents?: number | null
+  quantity?: number | null
+}
+
+type ProductVariant = {
+  sku?: string | null
+  status?: string | null
+  priceMode?: 'inherit' | 'fixed' | 'inquiry' | string | null
+  priceCents?: number | null
+  selection?: Array<{ option?: string | null; value?: string | null }> | null
+}
+
+type ProductDocument = {
+  title?: string | null
+  slug?: string | null
+  priceMode?: 'fixed' | 'inquiry' | string | null
+  basePriceCents?: number | null
+  optionDefinitions?: Array<{
+    code?: string | null
+    label?: string | null
+    values?: Array<{ value?: string | null; label?: string | null }> | null
+  }> | null
+  variants?: ProductVariant[] | null
+}
+
+function relationId(value: RelationValue) {
+  if (value && typeof value === 'object') return value.id ?? null
+  return value ?? null
+}
+
+function selectionLabel(product: ProductDocument, variant?: ProductVariant) {
+  if (!variant?.selection?.length) return null
+  const definitions = new Map(
+    (product.optionDefinitions || []).map((definition) => [definition.code, definition]),
+  )
+  return variant.selection
+    .map((selection) => {
+      const definition = definitions.get(selection.option)
+      const value = definition?.values?.find((entry) => entry.value === selection.value)
+      return `${definition?.label || selection.option || 'Opção'}: ${value?.label || selection.value || '—'}`
+    })
+    .join(' · ')
+}
+
+async function hydrateSaleItem(item: SaleItem, req: PayloadRequest): Promise<SaleItem> {
+  const productId = relationId(item.product)
+  if (!productId) return item
+
+  const product = (await req.payload.findByID({
+    collection: 'products',
+    id: productId,
+    depth: 0,
+    overrideAccess: false,
+    req,
+  })) as ProductDocument
+
+  const variant = item.variantSku
+    ? product.variants?.find((entry) => entry.sku === item.variantSku && entry.status !== 'disabled')
+    : undefined
+
+  if (item.variantSku && !variant) {
+    throw new Error(`A variante ${item.variantSku} não existe ou está desabilitada no produto selecionado.`)
+  }
+
+  const variantMode = variant?.priceMode
+  const referenceMode = variantMode === 'inherit' || !variantMode ? product.priceMode : variantMode
+  const referencePrice =
+    variantMode === 'fixed' && typeof variant?.priceCents === 'number'
+      ? variant.priceCents
+      : referenceMode === 'fixed' && typeof product.basePriceCents === 'number'
+        ? product.basePriceCents
+        : null
+
+  return {
+    ...item,
+    snapshotTitle: String(product.title || '').trim(),
+    snapshotSlug: String(product.slug || '').trim(),
+    snapshotSelection: selectionLabel(product, variant),
+    referencePriceCents: referencePrice,
+    priceMode: item.priceMode || referenceMode || 'inquiry',
+    unitPriceCents:
+      typeof item.unitPriceCents === 'number'
+        ? item.unitPriceCents
+        : referenceMode === 'fixed'
+          ? referencePrice
+          : null,
+  }
+}
+
+function calculateFinancials(data: Record<string, unknown>) {
+  const items = (Array.isArray(data.items) ? data.items : []) as SaleItem[]
+  const discount = typeof data.discountCents === 'number' ? data.discountCents : 0
+  const shipping = typeof data.shippingCents === 'number' ? data.shippingCents : 0
+  const override = typeof data.totalOverrideCents === 'number' ? data.totalOverrideCents : null
+  const reason = String(data.totalOverrideReason || '').trim()
+
+  if (override !== null) {
+    if (!reason) throw new Error('Informe o motivo do total negociado manualmente.')
+    data.subtotalCents = items.reduce(
+      (sum, item) =>
+        sum + (item.priceMode === 'fixed' && typeof item.unitPriceCents === 'number' ? item.unitPriceCents * Math.max(1, Number(item.quantity || 1)) : 0),
+      0,
+    )
+    data.totalCents = override
+    return
+  }
+
+  const hasUnpricedItem = items.some(
+    (item) => item.priceMode !== 'fixed' || typeof item.unitPriceCents !== 'number',
+  )
+  if (hasUnpricedItem) {
+    data.subtotalCents = null
+    data.totalCents = null
+    return
+  }
+
+  const subtotal = items.reduce(
+    (sum, item) => sum + Number(item.unitPriceCents || 0) * Math.max(1, Number(item.quantity || 1)),
+    0,
+  )
+  const total = subtotal - discount + shipping
+  if (total < 0) throw new Error('O total da venda não pode ser negativo.')
+  data.subtotalCents = subtotal
+  data.totalCents = total
+}
 
 export const Sales: CollectionConfig = {
   slug: 'sales',
@@ -12,7 +148,7 @@ export const Sales: CollectionConfig = {
     group: 'Business',
     useAsTitle: 'number',
     defaultColumns: ['number', 'customer', 'status', 'totalCents', 'expectedDeliveryAt', 'updatedAt'],
-    listSearchableFields: ['number', 'owner'],
+    listSearchableFields: ['number'],
   },
   access: {
     read: commercialUsers,
@@ -23,11 +159,30 @@ export const Sales: CollectionConfig = {
   },
   versions: { maxPerDoc: 100 },
   hooks: {
+    beforeValidate: [
+      async ({ data, originalDoc, req }) => {
+        if (!data) return data
+        const next = { ...(originalDoc || {}), ...data } as Record<string, unknown>
+        if (Array.isArray(next.items)) {
+          next.items = await Promise.all((next.items as SaleItem[]).map((item) => hydrateSaleItem(item, req)))
+          data.items = next.items
+        }
+        calculateFinancials(next)
+        data.subtotalCents = next.subtotalCents
+        data.totalCents = next.totalCents
+        return data
+      },
+    ],
     beforeChange: [
       ({ data, originalDoc }) => {
         if (!data) return data
-        const eligible = eligibleSaleStatuses.includes(data?.status as typeof eligibleSaleStatuses[number])
+        const nextStatus = data.status ?? originalDoc?.status
+        const eligible = eligibleSaleStatuses.includes(nextStatus as typeof eligibleSaleStatuses[number])
         if (eligible && !data?.confirmedAt && !originalDoc?.confirmedAt) data.confirmedAt = new Date().toISOString()
+        const total = data.totalCents ?? originalDoc?.totalCents
+        if (eligible && typeof total !== 'number') {
+          throw new Error('Uma venda confirmada precisa ter total calculável ou override financeiro com motivo.')
+        }
         return data
       },
     ],
@@ -74,7 +229,22 @@ export const Sales: CollectionConfig = {
                 { label: 'Cancelada', value: 'cancelled' },
               ],
             },
-            { name: 'owner', type: 'text', label: 'Responsável' },
+            {
+              name: 'ownerUser',
+              type: 'relationship',
+              relationTo: 'users',
+              label: 'Responsável',
+              index: true,
+              filterOptions: {
+                or: [{ role: { equals: 'admin' } }, { role: { equals: 'commercial' } }],
+              },
+            },
+            {
+              name: 'owner',
+              type: 'text',
+              label: 'Responsável legado',
+              admin: { hidden: true, description: 'Campo temporário para migração dos registros anteriores ao relacionamento com Users.' },
+            },
             {
               name: 'confirmedAt',
               type: 'date',
@@ -103,10 +273,11 @@ export const Sales: CollectionConfig = {
                   type: 'text',
                   label: 'Nome no momento da venda',
                   required: true,
-                  admin: { description: 'Snapshot obrigatório para preservar o histórico.' },
+                  admin: { readOnly: true, description: 'Preenchido automaticamente a partir do produto.' },
                 },
-                { name: 'snapshotSlug', type: 'text', label: 'Slug no momento da venda', required: true },
-                { name: 'snapshotSelection', type: 'text', label: 'Seleção no momento da venda' },
+                { name: 'snapshotSlug', type: 'text', label: 'Slug no momento da venda', required: true, admin: { readOnly: true } },
+                { name: 'snapshotSelection', type: 'text', label: 'Seleção no momento da venda', admin: { readOnly: true } },
+                { name: 'referencePriceCents', type: 'number', label: 'Preço de referência em centavos', admin: { readOnly: true } },
                 {
                   name: 'priceMode',
                   type: 'select',
@@ -127,14 +298,28 @@ export const Sales: CollectionConfig = {
                 { name: 'quantity', type: 'number', label: 'Quantidade', required: true, defaultValue: 1, min: 1, admin: { step: 1 } },
               ],
             },
+            { name: 'subtotalCents', type: 'number', label: 'Subtotal em centavos', admin: { readOnly: true } },
             { name: 'discountCents', type: 'number', label: 'Desconto em centavos', defaultValue: 0, min: 0 },
             { name: 'shippingCents', type: 'number', label: 'Frete em centavos', defaultValue: 0, min: 0 },
             {
+              name: 'totalOverrideCents',
+              type: 'number',
+              label: 'Total negociado manualmente em centavos',
+              min: 0,
+              admin: { description: 'Use apenas em negociação especial ou item sob consulta. Exige justificativa.' },
+            },
+            {
+              name: 'totalOverrideReason',
+              type: 'textarea',
+              label: 'Motivo do total negociado',
+              admin: { condition: (_, siblingData) => typeof siblingData?.totalOverrideCents === 'number' },
+            },
+            {
               name: 'totalCents',
               type: 'number',
-              label: 'Total fechado em centavos',
+              label: 'Total final em centavos',
               min: 0,
-              admin: { description: 'Snapshot financeiro final da venda.' },
+              admin: { readOnly: true, description: 'Calculado no servidor a partir dos itens, desconto, frete e eventual override justificado.' },
             },
           ],
         },
