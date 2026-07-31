@@ -15,9 +15,11 @@
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
     "typecheck": "tsc --noEmit",
     "validate": "pnpm generate:types && pnpm generate:importmap && pnpm typecheck && pnpm lint --max-warnings=0 && pnpm test:int && pnpm build",
+    "validate:release": "pnpm validate && pnpm test:e2e",
     "test": "pnpm run test:int && pnpm run test:e2e",
     "test:e2e": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.config.ts",
-    "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts"
+    "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts",
+    "baseline:capture": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.baseline.config.ts"
   },
   "dependencies": {
     "@payloadcms/next": "3.86.0",
@@ -26,7 +28,7 @@
     "cross-env": "^7.0.3",
     "dotenv": "16.4.7",
     "graphql": "^16.8.1",
-    "next": "16.2.6",
+    "next": "16.2.11",
     "payload": "3.86.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
@@ -41,7 +43,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "4.5.2",
     "eslint": "^9.16.0",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.2.11",
     "jsdom": "28.0.0",
     "prettier": "^3.4.2",
     "tsx": "4.22.4",
@@ -50,7 +52,7 @@
     "vitest": "4.0.18"
   },
   "engines": {
-    "node": "^18.20.2 || >=20.9.0",
+    "node": ">=20.9.0",
     "pnpm": "^9 || ^10 || ^11"
   }
 }
