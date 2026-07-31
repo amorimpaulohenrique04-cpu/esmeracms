@@ -274,7 +274,7 @@ Won/Lost are not treated as ordinary operational columns. The later Opportunitie
 
 ### Test coverage added
 
-Playwright now verifies:
+Playwright verifies:
 
 - final operational navigation contains no Content/Pipeline items;
 - global AppHeader is visible;
@@ -333,6 +333,137 @@ Visual inspection confirmed:
 
 ---
 
+## Stage 4 — Structural responsiveness and workspace behavior
+
+Stage 4 makes the operational workspaces consume the shell correctly at every supported width. It deliberately does not redesign Products, Categories or other feature workflows yet; those begin in Stage 5.
+
+### Full-width operational frame
+
+`ViewFrame` no longer relies on Payload's generic `Gutter` for operational workspace sizing. The Esmera workspace now owns its horizontal frame and padding.
+
+The previous global constraint:
+
+```css
+max-width: 1440px;
+margin: 0 auto;
+```
+
+was removed from `.esmera-view`.
+
+The workspace now uses:
+
+```css
+width: 100%;
+min-width: 0;
+max-width: none;
+container-type: inline-size;
+container-name: esmera-workspace;
+```
+
+This allows data-heavy screens to consume the actual area left by the sidebar/rail rather than behaving like centered marketing pages.
+
+### Container-query behavior
+
+Internal workspace layout is now driven by the available workspace width instead of only the browser viewport.
+
+Current structural thresholds:
+
+- `<=980px` workspace: multi-column content grids collapse and KPI layout becomes two columns;
+- `<=720px` workspace: page headers stack, action areas become contextual rows, dense card headers can wrap;
+- `<=560px` workspace: KPI layout becomes one column, list rows stack, actions become full-width and internal spacing tightens.
+
+The workspace applies systematic `min-width: 0` to grid/card/list descendants so long text and nested flex/grid content cannot force document-level overflow.
+
+### Horizontal interaction boundaries
+
+Horizontal movement is retained only where it is a deliberate interaction pattern:
+
+- Sales Pipeline keeps an internal horizontal board on narrow screens;
+- the compact Dashboard stage track may scroll within its own card when its minimum readable width is not available;
+- scrolling is contained with `overscroll-behavior-inline` instead of expanding the document.
+
+The Pipeline structural grid was also aligned to the four active operational stages currently exposed by the transitional Lead model.
+
+### Shell breakpoint contract hardened
+
+Stage 4 normalized the exact boundary between the navigation rail and mobile Drawer:
+
+- `>=1280px`: 236px full sidebar;
+- `1024–1279px`: 72px compact rail;
+- `<=1023px`: Drawer navigation.
+
+The nav CSS, shell controls and Payload wrapper now share the same boundary, eliminating ambiguous behavior at exactly `1024px`.
+
+### Responsive regression tests
+
+Playwright now verifies structural behavior directly:
+
+- at `1920px`, `.esmera-view` exceeds 1500px and has `max-width: none`;
+- `.esmera-view` exposes `container-type: inline-size`;
+- at `768px`, Dashboard KPI layout resolves to two columns;
+- at `390px`, KPI layout resolves to one column;
+- Dashboard has no document-level horizontal overflow on mobile;
+- every operational route is swept at `768px` and `390px` to assert that document horizontal overflow remains <=1px;
+- intentional Pipeline overflow remains inside the Pipeline component rather than the page.
+
+Routes covered by the responsive overflow sweep:
+
+```text
+/admin
+/admin/products
+/admin/categories
+/admin/customers
+/admin/sales?view=list
+/admin/sales?view=pipeline
+/admin/after-sales
+/admin/reports
+/admin/settings
+```
+
+### Visual validation
+
+The Stage 4 capture matrix remains:
+
+- 10 operational routes/views;
+- 5 target viewports;
+- **50 PNG screenshots**.
+
+Visual inspection confirmed:
+
+- `1440x900`: workspace uses the available content area rather than a centered max-width column;
+- `1280x800`: full sidebar and container-driven internal collapse remain coherent;
+- `1024x768`: compact rail remains active at the exact boundary and content uses the remaining width;
+- `768x1024`: Drawer shell plus two-column KPI structure with no sidebar residue;
+- `390x844`: one-column KPI flow, full-width contextual primary action and no document-level horizontal overflow.
+
+### Verified execution
+
+- Final Stage 4 code/test head: `748fb9585aba73d9ff863492994e07657c4c7308`
+- `Validate Esmera CMS` run `30668804433`: **success**
+- visual/release capture run `30668804166`: **success**
+- Visual artifact: `admin-baseline-30668804166`
+- Artifact ID: `8808070887`
+- Artifact digest: `sha256:89df8f6d9754c2c53fa6822048cc23f97e1daadc1c34af5354f15412beedcfaf`
+
+### Stage 4 acceptance checklist
+
+- [x] Global operational `max-width: 1440px` removed.
+- [x] Operational frame no longer depends on Payload Gutter sizing.
+- [x] Workspace establishes an inline-size CSS container.
+- [x] Core internal layout behavior migrated to Container Queries.
+- [x] Desktop/rail/Drawer breakpoints use one exact contract.
+- [x] 1024px rail boundary explicitly regression-tested.
+- [x] Tablet KPI behavior regression-tested.
+- [x] Mobile KPI behavior regression-tested.
+- [x] Operational routes swept for document-level horizontal overflow.
+- [x] Pipeline overflow contained locally.
+- [x] Release gate green.
+- [x] Multi-viewport visual baseline generated and inspected.
+
+**Stage 4 is complete.**
+
+---
+
 ## Next stage
 
-The next implementation milestone is **Stage 4 — structural responsiveness/workspace behavior**, followed by the feature workspaces in dependency order. Domain migrations such as `Opportunities` remain deferred to their explicit commercial-domain stage and must not be pulled forward into shell work.
+The next implementation milestone is **Stage 5 — Products workspace**: operational table/list behavior, filters in the URL, server pagination, inspector, bulk actions and the product operational Document View. Domain migrations such as `Opportunities` remain deferred to their explicit commercial-domain stage.
