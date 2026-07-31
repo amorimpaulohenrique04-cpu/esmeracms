@@ -1,16 +1,19 @@
 /* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
-import type { AdminViewServerProps, Where } from 'payload'
+import type { AdminViewServerProps } from 'payload'
 
 import { canManageBusiness, canManageSite } from '../../access/roles'
-import { eligibleSaleStatuses } from '../../collections/Sales'
+import {
+  getAfterSalesSummary,
+  getCatalogHealth,
+  getDueTaskSummary,
+  getMonthlySalesSummary,
+  getOpenLeadSummary,
+} from '../../services/dashboard'
 import {
   AccessDenied,
-  countDocs,
   dateTime,
   EmptyState,
   ensureUser,
-  findAllDocs,
-  findDocs,
   MetricCard,
   money,
   monthStartISO,
@@ -20,20 +23,6 @@ import {
   TechnicalLink,
   ViewFrame,
 } from './shared'
-
-type Product = { id: string | number; title?: string; code?: string; updatedAt?: string }
-type Task = {
-  id: string | number
-  title?: string
-  dueAt?: string
-  priority?: string
-  status?: string
-}
-type Sale = { totalCents?: number | null; status?: string }
-type FollowUp = { status?: string; dueAt?: string }
-type AfterSale = { followUps?: FollowUp[] }
-
-const activeLeadStages = ['new', 'curation', 'proposal', 'negotiation']
 
 const stageLabels: Record<string, string> = {
   new: 'Novo',
@@ -53,73 +42,21 @@ export default async function Dashboard(props: AdminViewServerProps) {
   }
 
   try {
-    const sitePromise = siteAllowed
-      ? Promise.all([
-          countDocs(req, 'products', {
-            and: [
-              { catalogStatus: { equals: 'active' } },
-              { _status: { equals: 'published' } },
-            ],
-          } as Where),
-          countDocs(req, 'products', { _status: { equals: 'draft' } } as Where),
-          findDocs<Product>(req, 'products', {
-            sort: '-updatedAt',
-            limit: 1,
-            depth: 0,
-            select: { id: true, title: true, code: true, updatedAt: true },
-          }),
-        ])
-      : Promise.resolve(null)
-
+    const sitePromise = siteAllowed ? getCatalogHealth(req) : Promise.resolve(null)
     const businessPromise = businessAllowed
       ? Promise.all([
-          countDocs(req, 'leads', { stage: { in: activeLeadStages } } as Where),
-          findAllDocs<Sale>(req, 'sales', {
-            where: {
-              and: [
-                { status: { in: [...eligibleSaleStatuses] } },
-                { confirmedAt: { greater_than_equal: monthStartISO() } },
-              ],
-            } as Where,
-            depth: 0,
-            select: { totalCents: true, status: true },
-          }),
-          findAllDocs<AfterSale>(req, 'after-sales', {
-            depth: 0,
-            select: { followUps: true },
-          }),
-          findDocs<Task>(req, 'tasks', {
-            where: { status: { in: ['pending', 'in_progress'] } } as Where,
-            sort: 'dueAt',
-            limit: 6,
-            depth: 0,
-            select: { id: true, title: true, dueAt: true, priority: true, status: true },
-          }),
-          Promise.all(
-            activeLeadStages.map((stage) =>
-              countDocs(req, 'leads', { stage: { equals: stage } } as Where),
-            ),
-          ),
+          getOpenLeadSummary(req),
+          getMonthlySalesSummary(req, monthStartISO()),
+          getAfterSalesSummary(req, nextDayThreshold().toISOString()),
+          getDueTaskSummary(req),
         ])
       : Promise.resolve(null)
 
     const [site, business] = await Promise.all([sitePromise, businessPromise])
-    const tomorrow = nextDayThreshold()
-    const pendingFollowups = business
-      ? business[2]
-          .flatMap((item) => item.followUps || [])
-          .filter(
-            (follow) =>
-              follow.status === 'pending' &&
-              follow.dueAt &&
-              new Date(follow.dueAt) <= tomorrow,
-          ).length
-      : 0
-    const salesCount = business?.[1].length || 0
-    const revenue = business?.[1].reduce((sum, sale) => sum + (sale.totalCents || 0), 0) || 0
-    const pipeline = business
-      ? activeLeadStages.map((stage, index) => ({ stage, count: business[4][index] }))
-      : []
+    const leadSummary = business?.[0] ?? null
+    const salesSummary = business?.[1] ?? null
+    const afterSalesSummary = business?.[2] ?? null
+    const tasks = business?.[3] ?? []
 
     return (
       <ViewFrame props={props} withTemplate={false}>
@@ -146,46 +83,46 @@ export default async function Dashboard(props: AdminViewServerProps) {
               <MetricCard
                 icon="box"
                 label="Produtos ativos"
-                value={site[0]}
+                value={site.publishedActive}
                 tone="green"
                 meta="Publicados e ativos no catálogo"
               />
               <MetricCard
                 icon="draft"
                 label="Aguardando publicação"
-                value={site[1]}
+                value={site.drafts}
                 meta="Documentos com status de rascunho"
               />
             </>
           ) : null}
-          {business ? (
+          {leadSummary && salesSummary && afterSalesSummary ? (
             <>
               <MetricCard
                 icon="lead"
                 label="Leads abertos"
-                value={business[0]}
+                value={leadSummary.open}
                 tone="blue"
                 meta="Novo, curadoria, proposta e negociação"
               />
               <MetricCard
                 icon="money"
                 label="Vendas no mês"
-                value={money(revenue)}
+                value={money(salesSummary.revenueCents)}
                 tone="green"
-                meta={`${salesCount} vendas confirmadas ou em andamento`}
+                meta={`${salesSummary.count} vendas confirmadas ou em andamento`}
               />
               <MetricCard
                 icon="alert"
                 label="Follow-ups até amanhã"
-                value={pendingFollowups}
-                tone={pendingFollowups ? 'red' : 'neutral'}
+                value={afterSalesSummary.dueFollowUps}
+                tone={afterSalesSummary.dueFollowUps ? 'red' : 'neutral'}
                 meta="Itens pendentes com prazo até amanhã"
               />
             </>
           ) : null}
         </div>
 
-        {business ? (
+        {leadSummary ? (
           <div className="esmera-grid-2">
             <section className="esmera-card">
               <div className="esmera-card-header">
@@ -194,7 +131,7 @@ export default async function Dashboard(props: AdminViewServerProps) {
               </div>
               <div className="esmera-card-body">
                 <div className="esmera-stage-track">
-                  {pipeline.map(({ stage, count }) => (
+                  {leadSummary.stages.map(({ stage, count }) => (
                     <div className="esmera-stage" key={stage}>
                       <strong>{count}</strong>
                       <span>{stageLabels[stage]}</span>
@@ -202,8 +139,7 @@ export default async function Dashboard(props: AdminViewServerProps) {
                   ))}
                 </div>
                 <div className="esmera-kpi-meta">
-                  Fonte: leads · leitura atual. Nenhum estágio é estimado ou preenchido com
-                  placeholder.
+                  Fonte: leads · leitura atual. Nenhum estágio é estimado ou preenchido com placeholder.
                 </div>
               </div>
             </section>
@@ -213,9 +149,9 @@ export default async function Dashboard(props: AdminViewServerProps) {
                 <h2>Pendências</h2>
                 <TechnicalLink href="/admin/collections/tasks/create">Nova tarefa</TechnicalLink>
               </div>
-              {business[3].docs.length ? (
+              {tasks.length ? (
                 <ul className="esmera-list">
-                  {business[3].docs.map((task) => (
+                  {tasks.map((task) => (
                     <li className="esmera-list-row" key={String(task.id)}>
                       <div>
                         <a className="esmera-row-title" href={`/admin/collections/tasks/${task.id}`}>
@@ -236,10 +172,7 @@ export default async function Dashboard(props: AdminViewServerProps) {
                   ))}
                 </ul>
               ) : (
-                <EmptyState
-                  title="Nenhuma pendência"
-                  copy="A consulta foi concluída e não existem tarefas abertas."
-                />
+                <EmptyState title="Nenhuma pendência" copy="A consulta foi concluída e não existem tarefas abertas." />
               )}
             </section>
           </div>
@@ -253,19 +186,15 @@ export default async function Dashboard(props: AdminViewServerProps) {
                 <TechnicalLink href="/admin/products">Ver produtos</TechnicalLink>
               </div>
               <div className="esmera-card-body">
-                {site[2].docs[0] ? (
+                {site.latest ? (
                   <>
-                    <strong>{site[2].docs[0].title || 'Produto sem título'}</strong>
+                    <strong>{site.latest.title || 'Produto sem título'}</strong>
                     <p className="esmera-card-copy">
-                      {site[2].docs[0].code || 'Sem código'} · atualizado em{' '}
-                      {dateTime(site[2].docs[0].updatedAt)}
+                      {site.latest.code || 'Sem código'} · atualizado em {dateTime(site.latest.updatedAt)}
                     </p>
                   </>
                 ) : (
-                  <EmptyState
-                    title="Catálogo vazio"
-                    copy="Crie o primeiro produto no Admin técnico."
-                  />
+                  <EmptyState title="Catálogo vazio" copy="Crie o primeiro produto no Admin técnico." />
                 )}
               </div>
             </section>
@@ -276,8 +205,7 @@ export default async function Dashboard(props: AdminViewServerProps) {
               </div>
               <div className="esmera-card-body">
                 <p className="esmera-card-copy">
-                  Nenhuma porcentagem ou gráfico é exibido sem uma integração de Analytics e uma
-                  regra de cálculo verificável.
+                  Nenhuma porcentagem ou gráfico é exibido sem uma integração de Analytics e uma regra de cálculo verificável.
                 </p>
               </div>
             </section>
