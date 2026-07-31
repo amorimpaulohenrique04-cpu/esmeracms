@@ -49,46 +49,46 @@ export default buildConfig({
       },
       views: {
         dashboard: {
-          Component: '/admin/views/Dashboard',
+          Component: '/admin/modules/dashboard/DashboardView',
         },
         content: {
-          Component: '/admin/views/SiteViews#ContentView',
+          Component: '/admin/modules/content/ContentView#ContentView',
           path: '/content',
         },
         products: {
-          Component: '/admin/views/SiteViews#ProductsView',
+          Component: '/admin/modules/products/ProductsView#ProductsView',
           path: '/products',
         },
         categories: {
-          Component: '/admin/views/SiteViews#CategoriesView',
+          Component: '/admin/modules/categories/CategoriesView#CategoriesView',
           path: '/categories',
         },
         customers: {
-          Component: '/admin/views/BusinessViews#CustomersView',
+          Component: '/admin/modules/customers/CustomersView#CustomersView',
           path: '/customers',
         },
         sales: {
-          Component: '/admin/views/BusinessViews#SalesView',
+          Component: '/admin/modules/sales/SalesViews#SalesView',
           path: '/sales',
         },
         pipeline: {
-          Component: '/admin/views/BusinessViews#PipelineView',
+          Component: '/admin/modules/sales/SalesViews#PipelineView',
           path: '/pipeline',
         },
         afterSales: {
-          Component: '/admin/views/BusinessViews#AfterSalesView',
+          Component: '/admin/modules/after-sales/AfterSalesView#AfterSalesView',
           path: '/after-sales',
         },
         reports: {
-          Component: '/admin/views/BusinessViews#ReportsView',
+          Component: '/admin/modules/reports/ReportsView#ReportsView',
           path: '/reports',
         },
         settings: {
-          Component: '/admin/views/SiteViews#SettingsView',
+          Component: '/admin/modules/settings/SettingsView#SettingsView',
           path: '/settings',
         },
         technical: {
-          Component: '/admin/views/SiteViews#TechnicalView',
+          Component: '/admin/modules/technical/TechnicalView#TechnicalView',
           path: '/technical',
         },
       },
