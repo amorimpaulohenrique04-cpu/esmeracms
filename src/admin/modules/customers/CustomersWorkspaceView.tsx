@@ -50,6 +50,15 @@ import './customers.scss'
 
 const tabs: CustomerTab[] = ['overview', 'history', 'interests', 'sales', 'after-sales', 'notes']
 const purchaseStatuses = new Set(['confirmed', 'production', 'ready', 'delivered'])
+const openOpportunityStages = new Set(['new', 'curation', 'proposal', 'negotiation'])
+
+type OpportunitySummary = {
+  id: string | number
+  stage?: string | null
+  estimatedValueCents?: number | null
+  nextAction?: string | null
+  nextActionAt?: string | null
+}
 
 function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -221,22 +230,31 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
     let sales: SaleSummary[] = []
     let afterSales: AfterSaleSummary[] = []
     let interests: ClientInterestSummary[] = []
+    let opportunities: OpportunitySummary[] = []
     let activities: ActivitySummary[] = []
     let tasks: TaskSummary[] = []
 
     if (selectedId) {
       detail = await req.payload.findByID({ collection: 'customers', id: selectedId, depth: 2, overrideAccess: false, user: req.user, req }) as unknown as CustomerDetail
       detail.status = detail.status || 'active'
-      const [salesResult, afterSalesResult, interestsResult, activitiesResult, tasksResult] = await Promise.all([
+      const [salesResult, afterSalesResult, interestsResult, opportunitiesResult, activitiesResult, tasksResult] = await Promise.all([
         findDocs<SaleSummary>(req, 'sales', { sort: '-confirmedAt', limit: 300, depth: 1, where: { customer: { equals: selectedId } } as Where }),
         findDocs<AfterSaleSummary>(req, 'after-sales', { sort: '-updatedAt', limit: 300, depth: 1, where: { customer: { equals: selectedId } } as Where }),
         findDocs<ClientInterestSummary>(req, 'client-interests', { sort: '-addedAt', limit: 300, depth: 1, where: { customer: { equals: selectedId } } as Where }),
+        findDocs<OpportunitySummary>(req, 'opportunities', {
+          sort: 'rank',
+          limit: 300,
+          depth: 0,
+          where: { customer: { equals: selectedId } } as Where,
+          select: { id: true, stage: true, estimatedValueCents: true, nextAction: true, nextActionAt: true },
+        }),
         findDocs<ActivitySummary>(req, 'activities', { sort: '-occurredAt', limit: 1000, depth: 1 }),
         findDocs<TaskSummary>(req, 'tasks', { sort: 'dueAt', limit: 1000, depth: 1 }),
       ])
       sales = salesResult.docs
       afterSales = afterSalesResult.docs
       interests = interestsResult.docs
+      opportunities = opportunitiesResult.docs
       activities = activitiesResult.docs.filter((activity) => hasCustomerRelation(activity.relatedTo, selectedId))
       tasks = tasksResult.docs.filter((task) => hasCustomerRelation(task.relatedTo, selectedId))
     }
@@ -244,6 +262,8 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
     const selectedPurchases = sales.filter((sale) => purchaseStatuses.has(sale.status || ''))
     const lifetimeValue = selectedPurchases.reduce((sum, sale) => sum + (sale.totalCents || 0), 0)
     const lastPurchase = selectedPurchases[0]
+    const openOpportunities = opportunities.filter((opportunity) => openOpportunityStages.has(opportunity.stage || ''))
+    const openOpportunityValue = openOpportunities.reduce((sum, opportunity) => sum + (opportunity.estimatedValueCents || 0), 0)
     const nextTask = tasks.find((task) => task.status === 'pending' || task.status === 'in_progress')
     const noteActivities = activities.filter((activity) => activity.eventType === 'note.created' || activity.kind === 'note')
 
@@ -251,7 +271,7 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
       <PageHeader
         eyebrow="Relacionamento"
         title="Clientes"
-        subtitle="Workspace relacional para entender identidade, interesses, vendas, pós-venda, tarefas e histórico sem abrir múltiplas Collections."
+        subtitle="Workspace relacional para entender identidade, interesses, oportunidades, vendas, pós-venda, tarefas e histórico sem abrir múltiplas Collections."
         actions={<><CustomerCreateDialog /><TechnicalLink href="/admin/collections/customers">Admin técnico</TechnicalLink></>}
       />
 
@@ -280,13 +300,13 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
               <article><span>Compras</span><strong>{selectedPurchases.length}</strong><small>{lastPurchase ? `Última em ${shortDate(lastPurchase.confirmedAt || lastPurchase.updatedAt)}` : 'Nenhuma compra confirmada'}</small></article>
               <article><span>Valor histórico</span><strong>{money(lifetimeValue)}</strong><small>Somente vendas confirmadas ou posteriores</small></article>
               <article><span>Interesses ativos</span><strong>{interests.filter((interest) => ['active', 'curation', 'paused'].includes(interest.status || '')).length}</strong><small>Associações explícitas a produtos</small></article>
-              <article><span>Oportunidades abertas</span><strong>—</strong><small>Disponível após a migração de Opportunities na Etapa 8</small></article>
+              <article><span>Oportunidades abertas</span><strong>{openOpportunities.length}</strong><small>{openOpportunities.length ? `${money(openOpportunityValue)} de potencial informado` : 'Nenhuma negociação aberta'}</small></article>
             </div>
             <section className="esmera-customer-next-action"><div><span className="esmera-eyebrow">Próxima ação</span><h3>{nextTask?.title || 'Nenhuma tarefa aberta'}</h3><p>{nextTask ? `${dateTime(nextTask.dueAt)} · ${relationLabel(nextTask.assignee, 'sem responsável')}` : 'Crie uma tarefa real quando houver um próximo passo definido.'}</p></div>{nextTask ? <TechnicalLink href={`/admin/collections/tasks/${nextTask.id}`}>Abrir tarefa</TechnicalLink> : <TechnicalLink href="/admin/collections/tasks/create">Nova tarefa</TechnicalLink>}</section>
             <section className="esmera-customer-profile"><div className="esmera-customer-section-heading"><div><span className="esmera-eyebrow">Perfil</span><h3>Identidade e interesse</h3></div><p>Status do cliente é independente da etapa de qualquer oportunidade comercial.</p></div><CustomerProfileEditor customer={detail} users={usersResult.docs} categories={categoriesResult.docs} /></section>
           </div> : null}
 
-          {tab === 'history' ? <div className="esmera-customer-panel"><div className="esmera-customer-section-heading"><div><span className="esmera-eyebrow">Event stream</span><h3>Histórico relacional</h3></div><p>Activities é append-mostly: operadores criam eventos; somente administradores alteram o passado.</p></div>{!activities.length ? <EmptyState title="Nenhuma atividade registrada" copy="Notas e interesses adicionados neste workspace passam a compor esta timeline." /> : <ol className="esmera-customer-timeline">{activities.map((activity) => <li key={String(activity.id)}><span className="esmera-customer-timeline__marker" aria-hidden="true" /><div><span>{activityLabel(activity)}</span><strong>{activity.summary || activityLabel(activity)}</strong>{activity.details ? <p>{activity.details}</p> : null}<small>{dateTime(activity.occurredAt)} · {relationLabel(activity.owner, 'sistema')}</small></div></li>)}</ol>}</div> : null}
+          {tab === 'history' ? <div className="esmera-customer-panel"><div className="esmera-customer-section-heading"><div><span className="esmera-eyebrow">Event stream</span><h3>Histórico relacional</h3></div><p>Activities é append-mostly: operadores criam eventos; somente administradores alteram o passado.</p></div>{!activities.length ? <EmptyState title="Nenhuma atividade registrada" copy="Notas, interesses e mudanças comerciais passam a compor esta timeline." /> : <ol className="esmera-customer-timeline">{activities.map((activity) => <li key={String(activity.id)}><span className="esmera-customer-timeline__marker" aria-hidden="true" /><div><span>{activityLabel(activity)}</span><strong>{activity.summary || activityLabel(activity)}</strong>{activity.details ? <p>{activity.details}</p> : null}<small>{dateTime(activity.occurredAt)} · {relationLabel(activity.owner, 'sistema')}</small></div></li>)}</ol>}</div> : null}
 
           {tab === 'interests' ? <div className="esmera-customer-panel"><div className="esmera-customer-section-heading"><div><span className="esmera-eyebrow">Curadoria</span><h3>Interesses explícitos</h3></div><p>Relações com produto ficam em ClientInterests para preservar status e histórico por interesse.</p></div><CustomerInterestComposer customerId={detail.id} products={productsResult.docs} interests={interests} /></div> : null}
 
@@ -295,7 +315,7 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
           {tab === 'after-sales' ? <div className="esmera-customer-panel"><div className="esmera-customer-section-heading"><div><span className="esmera-eyebrow">Continuidade</span><h3>Pós-venda</h3></div><p>Entrega, follow-ups e ocorrências vinculados ao cliente.</p></div>{!afterSales.length ? <EmptyState title="Nenhum pós-venda" copy="Casos criados a partir de vendas aparecerão aqui automaticamente." /> : <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Venda</th><th>Status</th><th>Prioridade</th><th>Entrega</th><th /></tr></thead><tbody>{afterSales.map((item) => <tr key={String(item.id)}><td>{typeof item.sale === 'object' && item.sale ? item.sale.number || item.sale.id : relationId(item.sale) || '—'}</td><td><Status tone={statusTone(item.status)}>{item.status || '—'}</Status></td><td>{item.priority || '—'}</td><td>{shortDate(item.deliveredAt || item.expectedDeliveryAt)}</td><td><Link href={`/admin/collections/after-sales/${item.id}`}>Abrir</Link></td></tr>)}</tbody></table></div>}</div> : null}
 
           {tab === 'notes' ? <div className="esmera-customer-panel"><div className="esmera-customer-section-heading"><div><span className="esmera-eyebrow">Registro</span><h3>Notas</h3></div><p>Novas notas são eventos imutáveis para o operador e entram na timeline.</p></div><CustomerNoteComposer customerId={detail.id} />{!noteActivities.length ? <EmptyState title="Nenhuma nota" copy="Registre apenas contexto relevante para o relacionamento." /> : <ul className="esmera-customer-notes">{noteActivities.map((activity) => <li key={String(activity.id)}><p>{activity.details || activity.summary}</p><small>{dateTime(activity.occurredAt)} · {relationLabel(activity.owner, 'sistema')}</small></li>)}</ul>}</div> : null}
-        </section> : <section className="esmera-customer-detail esmera-customer-detail--empty"><span className="esmera-eyebrow">Detalhe</span><h2>Selecione um cliente</h2><p>Abra uma linha para consultar identidade, interesses, histórico, vendas, pós-venda e notas no mesmo contexto.</p></section>}
+        </section> : <section className="esmera-customer-detail esmera-customer-detail--empty"><span className="esmera-eyebrow">Detalhe</span><h2>Selecione um cliente</h2><p>Abra uma linha para consultar identidade, interesses, histórico, oportunidades, vendas, pós-venda e notas no mesmo contexto.</p></section>}
       </div>
     </ViewFrame>
   } catch (error) {
