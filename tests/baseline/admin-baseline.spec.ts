@@ -139,24 +139,54 @@ test('capture current admin visual baseline', async ({ page }) => {
       sale: saleId,
       customer: customerId,
       status: 'following',
-      priority: 'normal',
+      priority: 'high',
+      summary: 'Acompanhamento ativo da entrega e da experiência da cliente.',
       expectedDeliveryAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       incidentType: 'none',
     },
   })
   expect(createAfterSale.ok(), `Baseline after-sale create failed: HTTP ${createAfterSale.status()} ${await createAfterSale.text()}`).toBeTruthy()
+  const afterSaleBody = await createAfterSale.json() as { id?: string | number; doc?: { id?: string | number } }
+  const afterSaleId = afterSaleBody.id ?? afterSaleBody.doc?.id
+  expect(afterSaleId).toBeTruthy()
 
-  const createTask = await page.request.post(`${baseURL}/api/tasks`, {
+  const createTask = await page.request.post(`${baseURL}/api/admin-after-sales`, {
     data: {
-      title: 'Enviar seleção complementar',
+      action: 'create-task',
+      caseId: afterSaleId,
+      title: 'Confirmar recebimento e integridade da peça',
+      type: 'delivery_confirmation',
       status: 'pending',
       priority: 'high',
       dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      relatedTo: [{ relationTo: 'customers', value: customerId }],
       notes: 'Próxima ação real para o baseline visual.',
     },
   })
   expect(createTask.ok(), `Baseline task create failed: HTTP ${createTask.status()} ${await createTask.text()}`).toBeTruthy()
+
+  const createShipment = await page.request.post(`${baseURL}/api/admin-after-sales`, {
+    data: {
+      action: 'create-shipment',
+      caseId: afterSaleId,
+      carrier: 'Entrega própria Esméra',
+      trackingCode: `ESM-TRACK-${stamp}`,
+      status: 'in_transit',
+      estimatedDelivery: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+      lastEvent: 'Peça em trânsito com acondicionamento conferido.',
+    },
+  })
+  expect(createShipment.ok(), `Baseline shipment create failed: HTTP ${createShipment.status()} ${await createShipment.text()}`).toBeTruthy()
+
+  const createOccurrence = await page.request.post(`${baseURL}/api/admin-after-sales`, {
+    data: {
+      action: 'create-occurrence',
+      caseId: afterSaleId,
+      type: 'delivery_delay',
+      severity: 'medium',
+      description: 'Janela de entrega revisada com a cliente; acompanhamento em andamento.',
+    },
+  })
+  expect(createOccurrence.ok(), `Baseline occurrence create failed: HTTP ${createOccurrence.status()} ${await createOccurrence.text()}`).toBeTruthy()
 
   const addInterest = await page.request.post(`${baseURL}/api/admin-customers`, {
     data: { action: 'add-interest', id: customerId, productId, note: 'Interesse para composição de living.' },
@@ -188,7 +218,8 @@ test('capture current admin visual baseline', async ({ page }) => {
     { name: 'opportunity-document', url: `/admin/collections/opportunities/${opportunityId}` },
     { name: 'sales-list', url: '/admin/sales?view=list' },
     { name: 'sales-pipeline', url: '/admin/sales?view=pipeline' },
-    { name: 'after-sales', url: '/admin/after-sales' },
+    { name: 'after-sales', url: '/admin/after-sales?status=all' },
+    { name: 'after-sales-occurrences', url: '/admin/after-sales?focus=occurrences&status=all' },
     { name: 'reports', url: '/admin/reports' },
     { name: 'settings', url: '/admin/settings' },
     { name: 'technical', url: '/admin/technical' },
