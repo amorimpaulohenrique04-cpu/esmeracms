@@ -1,4 +1,4 @@
-import { ValidationError, type CollectionBeforeChangeHook } from 'payload'
+import { ValidationError, type CollectionBeforeValidateHook } from 'payload'
 
 import { relationshipID } from '../../businessRules/relationships'
 import {
@@ -10,7 +10,7 @@ import {
   type OpportunityStage,
 } from '../../businessRules/opportunities/stages'
 
-export const applyOpportunityRules: CollectionBeforeChangeHook = ({ context, data, originalDoc, req }) => {
+export const applyOpportunityRules: CollectionBeforeValidateHook = ({ context, data, originalDoc, req }) => {
   if (!data) return data
 
   const id = originalDoc?.id as string | number | undefined
