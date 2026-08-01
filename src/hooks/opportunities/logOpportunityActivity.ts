@@ -1,13 +1,19 @@
 import type { CollectionAfterChangeHook } from 'payload'
 
 import { relationshipID } from '../../businessRules/relationships'
-import { isOpportunityStage, opportunityStageLabels } from '../../businessRules/opportunities/stages'
+import {
+  isOpportunityStage,
+  opportunityStageLabels,
+  type OpportunityStage,
+} from '../../businessRules/opportunities/stages'
 
 export const logOpportunityActivity: CollectionAfterChangeHook = async ({ context, doc, operation, previousDoc, req }) => {
   if (context?.skipOpportunityActivity) return doc
 
-  const stage = isOpportunityStage(doc.stage) ? doc.stage : 'new'
-  const previousStage = isOpportunityStage(previousDoc?.stage) ? previousDoc.stage : null
+  const stage: OpportunityStage = isOpportunityStage(doc.stage) ? doc.stage as OpportunityStage : 'new'
+  const previousStage: OpportunityStage | null = isOpportunityStage(previousDoc?.stage)
+    ? previousDoc.stage as OpportunityStage
+    : null
   if (operation === 'update' && previousStage === stage) return doc
 
   const relatedTo: Array<{ relationTo: 'opportunities' | 'customers'; value: string | number }> = [
