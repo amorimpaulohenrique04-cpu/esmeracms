@@ -26,27 +26,19 @@ test.describe('Reports workspace', () => {
     await expect(page.getByRole('button', { name: /Oportunidades/ }).first()).toBeVisible()
     await expect(page.getByRole('img', { name: /Evolução diária/ })).toBeVisible()
 
-    let releaseRequest: () => void = () => {}
-    let markRequestStarted: () => void = () => {}
-    const requestGate = new Promise<void>((resolve) => { releaseRequest = resolve })
-    const requestStarted = new Promise<void>((resolve) => { markRequestStarted = resolve })
-    await page.route('**/api/admin-reports?*', async (route) => {
-      markRequestStarted()
-      await requestGate
+    await page.route(/\/api\/admin-reports\?/, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 900))
       await route.continue()
     })
 
     await page.getByRole('combobox', { name: 'Comparar com' }).selectOption('previous_period')
     await page.getByRole('button', { name: 'Aplicar filtros' }).click()
 
-    await requestStarted
     await expect(page).toHaveURL(/compareWith=previous_period/)
     await expect(page.getByTestId('reports-workspace')).toHaveClass(/is-refreshing/)
     await expect(page.getByRole('button', { name: /Oportunidades/ }).first()).toBeVisible()
-
-    releaseRequest()
     await expect(page.getByTestId('reports-workspace')).not.toHaveClass(/is-refreshing/, { timeout: 15_000 })
-    await page.unroute('**/api/admin-reports?*')
+    await page.unroute(/\/api\/admin-reports\?/)
   })
 
   test('copies the exact filtered URL and drills down to real records', async () => {
