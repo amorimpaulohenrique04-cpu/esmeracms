@@ -83,7 +83,10 @@ test.describe('Stages 16–19 hardening', () => {
     await expect(adminPage.locator('.esmera-shell-menu-popup')).toBeHidden()
 
     await adminPage.keyboard.press('Control+k')
-    await expect(adminPage.getByTestId('esmera-command-palette')).toBeVisible()
+    const palette = adminPage.getByTestId('esmera-command-palette')
+    await expect(palette).toBeVisible()
+    await palette.getByPlaceholder('Produto, cliente, venda ou ação…').fill('Dashboard')
+    await expect(palette.getByRole('option', { name: /Dashboard/ }).first()).toBeVisible()
     await adminPage.keyboard.press('Enter')
     await expect(adminPage).toHaveURL('http://localhost:3000/admin')
   })
