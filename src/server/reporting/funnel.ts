@@ -3,6 +3,7 @@ import type { Payload } from 'payload'
 
 import {
   openOpportunityStages,
+  opportunityStageLabels,
   type OpportunityStage,
 } from '../../businessRules/opportunities/stages'
 import { numberFromRow, nullableNumberFromRow, runReportingQuery, stringFromRow } from './db'
@@ -23,6 +24,7 @@ export type OpportunityMetrics = {
 
 export type FunnelStageRow = {
   stage: Exclude<OpportunityStage, 'lost'>
+  label: string
   volume: number
   progressed: number
   dropOff: number
@@ -157,6 +159,7 @@ export async function getFunnelSnapshot(
     const dropOff = numberFromRow(row.drop_off)
     return {
       stage,
+      label: opportunityStageLabels[stage],
       volume,
       progressed,
       dropOff,
