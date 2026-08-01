@@ -19,6 +19,8 @@ type AfterSalesData = {
   openedAt?: string | null
   closedAt?: string | null
   followUps?: FollowUp[] | null
+  incidentType?: string | null
+  incidentDetails?: string | null
 }
 
 function previousFollowUp(items: FollowUp[], item: FollowUp, index: number) {
@@ -63,6 +65,12 @@ export const applyAfterSalesRules: CollectionBeforeValidateHook = async ({ data,
       errors.push({ path: 'customer', message: 'O cliente do pós-venda deve ser o mesmo cliente da venda.' })
     }
     incoming.customer = saleCustomer
+  }
+
+  const incidentType = incoming.incidentType ?? original.incidentType ?? 'none'
+  const incidentDetails = incoming.incidentDetails ?? original.incidentDetails
+  if (incidentType !== 'none' && !String(incidentDetails || '').trim()) {
+    errors.push({ path: 'incidentDetails', message: 'Descreva a ocorrência legada ou migre o registro para Occurrences.' })
   }
 
   if (Array.isArray(incoming.followUps)) {
