@@ -50,7 +50,7 @@ async function allCases(payload: Awaited<ReturnType<typeof getPayload>>) {
       depth: 0,
       page,
       limit: 100,
-      select: { id: true, caseNumber: true, sale: true, customer: true, owner: true, followUps: true },
+      select: { caseNumber: true, sale: true, customer: true, owner: true, followUps: true },
     })
     docs.push(...result.docs as unknown as AfterSalesCase[])
     if (!result.hasNextPage) break
@@ -66,7 +66,7 @@ async function runRollback(payload: Awaited<ReturnType<typeof getPayload>>) {
     depth: 0,
     limit: 1000,
     where: { legacySourceKey: { contains: 'after-sales:' } },
-    select: { id: true, title: true, legacySourceKey: true },
+    select: { title: true, legacySourceKey: true },
   })
   console.log(`[after-sales] rollback encontrou ${migrated.totalDocs} Tasks migradas.`)
   if (dryRun) return
@@ -99,7 +99,6 @@ async function runMigration(payload: Awaited<ReturnType<typeof getPayload>>) {
         depth: 0,
         limit: 1,
         where: { legacySourceKey: { equals: key } },
-        select: { id: true },
       })
       if (duplicate.totalDocs) {
         existing += 1
