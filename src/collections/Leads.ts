@@ -17,8 +17,9 @@ export const Leads: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'name',
-    defaultColumns: ['name', 'stage', 'source', 'owner', 'nextActionAt', 'updatedAt'],
+    defaultColumns: ['name', 'stage', 'opportunity', 'source', 'owner', 'nextActionAt', 'updatedAt'],
     listSearchableFields: ['name', 'phone', 'email', 'notes'],
+    description: 'Leads representam entrada e qualificação. Etapas comerciais legadas permanecem somente durante o ciclo de compatibilidade com Opportunities.',
   },
   access: {
     admin: commercialUsers,
@@ -45,7 +46,8 @@ export const Leads: CollectionConfig = {
           ],
         },
         {
-          label: 'Pipeline',
+          label: 'Qualificação e compatibilidade',
+          description: 'A negociação passa a ser representada por Opportunity. Estes campos permanecem para leitura e migração durante um ciclo de release.',
           fields: [
             {
               name: 'source',
@@ -65,10 +67,11 @@ export const Leads: CollectionConfig = {
             {
               name: 'stage',
               type: 'select',
-              label: 'Etapa',
+              label: 'Etapa legada',
               required: true,
               defaultValue: 'new',
               index: true,
+              admin: { description: 'Não usar como novo pipeline após a migração. A fonte comercial passa a ser Opportunities.' },
               options: [
                 { label: 'Novo', value: 'new' },
                 { label: 'Curadoria', value: 'curation' },
@@ -79,8 +82,8 @@ export const Leads: CollectionConfig = {
               ],
             },
             businessUserRelationship('owner', 'Responsável'),
-            { name: 'nextAction', type: 'text', label: 'Próxima ação' },
-            { name: 'nextActionAt', type: 'date', label: 'Prazo da próxima ação', admin: { date: { pickerAppearance: 'dayAndTime' } } },
+            { name: 'nextAction', type: 'text', label: 'Próxima ação legada' },
+            { name: 'nextActionAt', type: 'date', label: 'Prazo legado', admin: { date: { pickerAppearance: 'dayAndTime' } } },
             {
               name: 'closedAt',
               type: 'date',
@@ -91,7 +94,7 @@ export const Leads: CollectionConfig = {
             {
               name: 'lossReason',
               type: 'textarea',
-              label: 'Motivo da perda',
+              label: 'Motivo da perda legado',
               admin: { condition: (_, siblingData) => siblingData?.stage === 'lost' },
             },
             {
@@ -99,7 +102,20 @@ export const Leads: CollectionConfig = {
               type: 'relationship',
               relationTo: 'customers',
               label: 'Cliente qualificado',
-              admin: { condition: (_, siblingData) => siblingData?.stage === 'won' },
+            },
+            {
+              name: 'opportunity',
+              type: 'relationship',
+              relationTo: 'opportunities',
+              label: 'Oportunidade migrada',
+              index: true,
+              admin: { readOnly: true, position: 'sidebar' },
+            },
+            {
+              name: 'opportunityMigratedAt',
+              type: 'date',
+              label: 'Migração comercial',
+              admin: { readOnly: true, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' } },
             },
           ],
         },
