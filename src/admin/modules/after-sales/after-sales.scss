@@ -311,3 +311,10 @@
   .esmera-shipment-timeline li::before { left: 4px; top: 9px; right: auto; bottom: -8px; width: 1px; height: auto; }
   .esmera-occurrence-resolution { grid-template-columns: 1fr; }
 }
+
+@media (max-width: 1023px) {
+  .esmera-view:has(.esmera-after-sales-workspace.has-inspector) {
+    position: relative;
+    z-index: var(--esmera-z-modal);
+  }
+}
