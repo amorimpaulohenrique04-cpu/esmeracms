@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
 
 import { canManageBusiness, canManageSite, isAdmin } from '../../../../access/roles'
+import { opportunityStageLabels } from '../../../../businessRules/opportunities/stages'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,13 @@ type SearchItem = {
 
 function text(value: unknown) {
   return typeof value === 'string' ? value : ''
+}
+
+function relationLabel(value: unknown) {
+  if (!value || typeof value !== 'object') return ''
+  if ('name' in value && typeof value.name === 'string') return value.name
+  if ('email' in value && typeof value.email === 'string') return value.email
+  return ''
 }
 
 function actionsFor(user: unknown): SearchItem[] {
@@ -41,7 +49,8 @@ function actionsFor(user: unknown): SearchItem[] {
       { id: 'action-after-sales', group: 'Ações', label: 'Abrir Pós-venda', href: '/admin/after-sales', icon: 'heart' },
       { id: 'action-reports', group: 'Ações', label: 'Abrir Relatórios', href: '/admin/reports', icon: 'chart' },
       { id: 'action-new-customer', group: 'Ações', label: 'Novo cliente', href: '/admin/collections/customers/create', icon: 'plus' },
-      { id: 'action-new-lead', group: 'Ações', label: 'Novo lead', meta: 'Modelo comercial atual até a migração para Opportunities', href: '/admin/collections/leads/create', icon: 'plus' },
+      { id: 'action-new-lead', group: 'Ações', label: 'Novo lead', meta: 'Registrar entrada e qualificação', href: '/admin/collections/leads/create', icon: 'person' },
+      { id: 'action-new-opportunity', group: 'Ações', label: 'Nova oportunidade', meta: 'Iniciar negociação comercial', href: '/admin/collections/opportunities/create', icon: 'plus' },
     )
   }
 
@@ -113,8 +122,30 @@ export async function GET(request: Request) {
         group: 'Clientes',
         label: text(doc.name) || 'Cliente sem nome',
         meta: text(doc.phone) || text(doc.email) || undefined,
-        href: `/admin/collections/customers/${doc.id}`,
+        href: `/admin/customers?customer=${doc.id}&tab=overview`,
         icon: 'users',
+      }))),
+      payload.find({
+        collection: 'opportunities',
+        overrideAccess: false,
+        user,
+        depth: 1,
+        limit: 6,
+        where: {
+          or: [
+            { code: { like: query } },
+            { nextAction: { like: query } },
+            { 'customer.name': { like: query } },
+          ],
+        } as Where,
+        select: { id: true, code: true, stage: true, nextAction: true, customer: true },
+      }).then((result) => result.docs.map((doc) => ({
+        id: `opportunity-${doc.id}`,
+        group: 'Oportunidades',
+        label: text(doc.code) || 'Oportunidade sem código',
+        meta: [relationLabel(doc.customer), opportunityStageLabels[doc.stage as keyof typeof opportunityStageLabels] || text(doc.stage), text(doc.nextAction)].filter(Boolean).join(' · ') || undefined,
+        href: `/admin/collections/opportunities/${doc.id}`,
+        icon: 'receipt',
       }))),
       payload.find({
         collection: 'leads',
@@ -127,15 +158,14 @@ export async function GET(request: Request) {
             { name: { like: query } },
             { phone: { like: query } },
             { email: { like: query } },
-            { nextAction: { like: query } },
           ],
         } as Where,
-        select: { id: true, name: true, stage: true, nextAction: true },
+        select: { id: true, name: true, stage: true, source: true },
       }).then((result) => result.docs.map((doc) => ({
         id: `lead-${doc.id}`,
-        group: 'Pipeline',
+        group: 'Leads',
         label: text(doc.name) || 'Lead sem nome',
-        meta: [text(doc.stage), text(doc.nextAction)].filter(Boolean).join(' · ') || undefined,
+        meta: [text(doc.source), text(doc.stage)].filter(Boolean).join(' · ') || undefined,
         href: `/admin/collections/leads/${doc.id}`,
         icon: 'person',
       }))),
