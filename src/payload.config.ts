@@ -14,6 +14,7 @@ import { ClientInterests } from './collections/ClientInterests'
 import { Customers } from './collections/Customers'
 import { Leads } from './collections/Leads'
 import { Media } from './collections/Media'
+import { Opportunities } from './collections/Opportunities'
 import { Products } from './collections/Products'
 import { Sales } from './collections/Sales'
 import { Tasks } from './collections/Tasks'
@@ -109,6 +110,7 @@ export default buildConfig({
     Leads,
     Customers,
     ClientInterests,
+    Opportunities,
     Sales,
     AfterSales,
     Tasks,
