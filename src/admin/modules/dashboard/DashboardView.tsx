@@ -44,7 +44,7 @@ type MetricProps = {
 }
 
 function firstName(user: DashboardUser) {
-  const source = user.name?.trim() || user.email?.split('@')[0] || 'Esméra'
+  const source = user.name?.trim() || 'Esméra'
   return source.split(/\s+/)[0]
 }
 
@@ -130,11 +130,11 @@ function DashboardMetric({ label, value, meta, href, tone = 'neutral' }: MetricP
   )
 }
 
-function PanelHeader({ title, copy, action }: { title: string; copy: string; action?: ReactNode }) {
+function PanelHeader({ id, title, copy, action }: { id: string; title: string; copy: string; action?: ReactNode }) {
   return (
     <header className="esmera-dashboard-panel__header">
       <div>
-        <h2>{title}</h2>
+        <h2 id={id}>{title}</h2>
         <p>{copy}</p>
       </div>
       {action ? <div>{action}</div> : null}
@@ -186,7 +186,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
           actions={actions}
         />
 
-        <section className="esmera-dashboard-metrics" aria-label="Indicadores do Dashboard">
+        <section className={`esmera-dashboard-metrics esmera-metric-grid${reporting && tasks ? '' : ' is-editorial'}`} aria-label="Indicadores do Dashboard">
           <DashboardMetric
             label="Produtos ativos"
             value={snapshot.catalog.activeProducts}
@@ -229,6 +229,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
           <div className="esmera-dashboard-primary-grid">
             <section className="esmera-dashboard-panel esmera-dashboard-pipeline" aria-labelledby="dashboard-pipeline-title">
               <PanelHeader
+                id="dashboard-pipeline-title"
                 title="Pipeline compacto"
                 copy="Estado atual das Opportunities abertas. Cada etapa leva aos registros correspondentes em Vendas."
                 action={<Link className="esmera-dashboard-text-link" href="/admin/sales?view=pipeline">Ver pipeline completo</Link>}
@@ -254,12 +255,13 @@ export default async function DashboardView(props: AdminViewServerProps) {
                     )
                   })}
                 </ol>
-                <p className="esmera-dashboard-source">Fonte: Opportunities · contrato {reporting.semanticVersion}. O Dashboard não recalcula métricas.</p>
+                <p className="esmera-dashboard-source">Fonte: Opportunities. Contrato {reporting.semanticVersion}. O Dashboard não recalcula métricas.</p>
               </div>
             </section>
 
             <section className="esmera-dashboard-panel esmera-dashboard-tasks" aria-labelledby="dashboard-tasks-title">
               <PanelHeader
+                id="dashboard-tasks-title"
                 title="Pendências do dia"
                 copy="Tasks reais ordenadas pelo prazo; atrasadas aparecem primeiro."
                 action={<Link className="esmera-dashboard-text-link" href="/admin/after-sales?focus=all&status=open">Abrir fila</Link>}
@@ -298,6 +300,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
           {snapshot.permissions.site ? (
             <section className="esmera-dashboard-panel" aria-labelledby="dashboard-catalog-title">
               <PanelHeader
+                id="dashboard-catalog-title"
                 title="Catálogo recente"
                 copy="Últimos produtos atualizados no Payload, com acesso direto ao documento operacional."
                 action={<Link className="esmera-dashboard-text-link" href="/admin/products">Ver catálogo</Link>}
@@ -311,7 +314,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
           ) : null}
 
           <section className="esmera-dashboard-panel esmera-dashboard-traffic" aria-labelledby="dashboard-traffic-title">
-            <PanelHeader title="Tráfego" copy="Métricas de audiência só entram depois de uma integração verificável." />
+            <PanelHeader id="dashboard-traffic-title" title="Tráfego" copy="Métricas de audiência só entram depois de uma integração verificável." />
             <div className="esmera-dashboard-panel__body">
               <div className="esmera-dashboard-traffic__status">
                 <span aria-hidden="true" />
