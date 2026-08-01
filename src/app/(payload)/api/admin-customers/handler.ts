@@ -135,6 +135,7 @@ async function transferDirectRelations(payload: Payload, user: unknown, sourceId
     ['sales', 'customer'],
     ['after-sales', 'customer'],
     ['leads', 'customer'],
+    ['opportunities', 'customer'],
     ['client-interests', 'customer'],
   ] as const
 
