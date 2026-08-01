@@ -31,9 +31,11 @@
     "validate:release": "pnpm validate && pnpm test:e2e",
     "validate:production": "cross-env NODE_ENV=production NODE_OPTIONS=--no-deprecation tsx src/scripts/production-readiness.ts",
     "test": "pnpm run test:int && pnpm run test:e2e",
+    "test:unit": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts tests/unit",
     "test:e2e": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.config.ts",
     "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts",
-    "baseline:capture": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.baseline.config.ts"
+    "baseline:capture": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.baseline.config.ts",
+    "baseline:compare": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/compare-visual-baseline.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",
