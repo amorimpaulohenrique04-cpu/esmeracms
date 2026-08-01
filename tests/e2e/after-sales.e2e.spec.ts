@@ -127,8 +127,8 @@ test.describe('Stage 10 After-sales workspace', () => {
     await expect(page.getByRole('heading', { name: caseNumber })).toBeVisible()
     await expect(page.getByText(trackingCode, { exact: true })).toBeVisible()
     await expect(page.getByText(occurrenceDescription, { exact: true })).toBeVisible()
-    await expect(page.getByText('Pedido confirmado', { exact: true })).toBeVisible()
-    await expect(page.getByText('Entregue', { exact: true })).toBeVisible()
+    await expect(page.getByText('Pedido confirmado', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Entregue', { exact: true }).first()).toBeVisible()
 
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(`http://localhost:3000/admin/after-sales?q=${encodeURIComponent(taskTitle)}&status=all`)
