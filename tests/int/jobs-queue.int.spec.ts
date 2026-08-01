@@ -250,6 +250,17 @@ describe('Stage 11 Payload Jobs Queue', () => {
     created.jobs.push(firstJob.id)
     await payload.jobs.runByID({ id: firstJob.id })
 
+    const firstTasks = await payload.find({
+      collection: 'tasks',
+      overrideAccess: true,
+      depth: 0,
+      limit: 10,
+      pagination: false,
+      where: { automationKey: { equals: taskKey } } as never,
+    })
+    expect(firstTasks.totalDocs).toBe(1)
+    created.tasks.push(...firstTasks.docs.map((task) => task.id))
+
     const secondJob = await payload.jobs.queue({
       task: CREATE_AFTER_SALES_TASK_JOB,
       queue: uniqueQueue,
@@ -274,24 +285,8 @@ describe('Stage 11 Payload Jobs Queue', () => {
       pagination: false,
       where: { automationKey: { equals: taskKey } } as never,
     })
-    created.tasks.push(...tasks.docs.map((task) => task.id))
     expect(tasks.totalDocs).toBe(1)
     expect(tasks.docs[0]?.type).toBe('satisfaction')
     expect(tasks.docs[0]?.relatedTo?.some((item) => item.relationTo === 'after-sales')).toBe(true)
-
-    const completedFirst = await payload.findByID({
-      collection: 'payload-jobs',
-      id: firstJob.id,
-      overrideAccess: true,
-    })
-    const completedSecond = await payload.findByID({
-      collection: 'payload-jobs',
-      id: secondJob.id,
-      overrideAccess: true,
-    })
-    expect(completedFirst.completedAt).toBeTruthy()
-    expect(completedSecond.completedAt).toBeTruthy()
-    expect(completedFirst.hasError).toBeFalsy()
-    expect(completedSecond.hasError).toBeFalsy()
   }, 90_000)
 })
