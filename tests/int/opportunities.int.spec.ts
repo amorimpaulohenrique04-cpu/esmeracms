@@ -84,7 +84,7 @@ describe('Opportunity domain and Lead compatibility migration', () => {
         stage: 'new',
         owner: commercialUser.id,
         nextAction: `Qualificar necessidade ${stamp}`,
-      },
+      } as never,
     })
     created.opportunities.push(opportunity.id)
 
@@ -140,7 +140,7 @@ describe('Opportunity domain and Lead compatibility migration', () => {
       collection: 'opportunities',
       overrideAccess: true,
       user: commercialUser,
-      data: { source: 'site', stage: 'won' },
+      data: { source: 'site', stage: 'won' } as never,
     })).rejects.toThrow()
 
     const activities = await payload.find({
@@ -202,8 +202,11 @@ describe('Opportunity domain and Lead compatibility migration', () => {
     expect(first.skipped).toBe(0)
 
     const migratedLead = await payload.findByID({ collection: 'leads', id: lead.id, overrideAccess: true, depth: 0 })
-    expect(migratedLead.opportunity).toBeTruthy()
-    const opportunityID = typeof migratedLead.opportunity === 'object' ? migratedLead.opportunity.id : migratedLead.opportunity
+    const migratedOpportunity = migratedLead.opportunity
+    expect(migratedOpportunity).toBeTruthy()
+    const opportunityID = migratedOpportunity && typeof migratedOpportunity === 'object'
+      ? migratedOpportunity.id
+      : migratedOpportunity
     expect(opportunityID).toBeTruthy()
     created.opportunities.push(opportunityID as Opportunity['id'])
 
