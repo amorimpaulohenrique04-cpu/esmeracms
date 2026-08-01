@@ -89,6 +89,7 @@ describe('Stage 9 sales workflow', () => {
       collection: 'opportunities',
       overrideAccess: true,
       user: commercialUser,
+      draft: true,
       data: {
         customer: customer.id,
         source: 'whatsapp',
@@ -171,6 +172,7 @@ describe('Stage 9 sales workflow', () => {
       collection: 'opportunities',
       overrideAccess: true,
       user: commercialUser,
+      draft: true,
       data: { customer: customer.id, source: 'referral', stage: 'proposal', interestedProducts: [product.id] },
     })
     created.opportunities.push(opportunity.id)
