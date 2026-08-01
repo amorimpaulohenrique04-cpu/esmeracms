@@ -10,6 +10,8 @@
     "devsafe": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && cross-env NODE_OPTIONS=--no-deprecation next dev",
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
+    "jobs:run:operational": "pnpm payload jobs:run --cron \"* * * * *\" --queue operational --handle-schedules",
+    "jobs:run:integrations": "pnpm payload jobs:run --cron \"*/5 * * * *\" --queue integrations --handle-schedules",
     "lint": "cross-env NODE_OPTIONS=--no-deprecation eslint .",
     "migrate:opportunities": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/migrate-opportunities.ts",
     "migrate:opportunities:dry-run": "pnpm migrate:opportunities --dry-run",
