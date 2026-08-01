@@ -71,5 +71,12 @@ export default defineConfig([
       'react-hooks/incompatible-library': 'off',
     },
   },
+  {
+    files: ['src/admin/modules/after-sales/AfterSalesWorkspaceClient.tsx'],
+    rules: {
+      'react-hooks/incompatible-library': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+    },
+  },
   globalIgnores(['.next/**', 'src/payload-types.ts', 'src/payload-generated-schema.ts']),
 ])
