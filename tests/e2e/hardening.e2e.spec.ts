@@ -9,6 +9,15 @@ import { cleanupTestUser, seedTestUser, testUser } from '../helpers/seedUser'
 const editorUser = { email: 'editor-hardening@esmera.test', password: 'test-editor', role: 'editor' as const }
 const commercialUser = { email: 'commercial-hardening@esmera.test', password: 'test-commercial', role: 'commercial' as const }
 
+async function loginWithRoleAwareShell(page: Page, user: { email: string; password: string }) {
+  await page.goto('http://localhost:3000/admin/login')
+  await page.fill('#field-email', user.email)
+  await page.fill('#field-password', user.password)
+  await page.click('button[type="submit"]')
+  await page.waitForURL('http://localhost:3000/admin')
+  await expect(page.getByTestId('esmera-app-header')).toBeVisible()
+}
+
 test.describe('Stages 16–19 hardening', () => {
   let adminContext: BrowserContext
   let editorContext: BrowserContext
@@ -45,8 +54,8 @@ test.describe('Stages 16–19 hardening', () => {
     editorPage = await editorContext.newPage()
     commercialPage = await commercialContext.newPage()
     await login({ page: adminPage, user: testUser })
-    await login({ page: editorPage, user: editorUser })
-    await login({ page: commercialPage, user: commercialUser })
+    await loginWithRoleAwareShell(editorPage, editorUser)
+    await loginWithRoleAwareShell(commercialPage, commercialUser)
   })
 
   test.afterAll(async () => {
