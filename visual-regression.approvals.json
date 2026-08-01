@@ -1,0 +1,11 @@
+{
+  "baseSha": "aec048568a3541d136c603a73acf7619939a5a94",
+  "reason": "Etapa 22 adiciona o contrato visível de loading, empty, integração e erro ao Admin técnico.",
+  "files": [
+    "desktop-1440x900/technical.png",
+    "notebook-1280x800/technical.png",
+    "tablet-landscape-1024x768/technical.png",
+    "tablet-768x1024/technical.png",
+    "mobile-390x844/technical.png"
+  ]
+}
