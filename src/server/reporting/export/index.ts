@@ -1,10 +1,10 @@
 import type { Payload } from 'payload'
 
-import {
-  normalizeReportingFilters,
-  type NormalizedReportingFilters,
-  type ReportingFilters,
-} from '../filters'
+import { normalizeReportingFilters } from '../filters'
+import type {
+  NormalizedReportingFilters,
+  ReportingFilters,
+} from '../metrics'
 import type { ReportingSnapshot } from '..'
 import {
   renderReportingPDF,
