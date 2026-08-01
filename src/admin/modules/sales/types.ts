@@ -49,7 +49,7 @@ export type OpportunityRecord = {
   owner?: Relation<UserRef>
   source?: string | null
   priority?: string | null
-  interestedProducts?: Array<Relation<ProductRef>> | null
+  interestedProducts: Array<Relation<ProductRef>>
   estimatedValueCents?: number | null
   nextAction?: string | null
   nextActionAt?: string | null
