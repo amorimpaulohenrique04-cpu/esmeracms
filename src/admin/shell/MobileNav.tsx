@@ -29,6 +29,7 @@ export function MobileNav({
   const renderLinks = (items: ReturnType<typeof visibleOperationalLinks>) => items.map((item) => (
     <Dialog.Close
       key={item.href}
+      nativeButton={false}
       render={
         <Link
           className={`esmera-mobile-nav-link${isShellLinkActive(pathname, item) ? ' is-active' : ''}`}
@@ -64,7 +65,7 @@ export function MobileNav({
             </nav>
 
             <div className="esmera-mobile-nav-footer">
-              <Dialog.Close render={<Link className="esmera-mobile-user" href="/admin/account" />}>
+              <Dialog.Close nativeButton={false} render={<Link className="esmera-mobile-user" href="/admin/account" />}>
                 <span className="esmera-avatar">{name.slice(0, 2).toUpperCase()}</span>
                 <span><strong>{name}</strong><small>{roleLabel}</small></span>
               </Dialog.Close>
