@@ -68,6 +68,9 @@ test.describe('Stages 16–19 hardening', () => {
 
   test('operates the shell by keyboard without firing shortcuts while typing', async () => {
     await adminPage.goto('http://localhost:3000/admin/products')
+    const header = adminPage.getByTestId('esmera-app-header')
+    await expect(header).toHaveAttribute('data-shortcuts-ready', 'true')
+    await adminPage.locator('h1').first().click()
     await adminPage.keyboard.press('/')
     await expect(adminPage.locator('.esmera-view input[name="q"]').first()).toBeFocused()
 
