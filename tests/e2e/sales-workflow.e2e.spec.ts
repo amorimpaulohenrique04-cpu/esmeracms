@@ -103,7 +103,7 @@ test.describe('Stage 9 operational Sales workspace', () => {
 
     await card.getByLabel(`Mover ${code} para etapa`).selectOption('won')
     await expect(page.getByRole('heading', { name: 'Confirmar venda ganha' })).toBeVisible()
-    await expect(page.getByText(productTitle)).toBeVisible()
+    await expect(page.getByLabel('Produto').first()).toHaveValue(String(productId))
     const winResponsePromise = page.waitForResponse((response) => {
       const data = response.request().postData() || ''
       return response.url().endsWith('/api/admin-sales') && data.includes('"win"')
