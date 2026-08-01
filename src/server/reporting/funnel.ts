@@ -3,7 +3,6 @@ import type { Payload } from 'payload'
 
 import {
   openOpportunityStages,
-  opportunityStages,
   type OpportunityStage,
 } from '../../businessRules/opportunities/stages'
 import { numberFromRow, nullableNumberFromRow, runReportingQuery, stringFromRow } from './db'
@@ -42,8 +41,6 @@ export type CurrentPipelineStage = {
   stage: (typeof openOpportunityStages)[number]
   volume: number
 }
-
-const funnelStages = opportunityStages.filter((stage) => stage !== 'lost') as Exclude<OpportunityStage, 'lost'>[]
 
 function isOpenStage(value: string): value is (typeof openOpportunityStages)[number] {
   return (openOpportunityStages as readonly string[]).includes(value)
