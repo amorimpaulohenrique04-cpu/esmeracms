@@ -50,6 +50,7 @@ export function AppHeader() {
   const headerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
+    const headerNode = headerRef.current
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
 
@@ -74,10 +75,10 @@ export function AppHeader() {
     }
 
     window.addEventListener('keydown', onKeyDown)
-    headerRef.current?.setAttribute('data-shortcuts-ready', 'true')
+    headerNode?.setAttribute('data-shortcuts-ready', 'true')
 
     return () => {
-      headerRef.current?.setAttribute('data-shortcuts-ready', 'false')
+      headerNode?.setAttribute('data-shortcuts-ready', 'false')
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [])
