@@ -26,9 +26,10 @@ test.describe('Reports workspace', () => {
     await expect(page.getByRole('button', { name: /Oportunidades/ }).first()).toBeVisible()
     await expect(page.getByRole('img', { name: /Evolução diária/ })).toBeVisible()
 
-    let releaseRequest: (() => void) | undefined
+    let releaseRequest = () => undefined
+    const requestGate = new Promise<void>((resolve) => { releaseRequest = resolve })
     await page.route('**/api/admin-reports?*', async (route) => {
-      await new Promise<void>((resolve) => { releaseRequest = resolve })
+      await requestGate
       await route.continue()
     })
 
@@ -39,7 +40,7 @@ test.describe('Reports workspace', () => {
     await expect(page.getByTestId('reports-workspace')).toHaveClass(/is-refreshing/)
     await expect(page.getByRole('button', { name: /Oportunidades/ }).first()).toBeVisible()
 
-    releaseRequest?.()
+    releaseRequest()
     await expect(page.getByTestId('reports-workspace')).not.toHaveClass(/is-refreshing/, { timeout: 15_000 })
     await page.unroute('**/api/admin-reports?*')
   })
