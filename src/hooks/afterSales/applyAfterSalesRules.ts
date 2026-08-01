@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { ValidationError, type CollectionBeforeValidateHook } from 'payload'
 
 import { relationshipID, sameRelationship, type RelationshipValue } from '../../businessRules/relationships'
@@ -10,8 +12,12 @@ type FollowUp = {
 }
 
 type AfterSalesData = {
+  caseNumber?: string | null
   sale?: RelationshipValue
   customer?: RelationshipValue
+  status?: string | null
+  openedAt?: string | null
+  closedAt?: string | null
   followUps?: FollowUp[] | null
 }
 
@@ -22,6 +28,11 @@ function previousFollowUp(items: FollowUp[], item: FollowUp, index: number) {
   return items[index]
 }
 
+function caseNumber() {
+  const date = new Date().toISOString().slice(0, 10).replaceAll('-', '')
+  return `POS-${date}-${randomUUID().slice(0, 6).toUpperCase()}`
+}
+
 export const applyAfterSalesRules: CollectionBeforeValidateHook = async ({ data, originalDoc, req }) => {
   if (!data) return data
   const id = originalDoc?.id as number | string | undefined
@@ -29,6 +40,13 @@ export const applyAfterSalesRules: CollectionBeforeValidateHook = async ({ data,
   const original = (originalDoc || {}) as AfterSalesData
   const saleID = relationshipID(incoming.sale ?? original.sale)
   const errors: Array<{ path: string; message: string }> = []
+
+  incoming.caseNumber = original.caseNumber || incoming.caseNumber || caseNumber()
+  incoming.openedAt = original.openedAt || incoming.openedAt || new Date().toISOString()
+
+  const status = incoming.status ?? original.status ?? 'open'
+  if (status === 'resolved' || status === 'closed') incoming.closedAt = original.closedAt || incoming.closedAt || new Date().toISOString()
+  else incoming.closedAt = null
 
   if (saleID !== null) {
     const sale = await req.payload.findByID({
