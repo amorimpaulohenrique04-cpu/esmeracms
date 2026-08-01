@@ -10,7 +10,7 @@ import {
   type OpportunityStage,
 } from '../../businessRules/opportunities/stages'
 
-export const applyOpportunityRules: CollectionBeforeChangeHook = ({ data, originalDoc, req }) => {
+export const applyOpportunityRules: CollectionBeforeChangeHook = ({ context, data, originalDoc, req }) => {
   if (!data) return data
 
   const id = originalDoc?.id as string | number | undefined
@@ -50,8 +50,11 @@ export const applyOpportunityRules: CollectionBeforeChangeHook = ({ data, origin
 
   const wasClosed = fromStage === 'won' || fromStage === 'lost'
   const isClosed = stage === 'won' || stage === 'lost'
-  if (isClosed && !wasClosed) data.closedAt = data.closedAt || new Date().toISOString()
-  else if (isClosed && originalDoc?.closedAt) data.closedAt = originalDoc.closedAt
+  if (isClosed && !wasClosed) {
+    if (data.closedAt) data.closedAt = data.closedAt
+    else if (context?.allowMissingLegacyClosedAt) data.closedAt = null
+    else data.closedAt = new Date().toISOString()
+  } else if (isClosed && originalDoc?.closedAt) data.closedAt = originalDoc.closedAt
   else if (!isClosed) data.closedAt = null
 
   if (stage === 'won') {
