@@ -6,6 +6,7 @@ import { pt } from 'payload/i18n/pt'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
+import { isAdmin } from './access/roles'
 import { withActiveProductCategoryValidity } from './businessRules/products/categoryValidity'
 import { Activities } from './collections/Activities'
 import { AfterSales } from './collections/AfterSales'
@@ -22,11 +23,13 @@ import { Shipments } from './collections/Shipments'
 import { Tasks } from './collections/Tasks'
 import { Users } from './collections/Users'
 import { About } from './globals/About'
+import { AfterSalesAutomation } from './globals/AfterSalesAutomation'
 import { CollectionPage } from './globals/CollectionPage'
 import { Contact } from './globals/Contact'
 import { Home } from './globals/Home'
 import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
+import { canRunEsmeraJobs, esmeraJobTasks } from './server/jobs'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -104,6 +107,26 @@ export default buildConfig({
       },
     },
   },
+  jobs: {
+    access: {
+      run: canRunEsmeraJobs,
+    },
+    tasks: esmeraJobTasks,
+    enableConcurrencyControl: true,
+    shouldAutoRun: async () => process.env.PAYLOAD_JOBS_AUTORUN === 'true',
+    autoRun: [
+      { cron: '* * * * *', queue: 'operational', limit: 25 },
+      { cron: '*/5 * * * *', queue: 'integrations', limit: 10 },
+    ],
+    jobsCollectionOverrides: ({ defaultJobsCollection }) => ({
+      ...defaultJobsCollection,
+      admin: {
+        ...defaultJobsCollection.admin,
+        group: 'Admin técnico',
+        hidden: ({ user }) => !isAdmin(user),
+      },
+    }),
+  },
   collections: [
     Users,
     Media,
@@ -127,6 +150,7 @@ export default buildConfig({
     CollectionPage,
     Navigation,
     SiteSettings,
+    AfterSalesAutomation,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
