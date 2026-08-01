@@ -2,6 +2,7 @@
 import type { AdminViewServerProps, Where } from 'payload'
 
 import { canManageBusiness, canManageSite } from '../../../access/roles'
+import { openOpportunityStages, opportunityStageLabels } from '../../../businessRules/opportunities/stages'
 import { eligibleSaleStatuses } from '../../../collections/Sales'
 import {
   AccessDenied,
@@ -26,15 +27,6 @@ type Task = { id: string | number; title?: string; dueAt?: string; priority?: st
 type Sale = { totalCents?: number | null; status?: string }
 type FollowUp = { status?: string; dueAt?: string }
 type AfterSale = { followUps?: FollowUp[] }
-
-const activeLeadStages = ['new', 'curation', 'proposal', 'negotiation']
-
-const stageLabels: Record<string, string> = {
-  new: 'Novo',
-  curation: 'Curadoria',
-  proposal: 'Proposta',
-  negotiation: 'Negociação',
-}
 
 export default async function DashboardView(props: AdminViewServerProps) {
   const { user } = ensureUser(props)
@@ -72,7 +64,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
 
     const businessPromise = businessAllowed
       ? Promise.all([
-          countDocs(req, 'leads', { stage: { in: activeLeadStages } } as Where),
+          countDocs(req, 'opportunities', { stage: { in: [...openOpportunityStages] } } as Where),
           findAllDocs<Sale>(req, 'sales', {
             where: {
               and: [
@@ -95,8 +87,8 @@ export default async function DashboardView(props: AdminViewServerProps) {
             select: { id: true, title: true, dueAt: true, priority: true, status: true },
           }),
           Promise.all(
-            activeLeadStages.map((stage) =>
-              countDocs(req, 'leads', { stage: { equals: stage } } as Where),
+            openOpportunityStages.map((stage) =>
+              countDocs(req, 'opportunities', { stage: { equals: stage } } as Where),
             ),
           ),
         ])
@@ -111,11 +103,11 @@ export default async function DashboardView(props: AdminViewServerProps) {
       : 0
     const salesCount = business?.[1].length || 0
     const revenue = business?.[1].reduce((sum, sale) => sum + (sale.totalCents || 0), 0) || 0
-    const pipeline = business ? activeLeadStages.map((stage, index) => ({ stage, count: business[4][index] })) : []
+    const pipeline = business ? openOpportunityStages.map((stage, index) => ({ stage, count: business[4][index] })) : []
 
     return (
       <ViewFrame props={props} withTemplate={false}>
-        <PageHeader eyebrow="Hoje" title="Olá, Esméra." subtitle="Visão rápida do catálogo e da operação, derivada do Payload." actions={siteAllowed ? <TechnicalLink href="/admin/collections/products/create" primary>Novo produto</TechnicalLink> : businessAllowed ? <TechnicalLink href="/admin/collections/leads/create" primary>Novo lead</TechnicalLink> : null} />
+        <PageHeader eyebrow="Hoje" title="Olá, Esméra." subtitle="Visão rápida do catálogo e da operação, derivada do Payload." actions={siteAllowed ? <TechnicalLink href="/admin/collections/products/create" primary>Novo produto</TechnicalLink> : businessAllowed ? <TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink> : null} />
 
         <div className="esmera-metric-grid">
           {site ? <>
@@ -123,7 +115,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
             <MetricCard icon="draft" label="Pendências editoriais" value={site[1]} meta="Rascunhos com problemas reais de prontidão" />
           </> : null}
           {business ? <>
-            <MetricCard icon="lead" label="Leads abertos" value={business[0]} tone="blue" meta="Novo, curadoria, proposta e negociação" />
+            <MetricCard icon="lead" label="Oportunidades abertas" value={business[0]} tone="blue" meta="Novo, curadoria, proposta e negociação" />
             <MetricCard icon="money" label="Vendas no mês" value={money(revenue)} tone="green" meta={`${salesCount} vendas confirmadas ou em andamento`} />
             <MetricCard icon="alert" label="Follow-ups até amanhã" value={pendingFollowups} tone={pendingFollowups ? 'red' : 'neutral'} meta="Itens pendentes com prazo até amanhã" />
           </> : null}
@@ -131,8 +123,8 @@ export default async function DashboardView(props: AdminViewServerProps) {
 
         {business ? <div className="esmera-grid-2">
           <section className="esmera-card">
-            <div className="esmera-card-header"><h2>Pipeline comercial</h2><TechnicalLink href="/admin/pipeline">Ver pipeline</TechnicalLink></div>
-            <div className="esmera-card-body"><div className="esmera-stage-track">{pipeline.map(({ stage, count }) => <div className="esmera-stage" key={stage}><strong>{count}</strong><span>{stageLabels[stage]}</span></div>)}</div><div className="esmera-kpi-meta">Fonte: leads · leitura atual. Nenhum estágio é estimado ou preenchido com placeholder.</div></div>
+            <div className="esmera-card-header"><h2>Pipeline comercial</h2><TechnicalLink href="/admin/sales?view=pipeline">Ver pipeline</TechnicalLink></div>
+            <div className="esmera-card-body"><div className="esmera-stage-track">{pipeline.map(({ stage, count }) => <div className="esmera-stage" key={stage}><strong>{count}</strong><span>{opportunityStageLabels[stage]}</span></div>)}</div><div className="esmera-kpi-meta">Fonte: Opportunities. Leads permanecem somente como entrada e qualificação durante a compatibilidade.</div></div>
           </section>
           <section className="esmera-card">
             <div className="esmera-card-header"><h2>Pendências</h2><TechnicalLink href="/admin/collections/tasks/create">Nova tarefa</TechnicalLink></div>
