@@ -4,6 +4,7 @@ import { Dialog } from '@base-ui/react/dialog'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 
+import { expectAdminResponse } from '../state/asyncState'
 import { ShellIcon } from './ShellIcon'
 
 export type CommandResult = {
@@ -43,8 +44,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           headers: { Accept: 'application/json' },
           signal: controller.signal,
         })
-        const body = await response.json() as SearchResponse
-        if (!response.ok) throw new Error(body.error || 'Não foi possível pesquisar.')
+        const body = await expectAdminResponse<SearchResponse>(response, 'Não foi possível pesquisar.')
         setResults(body.results || [])
         setActiveIndex(0)
       } catch (cause) {
