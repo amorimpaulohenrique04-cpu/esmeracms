@@ -5,12 +5,29 @@ import { Drawer } from '@base-ui/react/drawer'
 import { Menu } from '@base-ui/react/menu'
 import { Popover } from '@base-ui/react/popover'
 import { Tooltip } from '@base-ui/react/tooltip'
-import React from 'react'
+import React, { useId, useRef, useState } from 'react'
+
+function useOverlayContext() {
+  const [open, setOpen] = useState(false)
+  const scroll = useRef({ x: 0, y: 0 })
+
+  const onOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) scroll.current = { x: window.scrollX, y: window.scrollY }
+    setOpen(nextOpen)
+    if (!nextOpen) {
+      window.requestAnimationFrame(() => window.scrollTo(scroll.current.x, scroll.current.y))
+    }
+  }
+
+  return { open, onOpenChange }
+}
 
 export function DialogPanel({ trigger, title, description, children }: { trigger: React.ReactNode; title: string; description?: string; children: React.ReactNode }) {
+  const context = useOverlayContext()
+  const contextKey = `dialog-${useId()}`
   return (
-    <Dialog.Root>
-      <Dialog.Trigger className="esmera-button">{trigger}</Dialog.Trigger>
+    <Dialog.Root open={context.open} onOpenChange={context.onOpenChange}>
+      <Dialog.Trigger className="esmera-button" data-esmera-context-key={contextKey}>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="esmera-overlay-backdrop" />
         <Dialog.Viewport className="esmera-dialog-viewport">
@@ -31,9 +48,11 @@ export function DialogPanel({ trigger, title, description, children }: { trigger
 }
 
 export function DrawerPanel({ trigger, title, description, children }: { trigger: React.ReactNode; title: string; description?: string; children: React.ReactNode }) {
+  const context = useOverlayContext()
+  const contextKey = `drawer-${useId()}`
   return (
-    <Drawer.Root swipeDirection="right">
-      <Drawer.Trigger className="esmera-button">{trigger}</Drawer.Trigger>
+    <Drawer.Root open={context.open} onOpenChange={context.onOpenChange} swipeDirection="right">
+      <Drawer.Trigger className="esmera-button" data-esmera-context-key={contextKey}>{trigger}</Drawer.Trigger>
       <Drawer.Portal>
         <Drawer.Backdrop className="esmera-overlay-backdrop" />
         <Drawer.Viewport className="esmera-drawer-viewport">
