@@ -18,7 +18,7 @@ async function loginWithRoleAwareShell(page: Page, user: { email: string; passwo
   await expect(page.getByTestId('esmera-app-header')).toBeVisible()
 }
 
-test.describe('Stages 16–19 hardening', () => {
+test.describe('Stages 16–20 hardening', () => {
   let adminContext: BrowserContext
   let editorContext: BrowserContext
   let commercialContext: BrowserContext
@@ -89,6 +89,31 @@ test.describe('Stages 16–19 hardening', () => {
     await expect(palette.getByRole('option', { name: /Dashboard/ }).first()).toBeVisible()
     await adminPage.keyboard.press('Enter')
     await expect(adminPage).toHaveURL('http://localhost:3000/admin')
+  })
+
+  test('enforces the role-aware navigation matrix', async () => {
+    const editorNav = editorPage.getByTestId('esmera-nav')
+    await expect(editorNav.getByRole('link', { name: 'Produtos', exact: true })).toBeVisible()
+    await expect(editorNav.getByRole('link', { name: 'Categorias', exact: true })).toBeVisible()
+    await expect(editorNav.getByRole('link', { name: 'Configurações', exact: true })).toBeVisible()
+    await expect(editorNav.getByRole('link', { name: 'Clientes', exact: true })).toHaveCount(0)
+    await expect(editorNav.getByRole('link', { name: 'Vendas', exact: true })).toHaveCount(0)
+    await expect(editorNav.getByRole('link', { name: 'Admin técnico', exact: true })).toBeVisible()
+
+    const commercialNav = commercialPage.getByTestId('esmera-nav')
+    await expect(commercialNav.getByRole('link', { name: 'Clientes', exact: true })).toBeVisible()
+    await expect(commercialNav.getByRole('link', { name: 'Privacidade', exact: true })).toBeVisible()
+    await expect(commercialNav.getByRole('link', { name: 'Vendas', exact: true })).toBeVisible()
+    await expect(commercialNav.getByRole('link', { name: 'Pós-venda', exact: true })).toBeVisible()
+    await expect(commercialNav.getByRole('link', { name: 'Relatórios', exact: true })).toBeVisible()
+    await expect(commercialNav.getByRole('link', { name: 'Produtos', exact: true })).toHaveCount(0)
+    await expect(commercialNav.getByRole('link', { name: 'Categorias', exact: true })).toHaveCount(0)
+    await expect(commercialNav.getByRole('link', { name: 'Admin técnico', exact: true })).toBeVisible()
+
+    const adminNav = adminPage.getByTestId('esmera-nav')
+    for (const label of ['Produtos', 'Categorias', 'Clientes', 'Privacidade', 'Vendas', 'Pós-venda', 'Relatórios', 'Configurações', 'Admin técnico']) {
+      await expect(adminNav.getByRole('link', { name: label, exact: true })).toBeVisible()
+    }
   })
 
   test('keeps serious and critical WCAG 2.2 AA violations out of the custom shell', async () => {
