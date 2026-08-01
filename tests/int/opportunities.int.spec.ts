@@ -47,6 +47,13 @@ describe('Opportunity domain and Lead compatibility migration', () => {
 
   afterAll(async () => {
     if (!payload) return
+    for (const opportunityID of created.opportunities) {
+      await payload.delete({
+        collection: 'activities',
+        overrideAccess: true,
+        where: { opportunity: { equals: opportunityID } },
+      })
+    }
     await payload.delete({
       collection: 'activities',
       overrideAccess: true,
@@ -217,6 +224,7 @@ describe('Opportunity domain and Lead compatibility migration', () => {
 
     const afterRollback = await payload.findByID({ collection: 'leads', id: lead.id, overrideAccess: true, depth: 0 })
     expect(afterRollback.opportunity).toBeFalsy()
-    created.opportunities.length = 0
+    const migratedIndex = created.opportunities.findIndex((id) => String(id) === String(opportunityID))
+    if (migratedIndex >= 0) created.opportunities.splice(migratedIndex, 1)
   }, 60_000)
 })
