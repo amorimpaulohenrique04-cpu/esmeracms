@@ -10,17 +10,32 @@ export const Activities: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'summary',
-    defaultColumns: ['summary', 'kind', 'occurredAt', 'owner', 'updatedAt'],
+    defaultColumns: ['summary', 'eventType', 'kind', 'occurredAt', 'owner', 'updatedAt'],
     listSearchableFields: ['summary', 'details'],
   },
   access: {
     admin: commercialUsers,
     read: commercialUsers,
     create: commercialUsers,
-    update: commercialUsers,
+    update: admins,
     delete: admins,
   },
   fields: [
+    {
+      name: 'eventType',
+      type: 'select',
+      label: 'Evento estruturado',
+      index: true,
+      options: [
+        { label: 'Venda criada', value: 'sale.created' },
+        { label: 'Etapa da oportunidade alterada', value: 'opportunity.stage_changed' },
+        { label: 'Interesse adicionado', value: 'interest.added' },
+        { label: 'Follow-up concluído', value: 'followup.completed' },
+        { label: 'Entrega realizada', value: 'shipment.delivered' },
+        { label: 'Nota criada', value: 'note.created' },
+        { label: 'Contato registrado', value: 'contact.logged' },
+      ],
+    },
     {
       name: 'kind',
       type: 'select',
@@ -50,7 +65,7 @@ export const Activities: CollectionConfig = {
     {
       name: 'relatedTo',
       type: 'relationship',
-      relationTo: ['leads', 'customers', 'sales', 'after-sales', 'tasks'],
+      relationTo: ['leads', 'customers', 'sales', 'after-sales', 'tasks', 'client-interests'],
       hasMany: true,
       label: 'Vínculos',
       required: true,
