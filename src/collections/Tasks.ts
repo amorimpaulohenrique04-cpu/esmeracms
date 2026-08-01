@@ -88,6 +88,18 @@ export const Tasks: CollectionConfig = {
       admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
     },
     {
+      name: 'automationKey',
+      type: 'text',
+      label: 'Chave da automação',
+      unique: true,
+      index: true,
+      admin: {
+        hidden: true,
+        readOnly: true,
+        description: 'Garante idempotência para Tasks criadas pela Payload Jobs Queue.',
+      },
+    },
+    {
       name: 'legacySourceKey',
       type: 'text',
       label: 'Chave de migração legada',
