@@ -33,6 +33,12 @@ async function settle(page: import('@playwright/test').Page) {
   await page.waitForTimeout(180)
 }
 
+async function waitForInteractiveShell(page: import('@playwright/test').Page) {
+  const header = page.getByTestId('esmera-app-header')
+  await expect(header).toBeVisible({ timeout: 15_000 })
+  await expect(header).toHaveAttribute('data-shortcuts-ready', 'true', { timeout: 15_000 })
+}
+
 test('capture critical interactive visual states', async ({ page }) => {
   await ensureAdmin(page)
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -43,22 +49,29 @@ test('capture critical interactive visual states', async ({ page }) => {
     await fs.mkdir(outputDir, { recursive: true })
 
     await page.goto('/admin', { waitUntil: 'domcontentloaded' })
+    await waitForInteractiveShell(page)
     await settle(page)
-    await page.locator('body').press('Tab')
+
+    await page.keyboard.press('Tab')
+    await expect.poll(() => page.evaluate(() => document.activeElement !== document.body)).toBe(true)
     await page.screenshot({ path: path.join(outputDir, 'shell-keyboard-focus.png'), fullPage: true })
 
-    await page.getByRole('button', { name: 'Buscar no CMS' }).click()
-    await expect(page.getByTestId('esmera-command-palette')).toBeVisible()
+    await page.keyboard.press('Control+k')
+    const palette = page.getByTestId('esmera-command-palette')
+    await expect(palette).toBeVisible({ timeout: 15_000 })
     await settle(page)
     await page.screenshot({ path: path.join(outputDir, 'command-palette.png'), fullPage: true })
     await page.keyboard.press('Escape')
+    await expect(palette).toBeHidden()
 
     if (viewport.width <= 768) {
       await page.getByRole('button', { name: 'Abrir navegação' }).click()
-      await expect(page.getByTestId('esmera-mobile-nav')).toBeVisible()
+      const mobileNav = page.getByTestId('esmera-mobile-nav')
+      await expect(mobileNav).toBeVisible({ timeout: 15_000 })
       await settle(page)
       await page.screenshot({ path: path.join(outputDir, 'mobile-navigation-drawer.png'), fullPage: true })
       await page.keyboard.press('Escape')
+      await expect(mobileNav).toBeHidden()
     }
   }
 })
