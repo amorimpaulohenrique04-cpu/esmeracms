@@ -111,7 +111,8 @@ test.describe('Customer relational workspace', () => {
       await expect(customerTabs.getByRole('link', { name: tab, exact: true })).toBeVisible()
     }
     await expect(page.getByText('R$ 1.250,00')).toBeVisible()
-    await expect(page.getByText('Disponível após a migração de Opportunities na Etapa 8')).toBeVisible()
+    await expect(page.getByText('Nenhuma negociação aberta')).toBeVisible()
+    await expect(page.getByText('Disponível após a migração de Opportunities na Etapa 8')).toHaveCount(0)
 
     await page.goto(`http://localhost:3000/admin/customers?customer=${customerId}&tab=history`)
     await expect(page.getByText(noteText)).toBeVisible()
