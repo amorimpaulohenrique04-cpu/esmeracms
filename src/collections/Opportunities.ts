@@ -30,7 +30,7 @@ export const Opportunities: CollectionConfig = {
   },
   versions: { maxPerDoc: 100 },
   hooks: {
-    beforeChange: [applyOpportunityRules],
+    beforeValidate: [applyOpportunityRules],
     afterChange: [logOpportunityActivity],
   },
   fields: [
@@ -61,6 +61,8 @@ export const Opportunities: CollectionConfig = {
               name: 'source',
               type: 'select',
               label: 'Origem',
+              required: true,
+              defaultValue: 'other',
               index: true,
               options: [
                 { label: 'Instagram', value: 'instagram' },
