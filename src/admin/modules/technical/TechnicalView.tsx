@@ -33,6 +33,7 @@ export async function TechnicalView(props: AdminViewServerProps) {
     ['Vendas', '/admin/collections/sales', 'Itens, snapshots, valores, status e entrega.'],
     ['Pós-venda', '/admin/collections/after-sales', 'Follow-ups, entregas e ocorrências.'],
     ['Tarefas', '/admin/collections/tasks', 'Pendências operacionais vinculadas aos registros.'],
+    ['Automação de pós-venda', '/admin/globals/after-sales-automation', 'Regras D+3, D+15, D+90 e preparação de entrega usadas pela Jobs Queue.'],
     ['Atividades', '/admin/collections/activities', 'Linha do tempo de contatos, mensagens, propostas e mudanças.'],
   ]
 
@@ -51,6 +52,11 @@ export async function TechnicalView(props: AdminViewServerProps) {
     </div>
   )
 
+  const systemEntries = [
+    ['Usuários', '/admin/collections/users', 'Acesso, autenticação e papéis de usuário.'],
+    ['Jobs Queue', '/admin/collections/payload-jobs', 'Execuções, tentativas, erros, filas e agendamentos persistidos pelo Payload.'],
+  ]
+
   return (
     <ViewFrame props={props}>
       <PageHeader eyebrow="Sistema" title="Admin técnico" subtitle="Formulários completos, drafts, versões e capacidades avançadas do Payload. É a mesma fonte de dados do portal operacional." />
@@ -60,7 +66,7 @@ export async function TechnicalView(props: AdminViewServerProps) {
       </div>
       {site ? <><h2 style={{ marginTop: 30 }}>Site e catálogo</h2>{renderEntries(siteEntries)}</> : null}
       {business ? <><h2 style={{ marginTop: 30 }}>Business</h2>{renderEntries(businessEntries)}</> : null}
-      {role === 'admin' ? <><h2 style={{ marginTop: 30 }}>Sistema</h2>{renderEntries([['Usuários', '/admin/collections/users', 'Acesso, autenticação e papéis de usuário.']])}</> : null}
+      {role === 'admin' ? <><h2 style={{ marginTop: 30 }}>Sistema</h2>{renderEntries(systemEntries)}</> : null}
     </ViewFrame>
   )
 }
