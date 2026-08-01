@@ -1,6 +1,12 @@
 import type { CollectionConfig } from 'payload'
 
 import { admins, commercialUsers } from '../access/roles'
+import {
+  opportunityLossReasonLabels,
+  opportunityLossReasons,
+  opportunityStageLabels,
+  opportunityStages,
+} from '../businessRules/opportunities/stages'
 import { businessUserRelationship } from '../fields/userRelationship'
 
 export const Activities: CollectionConfig = {
@@ -27,6 +33,8 @@ export const Activities: CollectionConfig = {
       label: 'Evento estruturado',
       index: true,
       options: [
+        { label: 'Oportunidade criada', value: 'opportunity.created' },
+        { label: 'Oportunidade migrada', value: 'opportunity.migrated' },
         { label: 'Venda criada', value: 'sale.created' },
         { label: 'Etapa da oportunidade alterada', value: 'opportunity.stage_changed' },
         { label: 'Interesse adicionado', value: 'interest.added' },
@@ -57,15 +65,46 @@ export const Activities: CollectionConfig = {
       label: 'Data e hora',
       required: true,
       defaultValue: () => new Date().toISOString(),
+      index: true,
       admin: { date: { pickerAppearance: 'dayAndTime' } },
     },
     { name: 'summary', type: 'text', label: 'Resumo', required: true },
     { name: 'details', type: 'textarea', label: 'Detalhes' },
     businessUserRelationship('owner', 'Responsável'),
     {
+      name: 'opportunity',
+      type: 'relationship',
+      relationTo: 'opportunities',
+      label: 'Oportunidade',
+      index: true,
+      admin: { condition: (_, siblingData) => Boolean(siblingData?.eventType?.startsWith?.('opportunity.')) },
+    },
+    {
+      name: 'fromStage',
+      type: 'select',
+      label: 'Etapa anterior',
+      options: opportunityStages.map((value) => ({ label: opportunityStageLabels[value], value })),
+      admin: { condition: (_, siblingData) => siblingData?.eventType === 'opportunity.stage_changed' },
+    },
+    {
+      name: 'toStage',
+      type: 'select',
+      label: 'Nova etapa',
+      index: true,
+      options: opportunityStages.map((value) => ({ label: opportunityStageLabels[value], value })),
+      admin: { condition: (_, siblingData) => Boolean(siblingData?.eventType?.startsWith?.('opportunity.')) },
+    },
+    {
+      name: 'lossReason',
+      type: 'select',
+      label: 'Motivo da perda',
+      options: opportunityLossReasons.map((value) => ({ label: opportunityLossReasonLabels[value], value })),
+      admin: { condition: (_, siblingData) => siblingData?.toStage === 'lost' },
+    },
+    {
       name: 'relatedTo',
       type: 'relationship',
-      relationTo: ['leads', 'customers', 'sales', 'after-sales', 'tasks', 'client-interests'],
+      relationTo: ['leads', 'customers', 'opportunities', 'sales', 'after-sales', 'tasks', 'client-interests'],
       hasMany: true,
       label: 'Vínculos',
       required: true,
