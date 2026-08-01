@@ -18,6 +18,8 @@ import { Media } from './collections/Media'
 import { Occurrences } from './collections/Occurrences'
 import { Opportunities } from './collections/Opportunities'
 import { Products } from './collections/Products'
+import { ReportExportFiles } from './collections/ReportExportFiles'
+import { ReportExports } from './collections/ReportExports'
 import { Sales } from './collections/Sales'
 import { Shipments } from './collections/Shipments'
 import { Tasks } from './collections/Tasks'
@@ -30,6 +32,7 @@ import { Home } from './globals/Home'
 import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
 import { canRunEsmeraJobs, esmeraJobTasks } from './server/jobs'
+import { GenerateReportExportJob } from './server/jobs/reportExport'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -111,7 +114,7 @@ export default buildConfig({
     access: {
       run: canRunEsmeraJobs,
     },
-    tasks: esmeraJobTasks,
+    tasks: [...esmeraJobTasks, GenerateReportExportJob],
     enableConcurrencyControl: true,
     shouldAutoRun: async () => process.env.PAYLOAD_JOBS_AUTORUN === 'true',
     autoRun: [
@@ -130,6 +133,7 @@ export default buildConfig({
   collections: [
     Users,
     Media,
+    ReportExportFiles,
     Categories,
     OperationalProducts,
     Leads,
@@ -142,6 +146,7 @@ export default buildConfig({
     Shipments,
     Occurrences,
     Activities,
+    ReportExports,
   ],
   globals: [
     Home,
