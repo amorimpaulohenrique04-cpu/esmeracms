@@ -42,7 +42,6 @@ export const Tasks: CollectionConfig = {
       name: 'type',
       type: 'select',
       label: 'Tipo',
-      required: true,
       defaultValue: 'custom',
       index: true,
       options: taskTypes.map((value) => ({ label: taskTypeLabels[value], value })),
@@ -80,7 +79,6 @@ export const Tasks: CollectionConfig = {
       relationTo: ['leads', 'customers', 'opportunities', 'sales', 'after-sales', 'shipments', 'occurrences'],
       hasMany: true,
       label: 'Vínculos',
-      required: true,
     },
     { name: 'notes', type: 'textarea', label: 'Observações' },
     {
