@@ -27,19 +27,15 @@ export function MobileNav({
   const roleLabel = role === 'admin' ? 'Administrador' : role === 'editor' ? 'Editorial' : role === 'commercial' ? 'Comercial' : 'Sem papel'
 
   const renderLinks = (items: ReturnType<typeof visibleOperationalLinks>) => items.map((item) => (
-    <Dialog.Close
+    <Link
       key={item.href}
-      nativeButton={false}
-      render={
-        <Link
-          className={`esmera-mobile-nav-link${isShellLinkActive(pathname, item) ? ' is-active' : ''}`}
-          href={item.href}
-        />
-      }
+      className={`esmera-mobile-nav-link${isShellLinkActive(pathname, item) ? ' is-active' : ''}`}
+      href={item.href}
+      onClick={() => onOpenChange(false)}
     >
       <ShellIcon name={item.icon} />
       <span>{item.label}</span>
-    </Dialog.Close>
+    </Link>
   ))
 
   return (
@@ -65,10 +61,10 @@ export function MobileNav({
             </nav>
 
             <div className="esmera-mobile-nav-footer">
-              <Dialog.Close nativeButton={false} render={<Link className="esmera-mobile-user" href="/admin/account" />}>
+              <Link className="esmera-mobile-user" href="/admin/account" onClick={() => onOpenChange(false)}>
                 <span className="esmera-avatar">{name.slice(0, 2).toUpperCase()}</span>
                 <span><strong>{name}</strong><small>{roleLabel}</small></span>
-              </Dialog.Close>
+              </Link>
               <button className="esmera-mobile-logout" type="button" onClick={onLogout}>Sair</button>
             </div>
           </Dialog.Popup>
