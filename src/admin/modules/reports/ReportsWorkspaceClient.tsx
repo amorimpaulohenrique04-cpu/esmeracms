@@ -272,7 +272,7 @@ function WorkspaceInner({ initialData, users, products, categories }: Props) {
   const reportQuery = useQuery({
     queryKey: ['reports', activeFilters],
     queryFn: () => fetchReport(activeFilters),
-    initialData,
+    initialData: activeFilters === initialData.filters ? initialData : undefined,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
