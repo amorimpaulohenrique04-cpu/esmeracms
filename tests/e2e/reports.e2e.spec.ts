@@ -61,6 +61,38 @@ test.describe('Reports workspace', () => {
     await page.getByRole('button', { name: 'Fechar' }).click()
   })
 
+  test('exports the current URL filters through the native PDF endpoint', async () => {
+    await page.goto('http://localhost:3000/admin/reports')
+    await page.getByRole('combobox', { name: 'Origem' }).selectOption('site')
+    await page.getByRole('button', { name: 'Aplicar filtros' }).click()
+    await expect(page).toHaveURL(/source=site/)
+
+    let postedSource: string | null | undefined
+    await page.route('**/api/admin-reports/export', async (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.continue()
+      const body = request.postDataJSON() as { filters?: { source?: string | null } }
+      postedSource = body.filters?.source
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        headers: {
+          'content-disposition': 'attachment; filename="esmera-relatorio-teste.pdf"',
+          'x-reporting-semantic-version': 'reporting-v1',
+        },
+        body: '%PDF-1.7\n%%EOF\n',
+      })
+    })
+
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Exportar PDF' }).click()
+    const download = await downloadPromise
+    expect(postedSource).toBe('site')
+    expect(download.suggestedFilename()).toBe('esmera-relatorio-teste.pdf')
+    await expect(page.getByText('PDF gerado · contrato reporting-v1.')).toBeVisible()
+    await page.unroute('**/api/admin-reports/export')
+  })
+
   test('keeps reports responsive without document-level overflow', async () => {
     for (const viewport of [{ width: 768, height: 1024 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(viewport)
