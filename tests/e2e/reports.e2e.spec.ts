@@ -26,8 +26,8 @@ test.describe('Reports workspace', () => {
     await expect(page.getByRole('button', { name: /Oportunidades/ }).first()).toBeVisible()
     await expect(page.getByRole('img', { name: /Evolução diária/ })).toBeVisible()
 
-    let releaseRequest = () => undefined
-    let markRequestStarted = () => undefined
+    let releaseRequest: () => void = () => {}
+    let markRequestStarted: () => void = () => {}
     const requestGate = new Promise<void>((resolve) => { releaseRequest = resolve })
     const requestStarted = new Promise<void>((resolve) => { markRequestStarted = resolve })
     await page.route('**/api/admin-reports?*', async (route) => {
