@@ -1,5 +1,7 @@
 import type { PayloadRequest, Where } from 'payload'
 
+import { measureServerOperation } from '../../performance'
+
 export type FindOptions = {
   where?: Where
   sort?: string
@@ -11,28 +13,30 @@ export type FindOptions = {
 }
 
 export async function findDocs<T>(req: PayloadRequest, collection: string, options: FindOptions = {}) {
-  const result = await req.payload.find({
-    collection: collection as never,
-    depth: options.depth ?? 1,
-    limit: options.limit ?? 100,
-    page: options.page,
-    sort: options.sort as never,
-    where: options.where,
-    overrideAccess: false,
-    user: req.user,
-    req,
-    draft: options.draft,
-    select: options.select as never,
-  })
+  return await measureServerOperation('operational', `${collection}.find`, async () => {
+    const result = await req.payload.find({
+      collection: collection as never,
+      depth: options.depth ?? 1,
+      limit: options.limit ?? 100,
+      page: options.page,
+      sort: options.sort as never,
+      where: options.where,
+      overrideAccess: false,
+      user: req.user,
+      req,
+      draft: options.draft,
+      select: options.select as never,
+    })
 
-  return result as unknown as {
-    docs: T[]
-    hasNextPage: boolean
-    limit: number
-    page: number
-    totalDocs: number
-    totalPages: number
-  }
+    return result as unknown as {
+      docs: T[]
+      hasNextPage: boolean
+      limit: number
+      page: number
+      totalDocs: number
+      totalPages: number
+    }
+  })
 }
 
 export async function findAllDocs<T>(
@@ -53,13 +57,15 @@ export async function findAllDocs<T>(
 }
 
 export async function countDocs(req: PayloadRequest, collection: string, where?: Where) {
-  const result = await req.payload.count({
-    collection: collection as never,
-    where,
-    overrideAccess: false,
-    user: req.user,
-    req,
-  })
+  return await measureServerOperation('operational', `${collection}.count`, async () => {
+    const result = await req.payload.count({
+      collection: collection as never,
+      where,
+      overrideAccess: false,
+      user: req.user,
+      req,
+    })
 
-  return result.totalDocs
+    return result.totalDocs
+  })
 }
