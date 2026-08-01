@@ -10,7 +10,7 @@ import {
   TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
-import { AfterSalesWorkspaceClient } from './AfterSalesWorkspaceClient'
+import { AfterSalesHydratedWorkspace } from './AfterSalesHydratedWorkspace'
 import type {
   ActivityRecord,
   AfterSalesCase,
@@ -159,7 +159,7 @@ export async function AfterSalesView(props: AdminViewServerProps) {
         subtitle="Fila operacional de tarefas, entregas e ocorrências. Prazos e estados reais substituem percentuais artificiais."
         actions={<><TechnicalLink href="/admin/collections/after-sales/create" primary>Novo caso</TechnicalLink><TechnicalLink href="/admin/collections/tasks">Tarefas técnicas</TechnicalLink></>}
       />
-      <AfterSalesWorkspaceClient
+      <AfterSalesHydratedWorkspace
         cases={caseResult.docs}
         tasks={taskResult.docs}
         shipments={shipmentResult.docs}
