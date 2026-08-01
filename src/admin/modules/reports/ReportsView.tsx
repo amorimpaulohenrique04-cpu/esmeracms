@@ -14,6 +14,7 @@ import {
   QueryError,
   ViewFrame,
 } from '../../views/shared'
+import { ReportExportControl } from './ReportExportControl'
 import { ReportsWorkspaceClient } from './ReportsWorkspaceClient'
 import './reports.scss'
 
@@ -93,6 +94,7 @@ export async function ReportsView(props: AdminViewServerProps) {
         title="Relatórios"
         subtitle="Investigação orientada por métricas: comece pelo indicador, aprofunde o segmento e abra os registros reais sem perder o período."
       />
+      <ReportExportControl />
       <ReportsWorkspaceClient
         key={JSON.stringify(initialData.filters)}
         initialData={initialData}
