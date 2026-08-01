@@ -4,6 +4,7 @@ import type {
   TaskConfig,
 } from 'payload'
 
+import { isAdmin } from '../../access/roles'
 import {
   isShipmentStatus,
   operationalPriorities,
@@ -13,7 +14,6 @@ import {
   type TaskType,
 } from '../../businessRules/afterSales/model'
 import { relationshipID, type RelationshipValue } from '../../businessRules/relationships'
-import { isAdmin } from '../../access/roles'
 
 export const OPERATIONAL_JOBS_QUEUE = 'operational'
 export const INTEGRATION_JOBS_QUEUE = 'integrations'
@@ -75,6 +75,14 @@ function nonNegativeInteger(value: unknown, fallback: number) {
 
 function validISO(value: unknown): value is string {
   return typeof value === 'string' && !Number.isNaN(new Date(value).getTime())
+}
+
+function storedRelationshipID(value: unknown): string | number | undefined {
+  if (typeof value === 'number') return value
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim()
+  if (!normalized) return undefined
+  return /^\d+$/.test(normalized) ? Number(normalized) : normalized
 }
 
 function relationIDs(values: RelationshipValue[] | null | undefined) {
@@ -323,14 +331,15 @@ export const CreateAfterSalesTaskJob = {
       return { output: { taskID: String(existing.docs[0].id), created: false, reason: 'already-created' } }
     }
 
-    const sale = await loadSale(req, input.saleId)
+    const saleID = storedRelationshipID(input.saleId) || input.saleId
+    const sale = await loadSale(req, saleID)
     if (sale.status === 'cancelled') {
       return { output: { created: false, reason: 'sale-cancelled' } }
     }
 
     const afterSalesCase = await ensureAfterSalesCase(req, sale)
     const customer = relationshipID(sale.customer)
-    const assignee = input.assigneeId || relationshipID(sale.owner) || undefined
+    const assignee = storedRelationshipID(input.assigneeId) || relationshipID(sale.owner) || undefined
     const relatedTo = [
       { relationTo: 'after-sales' as const, value: afterSalesCase.id },
       { relationTo: 'sales' as const, value: sale.id },
