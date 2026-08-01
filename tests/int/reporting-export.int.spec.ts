@@ -51,8 +51,10 @@ function snapshot(overrides: Partial<ReportingSnapshot> = {}) {
     },
     channels: [],
     funnel: {
-      stages: [{ stage: 'new', volume: 12, conversionToNext: 0.75, dropOff: 3, dropOffRate: 0.25 }],
+      stages: [{ stage: 'new', label: 'Nova', volume: 12, progressed: 9, conversionToNext: 0.75, dropOff: 3, dropOffRate: 0.25 }],
+      lost: 2,
       terminalConversionRate: 4 / 6,
+      historySource: 'activities',
     },
     sources: [{ source: 'instagram', opportunitiesCreated: 12, wonOpportunities: 4, lostOpportunities: 2, conversionRate: 4 / 6, validSales: 4, revenueCents: 4200000 }],
     products: [{ productId: 1, title: 'Cartografia Verde', opportunitiesCreated: 8, wonOpportunities: 3, lostOpportunities: 1, conversionRate: 0.75, validSales: 3, grossItemRevenueCents: 3600000 }],
