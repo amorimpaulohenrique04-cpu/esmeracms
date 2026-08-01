@@ -117,7 +117,6 @@ async function matchingCustomer(payload: Payload, lead: LegacyLead) {
     pagination: false,
     overrideAccess: true,
     where: { or } as Where,
-    select: { id: true },
   })
 
   if (result.docs.length === 1) return { id: result.docs[0].id, ambiguous: false }
@@ -180,7 +179,6 @@ async function ensureMigrationActivity(payload: Payload, lead: LegacyLead, oppor
         { opportunity: { equals: opportunity.id } },
       ],
     } as Where,
-    select: { id: true },
   })
   if (existing.docs.length) return
 
