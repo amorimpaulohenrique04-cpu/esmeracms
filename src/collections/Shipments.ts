@@ -3,6 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { commercialUsers } from '../access/roles'
 import { shipmentStatusLabels, shipmentStatuses } from '../businessRules/afterSales/model'
 import { applyShipmentRules, recordShipmentActivity } from '../hooks/afterSales/applyShipmentRules'
+import { scheduleShipmentJobs } from '../server/jobs'
 
 export const Shipments: CollectionConfig = {
   slug: 'shipments',
@@ -25,7 +26,7 @@ export const Shipments: CollectionConfig = {
   versions: { maxPerDoc: 50 },
   hooks: {
     beforeValidate: [applyShipmentRules],
-    afterChange: [recordShipmentActivity],
+    afterChange: [recordShipmentActivity, scheduleShipmentJobs],
   },
   fields: [
     { name: 'afterSalesCase', type: 'relationship', relationTo: 'after-sales', label: 'Caso de pós-venda', required: true, index: true },
