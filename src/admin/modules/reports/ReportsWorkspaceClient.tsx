@@ -8,7 +8,6 @@ import {
   useQuery,
 } from '@tanstack/react-query'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import React, { useMemo, useState } from 'react'
 
 import { opportunityStageLabels } from '../../../businessRules/opportunities/stages'
@@ -263,7 +262,6 @@ function DrilldownDrawer({
 }
 
 function WorkspaceInner({ initialData, users, products, categories }: Props) {
-  const router = useRouter()
   const [activeFilters, setActiveFilters] = useState(initialData.filters)
   const [draft, setDraft] = useState<DraftFilters>(() => draftFrom(initialData.filters))
   const [shareFeedback, setShareFeedback] = useState('')
@@ -298,7 +296,11 @@ function WorkspaceInner({ initialData, users, products, categories }: Props) {
   function navigate(next: NormalizedReportingFilters) {
     setActiveFilters(next)
     setDraft(draftFrom(next))
-    router.replace(`/admin/reports?${searchParams(next).toString()}`, { scroll: false })
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `/admin/reports?${searchParams(next).toString()}`,
+    )
   }
 
   function applyFilters() {
@@ -382,7 +384,7 @@ function WorkspaceInner({ initialData, users, products, categories }: Props) {
         {data.team.length ? <DataTable label="Performance por responsável"><thead><tr><th>Responsável</th><th>Oportunidades</th><th>Conversão</th><th>Vendas</th><th>Receita</th><th>Ticket</th><th /></tr></thead><tbody>{data.team.map((member) => <tr key={String(member.ownerId ?? 'unassigned')}><td>{member.ownerId === null ? member.ownerName : <button className="esmera-report-text-action" type="button" onClick={() => patchFilters({ ownerId: member.ownerId })}>{member.ownerName}</button>}</td><td>{member.opportunitiesCreated}</td><td>{percent(member.conversionRate)}</td><td>{member.validSales}</td><td>{money(member.revenueCents)}</td><td>{money(member.averageTicketCents)}</td><td>{member.ownerId !== null ? <button className="esmera-button esmera-button--quiet" type="button" onClick={() => openDrilldown('owner', member.ownerId)}>Registros</button> : null}</td></tr>)}</tbody></DataTable> : <EmptyState title="Sem responsáveis no período" copy="Nenhum registro atribuído corresponde aos filtros." />}
       </section>
 
-      <footer className="esmera-report-contract"><strong>Contrato {data.semanticVersion}</strong><span>{shortDate(activeFilters.period.from)} — {shortDate(activeFilters.period.to)}</span><span>Cutover do funil: {shortDate(data.opportunityCutoverAt)}</span><span>Fonte: Payload/PostgreSQL</span></footer>
+      <footer className="esmera-report-contract"><strong>Contrato {data.semanticVersion}</strong><span>{shortDate(activeFilters.period.from)} — {shortDate(activeFilters.period.to)}</span><span>Cutover do funil: {shortDate(data.opportunityCutoverAt)}</span><span>Fonte: Payload/PostgreSQL</span><span>Nenhum percentual é fixo.</span></footer>
 
       <DrilldownDrawer request={drilldownRequest} result={drilldownQuery.data} loading={drilldownQuery.isFetching} error={drilldownQuery.error} onClose={() => setDrilldownRequest(null)} />
     </div>
