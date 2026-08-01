@@ -288,6 +288,19 @@ async function ensureAfterSalesCase(req: PayloadRequest, sale: SaleDocument) {
   })
 }
 
+async function findTaskByAutomationKey(req: PayloadRequest, automationKey: string) {
+  const result = await req.payload.find({
+    collection: 'tasks',
+    depth: 0,
+    limit: 1,
+    pagination: false,
+    overrideAccess: true,
+    req,
+    where: { automationKey: { equals: automationKey } } as never,
+  })
+  return result.docs[0]
+}
+
 export const CreateAfterSalesTaskJob = {
   slug: CREATE_AFTER_SALES_TASK_JOB,
   label: 'Criar tarefa automática de pós-venda',
@@ -318,17 +331,9 @@ export const CreateAfterSalesTaskJob = {
     { name: 'reason', type: 'text' },
   ],
   handler: async ({ input, req }) => {
-    const existing = await req.payload.find({
-      collection: 'tasks',
-      depth: 0,
-      limit: 1,
-      pagination: false,
-      overrideAccess: true,
-      req,
-      where: { automationKey: { equals: input.automationKey } } as never,
-    })
-    if (existing.docs[0]) {
-      return { output: { taskID: String(existing.docs[0].id), created: false, reason: 'already-created' } }
+    const existing = await findTaskByAutomationKey(req, input.automationKey)
+    if (existing) {
+      return { output: { taskID: String(existing.id), created: false, reason: 'already-created' } }
     }
 
     const saleID = storedRelationshipID(input.saleId) || input.saleId
@@ -346,25 +351,32 @@ export const CreateAfterSalesTaskJob = {
       customer !== null ? { relationTo: 'customers' as const, value: customer } : null,
     ].filter(Boolean)
 
-    const task = await req.payload.create({
-      collection: 'tasks',
-      overrideAccess: true,
-      req,
-      context: { skipJobScheduling: true },
-      data: {
-        automationKey: input.automationKey,
-        title: input.title,
-        type: input.type,
-        status: 'pending',
-        priority: input.priority,
-        dueAt: input.dueAt,
-        assignee,
-        relatedTo,
-        notes: input.notes || null,
-      } as never,
-    })
-
-    return { output: { taskID: String(task.id), created: true } }
+    try {
+      const task = await req.payload.create({
+        collection: 'tasks',
+        overrideAccess: true,
+        req,
+        context: { skipJobScheduling: true },
+        data: {
+          automationKey: input.automationKey,
+          title: input.title,
+          type: input.type,
+          status: 'pending',
+          priority: input.priority,
+          dueAt: input.dueAt,
+          assignee,
+          relatedTo,
+          notes: input.notes || null,
+        } as never,
+      })
+      return { output: { taskID: String(task.id), created: true } }
+    } catch (error) {
+      const concurrent = await findTaskByAutomationKey(req, input.automationKey)
+      if (concurrent) {
+        return { output: { taskID: String(concurrent.id), created: false, reason: 'concurrent-duplicate' } }
+      }
+      throw error
+    }
   },
 } as TaskConfig<typeof CREATE_AFTER_SALES_TASK_JOB>
 
@@ -410,7 +422,6 @@ async function syncShipment(req: PayloadRequest, shipment: ShipmentDocument) {
     id: shipment.id,
     overrideAccess: true,
     req,
-    context: { skipJobScheduling: true },
     data: {
       status: nextStatus,
       estimatedDelivery: nextEstimatedDelivery || null,
