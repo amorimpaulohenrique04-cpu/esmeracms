@@ -3,6 +3,10 @@ import type { Payload, PayloadRequest } from 'payload'
 import { canManageBusiness } from '../../access/roles'
 import { reportingPerformanceSnapshot } from './db'
 import {
+  getReportingDrilldown as getDrilldown,
+  type ReportingDrilldownKind,
+} from './drilldown'
+import {
   comparisonPeriod,
   filtersForPeriod,
   normalizeReportingFilters,
@@ -25,10 +29,12 @@ import {
   type ReportingFilters,
 } from './metrics'
 import { getCategoryPerformance, getProductPerformance } from './products'
-import { getSalesByChannel, getSalesMetrics, getSalesTimeline } from './sales'
+import { getSalesByChannel, getSalesMetrics } from './sales'
 import { getLeadAcquisitionBySource, getSourcePerformance } from './sources'
 import { getTeamPerformance } from './team'
+import { getCommercialEvolution } from './timeline'
 
+export * from './drilldown'
 export * from './filters'
 export * from './funnel'
 export * from './losses'
@@ -37,6 +43,7 @@ export * from './products'
 export * from './sales'
 export * from './sources'
 export * from './team'
+export * from './timeline'
 
 export class ReportingAccessError extends Error {
   readonly status = 403
@@ -120,7 +127,7 @@ export async function getReportingSnapshot(
   const [
     metrics,
     leadAcquisition,
-    timeline,
+    evolution,
     channels,
     funnel,
     sources,
@@ -131,7 +138,7 @@ export async function getReportingSnapshot(
   ] = await Promise.all([
     metricComparison(req.payload, filters),
     getLeadAcquisitionBySource(req.payload, filters),
-    getSalesTimeline(req.payload, filters),
+    getCommercialEvolution(req.payload, filters),
     getSalesByChannel(req.payload, filters),
     getFunnelSnapshot(req.payload, filters),
     getSourcePerformance(req.payload, filters),
@@ -148,7 +155,7 @@ export async function getReportingSnapshot(
     filters,
     metrics,
     leadAcquisition,
-    timeline,
+    evolution,
     channels,
     funnel,
     sources,
@@ -166,6 +173,19 @@ export async function getReportingSnapshot(
         'Oportunidades migradas podem participar da conversão quando closedAt é verificável, mas não são contadas como oportunidades criadas nem entram no ciclo médio.',
     },
   }
+}
+
+export type ReportingSnapshot = Awaited<ReturnType<typeof getReportingSnapshot>>
+
+export async function getReportingDrilldown(
+  req: PayloadRequest,
+  input: ReportingFilters,
+  kind: ReportingDrilldownKind,
+  value: string | null = null,
+) {
+  assertReportingAccess(req)
+  const filters = normalizeReportingFilters(input)
+  return await getDrilldown(req.payload, filters, kind, value)
 }
 
 export async function getDashboardReporting(

@@ -106,7 +106,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
         {reporting && tasks ? <div className="esmera-grid-2">
           <section className="esmera-card">
             <div className="esmera-card-header"><h2>Pipeline comercial</h2><TechnicalLink href="/admin/sales?view=pipeline">Ver pipeline</TechnicalLink></div>
-            <div className="esmera-card-body"><div className="esmera-stage-track">{reporting.pipeline.map(({ stage, volume }) => <div className="esmera-stage" key={stage}><strong>{volume}</strong><span>{opportunityStageLabels[stage]}</span></div>)}</div><div className="esmera-kpi-meta">Fonte: Reporting Service sobre Opportunities. Nenhum estágio é estimado ou preenchido com placeholder.</div></div>
+            <div className="esmera-card-body"><div className="esmera-stage-track">{reporting.pipeline.map(({ stage, volume }) => <div className="esmera-stage" key={stage}><strong>{volume}</strong><span>{opportunityStageLabels[stage]}</span></div>)}</div><div className="esmera-kpi-meta">Fonte: Opportunities. Agregação: Reporting Service. Nenhum estágio é estimado ou preenchido com placeholder.</div></div>
           </section>
           <section className="esmera-card">
             <div className="esmera-card-header"><h2>Pendências</h2><TechnicalLink href="/admin/collections/tasks/create">Nova tarefa</TechnicalLink></div>
