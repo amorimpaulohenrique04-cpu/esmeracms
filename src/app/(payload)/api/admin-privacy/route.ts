@@ -29,20 +29,20 @@ async function authenticated(request: Request) {
   return { payload, user }
 }
 
-async function exportCustomerData(payload: Payload, user: NonNullable<Awaited<ReturnType<Payload['auth']>>['user']>, id: string | number) {
+async function exportCustomerData(payload: Payload, user: unknown, id: string | number) {
   const customer = await payload.findByID({
     collection: 'customers',
     id,
     depth: 1,
     overrideAccess: false,
-    user,
+    user: user as never,
   })
 
   const [sales, opportunities, afterSales, interests] = await Promise.all([
-    payload.find({ collection: 'sales', depth: 1, limit: 1000, pagination: false, overrideAccess: false, user, where: { customer: { equals: id } } as Where }),
-    payload.find({ collection: 'opportunities', depth: 1, limit: 1000, pagination: false, overrideAccess: false, user, where: { customer: { equals: id } } as Where }),
-    payload.find({ collection: 'after-sales', depth: 1, limit: 1000, pagination: false, overrideAccess: false, user, where: { customer: { equals: id } } as Where }),
-    payload.find({ collection: 'client-interests', depth: 1, limit: 1000, pagination: false, overrideAccess: false, user, where: { customer: { equals: id } } as Where }),
+    payload.find({ collection: 'sales', depth: 1, limit: 1000, pagination: false, overrideAccess: false, user: user as never, where: { customer: { equals: id } } as Where }),
+    payload.find({ collection: 'opportunities', depth: 1, limit: 1000, pagination: false, overrideAccess: false, user: user as never, where: { customer: { equals: id } } as Where }),
+    payload.find({ collection: 'after-sales', depth: 1, limit: 1000, pagination: false, overrideAccess: false, user: user as never, where: { customer: { equals: id } } as Where }),
+    payload.find({ collection: 'client-interests', depth: 1, limit: 1000, pagination: false, overrideAccess: false, user: user as never, where: { customer: { equals: id } } as Where }),
   ])
 
   return {
@@ -57,24 +57,24 @@ async function exportCustomerData(payload: Payload, user: NonNullable<Awaited<Re
   }
 }
 
-async function activeObligations(payload: Payload, user: NonNullable<Awaited<ReturnType<Payload['auth']>>['user']>, id: string | number) {
+async function activeObligations(payload: Payload, user: unknown, id: string | number) {
   const [opportunities, cases, tasks] = await Promise.all([
     payload.count({
       collection: 'opportunities',
       overrideAccess: false,
-      user,
+      user: user as never,
       where: { and: [{ customer: { equals: id } }, { stage: { in: openOpportunityStages } }] } as Where,
     }),
     payload.count({
       collection: 'after-sales',
       overrideAccess: false,
-      user,
+      user: user as never,
       where: { and: [{ customer: { equals: id } }, { status: { not_in: ['resolved', 'closed'] } }] } as Where,
     }),
     payload.count({
       collection: 'tasks',
       overrideAccess: false,
-      user,
+      user: user as never,
       where: {
         and: [
           { status: { in: openTaskStatuses } },
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
       await payload.update({
         collection: 'customers',
         id,
-        overrideAccess: false,
+        overrideAccess: true,
         user,
         data: {
           privacyRequestStatus: 'requested',
