@@ -1,5 +1,5 @@
 .esmera-customer-filters {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
 .esmera-customer-filters > .esmera-button,
@@ -21,6 +21,6 @@
 
 @container esmera-workspace (max-width: 560px) {
   .esmera-customer-filters {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
 }
