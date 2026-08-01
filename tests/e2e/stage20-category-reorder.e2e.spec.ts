@@ -39,8 +39,8 @@ test.describe('Stage 20 category ordering', () => {
     expect(secondId).toBeTruthy()
 
     await page.goto('http://localhost:3000/admin/categories?status=active')
-    const firstHandle = page.getByRole('button', { name: `Reordenar ${firstTitle}` })
-    const secondHandle = page.getByRole('button', { name: `Reordenar ${secondTitle}` })
+    const firstHandle = page.getByRole('button', { name: `Reordenar ${firstTitle}` }).first()
+    const secondHandle = page.getByRole('button', { name: `Reordenar ${secondTitle}` }).first()
     await expect(firstHandle).toBeVisible()
     await expect(secondHandle).toBeVisible()
 
@@ -53,11 +53,12 @@ test.describe('Stage 20 category ordering', () => {
     await page.mouse.down()
     await page.mouse.move((secondBox?.x || 0) + (secondBox?.width || 0) / 2, (secondBox?.y || 0) + (secondBox?.height || 0) + 12, { steps: 12 })
     await page.mouse.up()
-    await expect(page.getByText('Ordem editorial salva.')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Ordem editorial salva.').first()).toBeVisible({ timeout: 10_000 })
 
-    const firstPosition = page.getByLabel(`Mover ${firstTitle} para posição`)
+    const firstItem = page.getByRole('listitem').filter({ hasText: firstTitle }).first()
+    const firstPosition = firstItem.getByLabel(`Mover ${firstTitle} para posição`)
     await firstPosition.selectOption('1')
-    await expect(page.getByText('Ordem editorial salva.')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Ordem editorial salva.').first()).toBeVisible({ timeout: 10_000 })
 
     for (const id of [firstId, secondId]) {
       if (!id) continue
