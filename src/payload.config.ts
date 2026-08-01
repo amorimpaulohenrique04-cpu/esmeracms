@@ -14,9 +14,11 @@ import { ClientInterests } from './collections/ClientInterests'
 import { Customers } from './collections/Customers'
 import { Leads } from './collections/Leads'
 import { Media } from './collections/Media'
+import { Occurrences } from './collections/Occurrences'
 import { Opportunities } from './collections/Opportunities'
 import { Products } from './collections/Products'
 import { Sales } from './collections/Sales'
+import { Shipments } from './collections/Shipments'
 import { Tasks } from './collections/Tasks'
 import { Users } from './collections/Users'
 import { About } from './globals/About'
@@ -114,6 +116,8 @@ export default buildConfig({
     Sales,
     AfterSales,
     Tasks,
+    Shipments,
+    Occurrences,
     Activities,
   ],
   globals: [
