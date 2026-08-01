@@ -14,7 +14,9 @@ export const applyOpportunityRules: CollectionBeforeValidateHook = ({ context, d
   if (!data) return data
 
   const id = originalDoc?.id as string | number | undefined
-  const fromStage = isOpportunityStage(originalDoc?.stage) ? originalDoc.stage : null
+  const fromStage: OpportunityStage | null = isOpportunityStage(originalDoc?.stage)
+    ? originalDoc.stage as OpportunityStage
+    : null
   const stageValue = data.stage ?? originalDoc?.stage ?? 'new'
   const errors: Array<{ path: string; message: string }> = []
 
@@ -22,7 +24,7 @@ export const applyOpportunityRules: CollectionBeforeValidateHook = ({ context, d
     errors.push({ path: 'stage', message: 'Etapa comercial inválida.' })
   }
 
-  const stage = isOpportunityStage(stageValue) ? stageValue : 'new'
+  const stage: OpportunityStage = isOpportunityStage(stageValue) ? stageValue as OpportunityStage : 'new'
   if (fromStage && !canTransitionOpportunity(fromStage, stage)) {
     errors.push({
       path: 'stage',
