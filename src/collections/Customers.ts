@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { commercialUsers } from '../access/roles'
+import { adminField, admins, commercialUsers } from '../access/roles'
 import { businessUserRelationship } from '../fields/userRelationship'
 import { applyCustomerPrivacyRules } from '../hooks/customers/applyCustomerPrivacyRules'
 import { normalizeCustomer } from '../hooks/customers/normalizeCustomer'
@@ -30,7 +30,7 @@ export const Customers: CollectionConfig = {
     read: commercialUsers,
     create: commercialUsers,
     update: commercialUsers,
-    delete: commercialUsers,
+    delete: admins,
     readVersions: commercialUsers,
   },
   versions: { maxPerDoc: 100 },
@@ -145,6 +145,7 @@ export const Customers: CollectionConfig = {
               label: 'Solicitação LGPD',
               defaultValue: 'none',
               index: true,
+              access: { update: adminField },
               options: [
                 { label: 'Nenhuma', value: 'none' },
                 { label: 'Solicitada', value: 'requested' },
@@ -169,9 +170,10 @@ export const Customers: CollectionConfig = {
               name: 'retentionReviewAt',
               type: 'date',
               label: 'Revisar retenção em',
+              access: { update: adminField },
               admin: { date: { pickerAppearance: 'dayAndTime' } },
             },
-            { name: 'processingRestricted', type: 'checkbox', label: 'Tratamento restrito', defaultValue: false },
+            { name: 'processingRestricted', type: 'checkbox', label: 'Tratamento restrito', defaultValue: false, access: { update: adminField } },
             { name: 'dataHandlingNotes', type: 'textarea', label: 'Observações de privacidade' },
           ],
         },
