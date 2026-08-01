@@ -39,6 +39,12 @@ body {
     width: 100%;
     min-width: 0;
   }
+
+  /* A full-screen operational inspector replaces, rather than competes with, the shell header. */
+  body:has(.esmera-after-sales-workspace.has-inspector) .esmera-app-header {
+    visibility: hidden;
+    pointer-events: none;
+  }
 }
 
 /* The master plan defines 1024–1279px as the compact rail range. */
