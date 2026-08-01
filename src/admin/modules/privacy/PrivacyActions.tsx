@@ -5,6 +5,7 @@ import React, { useState } from 'react'
 
 import { Button } from '../../design-system'
 import { announceAdmin } from '../../state/AdminStateProvider'
+import { expectAdminResponse, normalizeAdminError } from '../../state/asyncState'
 
 type Props = {
   customerId: string | number
@@ -22,9 +23,7 @@ async function privacyMutation(body: Record<string, unknown>) {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   })
-  const result = await response.json() as { error?: string }
-  if (!response.ok) throw new Error(result.error || 'Não foi possível concluir a operação de privacidade.')
-  return result
+  return expectAdminResponse<Record<string, unknown>>(response, 'Não foi possível concluir a operação de privacidade.')
 }
 
 export function PrivacyActions({ customerId, consent, requestStatus, isAdmin }: Props) {
@@ -53,9 +52,9 @@ export function PrivacyActions({ customerId, consent, requestStatus, isAdmin }: 
       announceAdmin(message)
       router.refresh()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Não foi possível concluir a operação.'
-      setFeedback(message)
-      announceAdmin(message, true)
+      const normalized = normalizeAdminError(error, 'Não foi possível concluir a operação.')
+      setFeedback(normalized.message)
+      announceAdmin(normalized.message, true)
     } finally {
       setBusy(null)
     }
