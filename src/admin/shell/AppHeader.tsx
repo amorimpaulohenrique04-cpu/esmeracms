@@ -47,6 +47,7 @@ export function AppHeader() {
   const name = user?.name || user?.email?.split('@')[0] || 'Esméra'
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [shortcutsReady, setShortcutsReady] = useState(false)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -73,6 +74,7 @@ export function AppHeader() {
     }
 
     window.addEventListener('keydown', onKeyDown)
+    setShortcutsReady(true)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
@@ -80,7 +82,11 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="esmera-app-header" data-testid="esmera-app-header">
+      <header
+        className="esmera-app-header"
+        data-testid="esmera-app-header"
+        data-shortcuts-ready={shortcutsReady ? 'true' : 'false'}
+      >
         <div className="esmera-app-header__left">
           <button className="esmera-shell-mobile-trigger" type="button" onClick={() => setMobileNavOpen(true)} aria-label="Abrir navegação">
             <ShellIcon name="menu" />
