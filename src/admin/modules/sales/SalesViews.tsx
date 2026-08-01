@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, Where } from 'payload'
 
+import { openOpportunityStages, opportunityStageLabels } from '../../../businessRules/opportunities/stages'
 import { eligibleSaleStatuses } from '../../../collections/Sales'
 import {
   AccessDenied,
@@ -18,6 +19,7 @@ import {
 } from '../../views/shared'
 
 type Customer = { id: string | number; name?: string }
+type User = { id: string | number; name?: string; email?: string }
 type Sale = {
   id: string | number
   number?: string
@@ -27,24 +29,20 @@ type Sale = {
   customer?: Customer | string | number
   expectedDeliveryAt?: string
 }
-type Lead = {
+type Opportunity = {
   id: string | number
-  name?: string
+  code?: string
   stage?: string
+  rank?: number
+  customer?: Customer | string | number
+  owner?: User | string | number
+  source?: string
+  estimatedValueCents?: number | null
   nextAction?: string
   nextActionAt?: string
 }
 
 type SalesMode = 'list' | 'pipeline'
-
-const pipelineStages = ['new', 'curation', 'proposal', 'negotiation'] as const
-
-const stageLabels: Record<string, string> = {
-  new: 'Novo',
-  curation: 'Curadoria',
-  proposal: 'Proposta',
-  negotiation: 'Negociação',
-}
 
 const channelLabels: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -55,8 +53,22 @@ const channelLabels: Record<string, string> = {
   other: 'Outro',
 }
 
-function customerName(value: Sale['customer']) {
-  return value && typeof value === 'object' ? value.name || 'Cliente' : 'Cliente'
+const sourceLabels: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  instagram: 'Instagram',
+  site: 'Site',
+  referral: 'Indicação',
+  architect: 'Arquiteto',
+  organic: 'Orgânico',
+  other: 'Outro',
+}
+
+function customerName(value: Sale['customer'] | Opportunity['customer']) {
+  return value && typeof value === 'object' ? value.name || 'Cliente' : 'Cliente ainda não vinculado'
+}
+
+function ownerName(value: Opportunity['owner']) {
+  return value && typeof value === 'object' ? value.name || value.email || 'Sem responsável' : 'Sem responsável'
 }
 
 async function salesMode(props: AdminViewServerProps): Promise<SalesMode> {
@@ -115,33 +127,51 @@ async function SalesListContent(props: AdminViewServerProps) {
 }
 
 async function PipelineContent(props: AdminViewServerProps) {
-  const result = await findDocs<Lead>(props.initPageResult.req, 'leads', {
-    where: { stage: { in: [...pipelineStages] } } as Where,
-    sort: 'nextActionAt',
-    limit: 200,
-    depth: 0,
-    select: { id: true, name: true, stage: true, nextAction: true, nextActionAt: true },
+  const result = await findDocs<Opportunity>(props.initPageResult.req, 'opportunities', {
+    where: { stage: { in: [...openOpportunityStages] } } as Where,
+    sort: 'rank',
+    limit: 500,
+    depth: 1,
+    select: {
+      id: true,
+      code: true,
+      stage: true,
+      rank: true,
+      customer: true,
+      owner: true,
+      source: true,
+      estimatedValueCents: true,
+      nextAction: true,
+      nextActionAt: true,
+    },
   })
 
   return (
     <>
       <div className="esmera-pipeline">
-        {pipelineStages.map((stage) => {
-          const leads = result.docs.filter((lead) => lead.stage === stage)
+        {openOpportunityStages.map((stage) => {
+          const opportunities = result.docs.filter((opportunity) => opportunity.stage === stage)
+          const potential = opportunities.reduce((sum, opportunity) => sum + (opportunity.estimatedValueCents || 0), 0)
           return (
             <section className="esmera-pipeline-column" key={stage}>
-              <div className="esmera-pipeline-head"><span>{stageLabels[stage]}</span><span className="esmera-pill">{leads.length}</span></div>
-              {leads.map((lead) => (
-                <a className="esmera-pipeline-card" href={`/admin/collections/leads/${lead.id}`} key={String(lead.id)} style={{ color: 'inherit', textDecoration: 'none' }}>
-                  <strong>{lead.name || 'Lead sem nome'}</strong>
-                  <span>{lead.nextAction || 'Sem próxima ação'}{lead.nextActionAt ? ` · ${shortDate(lead.nextActionAt)}` : ''}</span>
+              <div className="esmera-pipeline-head">
+                <span>{opportunityStageLabels[stage]}</span>
+                <span className="esmera-pill">{opportunities.length} · {money(potential)}</span>
+              </div>
+              {opportunities.map((opportunity) => (
+                <a className="esmera-pipeline-card" href={`/admin/collections/opportunities/${opportunity.id}`} key={String(opportunity.id)} style={{ color: 'inherit', textDecoration: 'none' }}>
+                  <small>{opportunity.code || 'Sem código'} · {sourceLabels[opportunity.source || ''] || 'Origem não informada'}</small>
+                  <strong>{customerName(opportunity.customer)}</strong>
+                  <span>{opportunity.estimatedValueCents == null ? 'Valor potencial não informado' : money(opportunity.estimatedValueCents)}</span>
+                  <span>{opportunity.nextAction || 'Sem próxima ação'}{opportunity.nextActionAt ? ` · ${shortDate(opportunity.nextActionAt)}` : ''}</span>
+                  <small>{ownerName(opportunity.owner)}</small>
                 </a>
               ))}
             </section>
           )
         })}
       </div>
-      <div className="esmera-kpi-meta">Fonte transitória: leads.stage. Ganhos e perdidos não ocupam coluna operacional; a coleção Opportunities será introduzida na etapa de domínio comercial.</div>
+      <div className="esmera-kpi-meta">Fonte comercial: Opportunities. Leads permanecem apenas como entrada e qualificação durante o ciclo de compatibilidade.</div>
     </>
   )
 }
@@ -158,8 +188,8 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
         <PageHeader
           eyebrow="Business"
           title="Vendas"
-          subtitle={mode === 'pipeline' ? 'Pipeline comercial dentro da mesma superfície de Vendas, sem rota operacional paralela.' : 'Pedidos, valores registrados e entrega. Rascunhos e cancelamentos não entram nas métricas de receita.'}
-          actions={mode === 'pipeline' ? <TechnicalLink href="/admin/collections/leads/create" primary>Novo lead</TechnicalLink> : <TechnicalLink href="/admin/collections/sales/create" primary>Nova venda</TechnicalLink>}
+          subtitle={mode === 'pipeline' ? 'Oportunidades comerciais na mesma superfície de Vendas. Leads representam somente aquisição e qualificação.' : 'Transações ganhas, valores registrados e entrega. Negociação comercial pertence a Opportunities.'}
+          actions={mode === 'pipeline' ? <TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink> : <TechnicalLink href="/admin/collections/sales/create" primary>Nova venda</TechnicalLink>}
         />
         <ViewSwitch mode={mode} />
         {mode === 'pipeline' ? <PipelineContent {...props} /> : <SalesListContent {...props} />}
