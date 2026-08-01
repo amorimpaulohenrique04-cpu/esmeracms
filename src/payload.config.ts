@@ -36,6 +36,11 @@ import { GenerateReportExportJob } from './server/jobs/reportExport'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+const payloadSecret = process.env.PAYLOAD_SECRET || ''
+
+if (process.env.NODE_ENV === 'production' && payloadSecret.length < 24) {
+  throw new Error('PAYLOAD_SECRET deve possuir pelo menos 24 caracteres em produção.')
+}
 
 const OperationalProducts = {
   ...Products,
@@ -63,6 +68,7 @@ export default buildConfig({
     components: {
       Nav: '/admin/components/Nav#EsmeraNav',
       header: ['/admin/shell/AppHeader#AppHeader'],
+      providers: ['/admin/state/AdminStateProvider#AdminStateProvider'],
       graphics: {
         Icon: '/admin/components/Brand#EsmeraIcon',
         Logo: '/admin/components/Brand#EsmeraLogo',
@@ -82,6 +88,10 @@ export default buildConfig({
         customers: {
           Component: '/admin/modules/customers/CustomersView#CustomersView',
           path: '/customers',
+        },
+        privacy: {
+          Component: '/admin/modules/privacy/PrivacyView#PrivacyView',
+          path: '/privacy',
         },
         sales: {
           Component: '/admin/modules/sales/SalesViews#SalesWorkspace',
@@ -112,7 +122,9 @@ export default buildConfig({
   },
   jobs: {
     access: {
+      queue: ({ req }) => isAdmin(req.user),
       run: canRunEsmeraJobs,
+      cancel: ({ req }) => isAdmin(req.user),
     },
     tasks: [...esmeraJobTasks, GenerateReportExportJob],
     enableConcurrencyControl: true,
@@ -158,11 +170,12 @@ export default buildConfig({
     AfterSalesAutomation,
   ],
   editor: lexicalEditor(),
-  secret: process.env.PAYLOAD_SECRET || '',
+  secret: payloadSecret,
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
   db: postgresAdapter({
+    push: process.env.NODE_ENV !== 'production',
     pool: {
       connectionString: process.env.DATABASE_URL || '',
     },
