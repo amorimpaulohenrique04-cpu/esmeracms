@@ -22,7 +22,7 @@ export type CustomerListItem = {
   email?: string | null
   city?: string | null
   state?: string | null
-  status?: CustomerStatus | null
+  status: CustomerStatus
   origin?: string | null
   owner?: Relation<UserRef>
   createdAt?: string | null
