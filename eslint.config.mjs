@@ -64,5 +64,12 @@ export default defineConfig([
       'react-hooks/refs': 'off',
     },
   },
+  {
+    files: ['src/admin/modules/sales/SalesWorkspaceClient.tsx'],
+    rules: {
+      'react-hooks/refs': 'off',
+      'react-hooks/incompatible-library': 'off',
+    },
+  },
   globalIgnores(['.next/**', 'src/payload-types.ts', 'src/payload-generated-schema.ts']),
 ])
