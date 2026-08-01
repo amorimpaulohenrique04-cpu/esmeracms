@@ -33,10 +33,11 @@ test('capture current admin visual baseline', async ({ page }) => {
   })
   expect(login.ok(), `Baseline admin login failed: HTTP ${login.status()} ${await login.text()}`).toBeTruthy()
 
+  const stamp = Date.now()
   const createCategory = await page.request.post(`${baseURL}/api/categories?draft=true`, {
     data: {
       title: 'Objetos Baseline',
-      slug: `objetos-baseline-${Date.now()}`,
+      slug: `objetos-baseline-${stamp}`,
       status: 'active',
       order: 100,
       description: 'Categoria usada para validar o workspace master-detail.',
@@ -57,10 +58,11 @@ test('capture current admin visual baseline', async ({ page }) => {
   const createProduct = await page.request.post(`${baseURL}/api/products?draft=true`, {
     data: {
       title: 'Objeto Baseline Esméra',
-      code: `BASE-${Date.now()}`,
-      catalogStatus: 'archived',
+      code: `BASE-${stamp}`,
+      catalogStatus: 'active',
       availability: 'unique',
-      priceMode: 'inquiry',
+      priceMode: 'fixed',
+      basePriceCents: 145_000,
       material: 'Esmeralda bruta',
       edition: 'Peça única',
       categories: [categoryId],
@@ -72,6 +74,82 @@ test('capture current admin visual baseline', async ({ page }) => {
   const productId = productBody.id ?? productBody.doc?.id
   expect(productId).toBeTruthy()
 
+  const createCustomer = await page.request.post(`${baseURL}/api/admin-customers`, {
+    data: {
+      action: 'create',
+      data: {
+        name: 'Mariana Lopes',
+        company: 'Atelier Mariana',
+        phone: '(11) 99876-5432',
+        email: `MARIANA.${stamp}@EXAMPLE.COM`,
+        origin: 'instagram',
+        status: 'follow_up',
+        tags: ['colecionadora', 'interiores'],
+        interestProfile: {
+          categories: [categoryId],
+          materials: ['esmeralda', 'pedra natural'],
+          investmentMinCents: 100_000,
+          investmentMaxCents: 500_000,
+        },
+      },
+    },
+  })
+  expect(createCustomer.ok(), `Baseline customer create failed: HTTP ${createCustomer.status()} ${await createCustomer.text()}`).toBeTruthy()
+  const customerBody = await createCustomer.json() as { id?: string | number }
+  const customerId = customerBody.id
+  expect(customerId).toBeTruthy()
+
+  const createSale = await page.request.post(`${baseURL}/api/sales`, {
+    data: {
+      number: `BASE-SALE-${stamp}`,
+      customer: customerId,
+      channel: 'whatsapp',
+      status: 'confirmed',
+      nextAction: 'Confirmar endereço de entrega',
+      items: [{ product: productId, quantity: 1 }],
+      discountCents: 0,
+      shippingCents: 12_000,
+    },
+  })
+  expect(createSale.ok(), `Baseline sale create failed: HTTP ${createSale.status()} ${await createSale.text()}`).toBeTruthy()
+  const saleBody = await createSale.json() as { id?: string | number; doc?: { id?: string | number } }
+  const saleId = saleBody.id ?? saleBody.doc?.id
+  expect(saleId).toBeTruthy()
+
+  const createAfterSale = await page.request.post(`${baseURL}/api/after-sales`, {
+    data: {
+      sale: saleId,
+      customer: customerId,
+      status: 'following',
+      priority: 'normal',
+      expectedDeliveryAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      incidentType: 'none',
+    },
+  })
+  expect(createAfterSale.ok(), `Baseline after-sale create failed: HTTP ${createAfterSale.status()} ${await createAfterSale.text()}`).toBeTruthy()
+
+  const createTask = await page.request.post(`${baseURL}/api/tasks`, {
+    data: {
+      title: 'Enviar seleção complementar',
+      status: 'pending',
+      priority: 'high',
+      dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      relatedTo: [{ relationTo: 'customers', value: customerId }],
+      notes: 'Próxima ação real para o baseline visual.',
+    },
+  })
+  expect(createTask.ok(), `Baseline task create failed: HTTP ${createTask.status()} ${await createTask.text()}`).toBeTruthy()
+
+  const addInterest = await page.request.post(`${baseURL}/api/admin-customers`, {
+    data: { action: 'add-interest', id: customerId, productId, note: 'Interesse para composição de living.' },
+  })
+  expect(addInterest.ok(), `Baseline interest create failed: HTTP ${addInterest.status()} ${await addInterest.text()}`).toBeTruthy()
+
+  const addNote = await page.request.post(`${baseURL}/api/admin-customers`, {
+    data: { action: 'add-note', id: customerId, note: 'Cliente prefere contato no período da tarde e curadoria com peças únicas.' },
+  })
+  expect(addNote.ok(), `Baseline note create failed: HTTP ${addNote.status()} ${await addNote.text()}`).toBeTruthy()
+
   const routes = [
     { name: 'dashboard', url: '/admin' },
     { name: 'products-list', url: '/admin/products' },
@@ -82,7 +160,13 @@ test('capture current admin visual baseline', async ({ page }) => {
     { name: 'category-general', url: `/admin/categories?status=active&category=${categoryId}&tab=general` },
     { name: 'category-media-seo', url: `/admin/categories?status=active&category=${categoryId}&tab=media` },
     { name: 'category-products', url: `/admin/categories?status=active&category=${categoryId}&tab=products` },
-    { name: 'customers', url: '/admin/customers' },
+    { name: 'customers-list', url: '/admin/customers' },
+    { name: 'customer-overview', url: `/admin/customers?customer=${customerId}&tab=overview` },
+    { name: 'customer-history', url: `/admin/customers?customer=${customerId}&tab=history` },
+    { name: 'customer-interests', url: `/admin/customers?customer=${customerId}&tab=interests` },
+    { name: 'customer-sales', url: `/admin/customers?customer=${customerId}&tab=sales` },
+    { name: 'customer-after-sales', url: `/admin/customers?customer=${customerId}&tab=after-sales` },
+    { name: 'customer-notes', url: `/admin/customers?customer=${customerId}&tab=notes` },
     { name: 'sales-list', url: '/admin/sales?view=list' },
     { name: 'sales-pipeline', url: '/admin/sales?view=pipeline' },
     { name: 'after-sales', url: '/admin/after-sales' },
