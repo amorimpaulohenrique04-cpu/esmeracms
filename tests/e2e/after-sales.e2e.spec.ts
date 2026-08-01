@@ -137,7 +137,7 @@ test.describe('Stage 10 After-sales workspace', () => {
     await expect(page.getByRole('heading', { name: caseNumber })).toBeVisible()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBeLessThanOrEqual(1)
-    await mobileInspectorClose.click()
+    await mobileInspectorClose.evaluate((element) => (element as HTMLButtonElement).click())
     await expect(mobileInspectorClose).toBeHidden()
   })
 })
