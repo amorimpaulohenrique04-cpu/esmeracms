@@ -3,9 +3,10 @@ import type { CollectionConfig } from 'payload'
 import { commercialUsers } from '../access/roles'
 import { businessUserRelationship } from '../fields/userRelationship'
 import { applySaleRules } from '../hooks/sales/applySaleRules'
+import { VALID_SALE_STATUSES } from '../server/reporting/metrics'
 import { scheduleSaleJobs } from '../server/jobs'
 
-export const eligibleSaleStatuses = ['confirmed', 'production', 'ready', 'delivered'] as const
+export const eligibleSaleStatuses = VALID_SALE_STATUSES
 
 export const Sales: CollectionConfig = {
   slug: 'sales',
@@ -67,6 +68,7 @@ export const Sales: CollectionConfig = {
               label: 'Canal',
               required: true,
               defaultValue: 'whatsapp',
+              index: true,
               options: [
                 { label: 'WhatsApp', value: 'whatsapp' },
                 { label: 'Instagram', value: 'instagram' },
@@ -94,7 +96,10 @@ export const Sales: CollectionConfig = {
                 { label: 'Cancelada', value: 'cancelled' },
               ],
             },
-            businessUserRelationship('owner', 'Responsável'),
+            {
+              ...businessUserRelationship('owner', 'Responsável'),
+              index: true,
+            },
             {
               name: 'confirmedAt',
               type: 'date',

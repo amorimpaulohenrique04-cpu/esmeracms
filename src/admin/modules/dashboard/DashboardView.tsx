@@ -2,8 +2,8 @@
 import type { AdminViewServerProps, Where } from 'payload'
 
 import { canManageBusiness, canManageSite } from '../../../access/roles'
-import { openOpportunityStages, opportunityStageLabels } from '../../../businessRules/opportunities/stages'
-import { eligibleSaleStatuses } from '../../../collections/Sales'
+import { opportunityStageLabels } from '../../../businessRules/opportunities/stages'
+import { getDashboardReporting } from '../../../server/reporting'
 import {
   AccessDenied,
   countDocs,
@@ -14,7 +14,6 @@ import {
   findDocs,
   MetricCard,
   money,
-  monthStartISO,
   nextDayThreshold,
   PageHeader,
   QueryError,
@@ -24,7 +23,6 @@ import {
 
 type Product = { id: string | number; title?: string; code?: string; updatedAt?: string }
 type Task = { id: string | number; title?: string; dueAt?: string; priority?: string; status?: string }
-type Sale = { totalCents?: number | null; status?: string }
 type FollowUp = { status?: string; dueAt?: string }
 type AfterSale = { followUps?: FollowUp[] }
 
@@ -64,17 +62,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
 
     const businessPromise = businessAllowed
       ? Promise.all([
-          countDocs(req, 'opportunities', { stage: { in: [...openOpportunityStages] } } as Where),
-          findAllDocs<Sale>(req, 'sales', {
-            where: {
-              and: [
-                { status: { in: [...eligibleSaleStatuses] } },
-                { confirmedAt: { greater_than_equal: monthStartISO() } },
-              ],
-            } as Where,
-            depth: 0,
-            select: { totalCents: true, status: true },
-          }),
+          getDashboardReporting(req),
           findAllDocs<AfterSale>(req, 'after-sales', {
             depth: 0,
             select: { followUps: true },
@@ -86,24 +74,18 @@ export default async function DashboardView(props: AdminViewServerProps) {
             depth: 0,
             select: { id: true, title: true, dueAt: true, priority: true, status: true },
           }),
-          Promise.all(
-            openOpportunityStages.map((stage) =>
-              countDocs(req, 'opportunities', { stage: { equals: stage } } as Where),
-            ),
-          ),
         ])
       : Promise.resolve(null)
 
     const [site, business] = await Promise.all([sitePromise, businessPromise])
     const tomorrow = nextDayThreshold()
     const pendingFollowups = business
-      ? business[2]
+      ? business[1]
           .flatMap((item) => item.followUps || [])
           .filter((follow) => follow.status === 'pending' && follow.dueAt && new Date(follow.dueAt) <= tomorrow).length
       : 0
-    const salesCount = business?.[1].length || 0
-    const revenue = business?.[1].reduce((sum, sale) => sum + (sale.totalCents || 0), 0) || 0
-    const pipeline = business ? openOpportunityStages.map((stage, index) => ({ stage, count: business[4][index] })) : []
+    const reporting = business?.[0] || null
+    const tasks = business?.[2] || null
 
     return (
       <ViewFrame props={props} withTemplate={false}>
@@ -114,21 +96,21 @@ export default async function DashboardView(props: AdminViewServerProps) {
             <MetricCard icon="box" label="Produtos ativos" value={site[0]} tone="green" meta="Publicados e ativos no catálogo" />
             <MetricCard icon="draft" label="Pendências editoriais" value={site[1]} meta="Rascunhos com problemas reais de prontidão" />
           </> : null}
-          {business ? <>
-            <MetricCard icon="lead" label="Oportunidades abertas" value={business[0]} tone="blue" meta="Novo, curadoria, proposta e negociação" />
-            <MetricCard icon="money" label="Vendas no mês" value={money(revenue)} tone="green" meta={`${salesCount} vendas confirmadas ou em andamento`} />
+          {reporting ? <>
+            <MetricCard icon="lead" label="Oportunidades abertas" value={reporting.openOpportunities} tone="blue" meta="Novo, curadoria, proposta e negociação" />
+            <MetricCard icon="money" label="Vendas no mês" value={money(reporting.sales.revenueCents)} tone="green" meta={`${reporting.sales.validSales} vendas válidas · contrato ${reporting.semanticVersion}`} />
             <MetricCard icon="alert" label="Follow-ups até amanhã" value={pendingFollowups} tone={pendingFollowups ? 'red' : 'neutral'} meta="Itens pendentes com prazo até amanhã" />
           </> : null}
         </div>
 
-        {business ? <div className="esmera-grid-2">
+        {reporting && tasks ? <div className="esmera-grid-2">
           <section className="esmera-card">
             <div className="esmera-card-header"><h2>Pipeline comercial</h2><TechnicalLink href="/admin/sales?view=pipeline">Ver pipeline</TechnicalLink></div>
-            <div className="esmera-card-body"><div className="esmera-stage-track">{pipeline.map(({ stage, count }) => <div className="esmera-stage" key={stage}><strong>{count}</strong><span>{opportunityStageLabels[stage]}</span></div>)}</div><div className="esmera-kpi-meta">Fonte: Opportunities. Leads permanecem somente como entrada e qualificação durante a compatibilidade.</div></div>
+            <div className="esmera-card-body"><div className="esmera-stage-track">{reporting.pipeline.map(({ stage, volume }) => <div className="esmera-stage" key={stage}><strong>{volume}</strong><span>{opportunityStageLabels[stage]}</span></div>)}</div><div className="esmera-kpi-meta">Fonte: Reporting Service sobre Opportunities. Nenhum estágio é estimado ou preenchido com placeholder.</div></div>
           </section>
           <section className="esmera-card">
             <div className="esmera-card-header"><h2>Pendências</h2><TechnicalLink href="/admin/collections/tasks/create">Nova tarefa</TechnicalLink></div>
-            {business[3].docs.length ? <ul className="esmera-list">{business[3].docs.map((task) => <li className="esmera-list-row" key={String(task.id)}><div><a className="esmera-row-title" href={`/admin/collections/tasks/${task.id}`}>{task.title || 'Tarefa'}</a><span className="esmera-row-meta">{dateTime(task.dueAt)}</span></div><span className={`esmera-pill ${task.priority === 'urgent' || task.priority === 'high' ? 'esmera-pill--red' : ''}`}>{task.priority || 'normal'}</span></li>)}</ul> : <EmptyState title="Nenhuma pendência" copy="A consulta foi concluída e não existem tarefas abertas." />}
+            {tasks.docs.length ? <ul className="esmera-list">{tasks.docs.map((task) => <li className="esmera-list-row" key={String(task.id)}><div><a className="esmera-row-title" href={`/admin/collections/tasks/${task.id}`}>{task.title || 'Tarefa'}</a><span className="esmera-row-meta">{dateTime(task.dueAt)}</span></div><span className={`esmera-pill ${task.priority === 'urgent' || task.priority === 'high' ? 'esmera-pill--red' : ''}`}>{task.priority || 'normal'}</span></li>)}</ul> : <EmptyState title="Nenhuma pendência" copy="A consulta foi concluída e não existem tarefas abertas." />}
           </section>
         </div> : null}
 
