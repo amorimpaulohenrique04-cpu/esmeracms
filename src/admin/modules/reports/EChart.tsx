@@ -37,8 +37,6 @@ export function EChart({
   const optionRef = useRef(option)
   const [ready, setReady] = useState(false)
 
-  optionRef.current = option
-
   useEffect(() => {
     let cancelled = false
     let resizeObserver: ResizeObserver | null = null
@@ -120,6 +118,7 @@ export function EChart({
   }, [ariaLabel])
 
   useEffect(() => {
+    optionRef.current = option
     chartRef.current?.setOption(accessibleOption(option, ariaLabel), true)
   }, [ariaLabel, option])
 
