@@ -132,6 +132,8 @@ test.describe('Stage 10 After-sales workspace', () => {
 
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(`http://localhost:3000/admin/after-sales?q=${encodeURIComponent(taskTitle)}&status=all`)
+    const initialInspectorClose = page.getByRole('button', { name: 'Fechar inspector' })
+    if (await initialInspectorClose.isVisible()) await initialInspectorClose.click()
     const mobileRow = page.getByRole('row').filter({ hasText: taskTitle })
     await mobileRow.getByRole('button', { name: 'Inspecionar' }).click()
     await expect(page.getByRole('button', { name: 'Fechar inspector' })).toBeVisible()
