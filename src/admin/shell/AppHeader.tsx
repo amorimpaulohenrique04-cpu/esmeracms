@@ -2,7 +2,7 @@
 
 import { useAuth } from '@payloadcms/ui'
 import Link from 'next/link'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 import type { EsmeraRole } from '../../access/roles'
 import { ADMIN_CREATE_EVENT } from '../state/AdminStateProvider'
@@ -47,10 +47,9 @@ export function AppHeader() {
   const name = user?.name || user?.email?.split('@')[0] || 'Esméra'
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const headerRef = useRef<HTMLElement>(null)
+  const [shortcutsReady, setShortcutsReady] = useState(false)
 
   useEffect(() => {
-    const headerNode = headerRef.current
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
 
@@ -75,10 +74,10 @@ export function AppHeader() {
     }
 
     window.addEventListener('keydown', onKeyDown)
-    headerNode?.setAttribute('data-shortcuts-ready', 'true')
+    const readyFrame = window.requestAnimationFrame(() => setShortcutsReady(true))
 
     return () => {
-      headerNode?.setAttribute('data-shortcuts-ready', 'false')
+      window.cancelAnimationFrame(readyFrame)
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [])
@@ -88,10 +87,9 @@ export function AppHeader() {
   return (
     <>
       <header
-        ref={headerRef}
         className="esmera-app-header"
         data-testid="esmera-app-header"
-        data-shortcuts-ready="false"
+        data-shortcuts-ready={shortcutsReady ? 'true' : 'false'}
       >
         <div className="esmera-app-header__left">
           <button className="esmera-shell-mobile-trigger" type="button" onClick={() => setMobileNavOpen(true)} aria-label="Abrir navegação">
