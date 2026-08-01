@@ -49,6 +49,7 @@ jobs:
       VISUAL_REFERENCE_DIR: artifacts/reference-baseline
       VISUAL_CURRENT_DIR: artifacts/admin-baseline
       VISUAL_REPORT_PATH: artifacts/visual-regression-report.json
+      VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
 
     steps:
       - name: Checkout reconstruction branch
