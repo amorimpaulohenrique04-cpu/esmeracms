@@ -126,7 +126,7 @@ test.describe('Stage 10 After-sales workspace', () => {
     await taskRow.getByRole('button', { name: 'Inspecionar' }).click()
     await expect(page.getByRole('heading', { name: caseNumber })).toBeVisible()
     await expect(page.getByText(trackingCode, { exact: true })).toBeVisible()
-    await expect(page.getByText(occurrenceDescription, { exact: true })).toBeVisible()
+    await expect(page.getByText(occurrenceDescription, { exact: true }).first()).toBeVisible()
     await expect(page.getByText('Pedido confirmado', { exact: true }).first()).toBeVisible()
     await expect(page.getByText('Entregue', { exact: true }).first()).toBeVisible()
 
