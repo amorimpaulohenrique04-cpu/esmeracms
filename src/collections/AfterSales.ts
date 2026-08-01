@@ -60,7 +60,7 @@ export const AfterSales: CollectionConfig = {
               options: operationalPriorities.map((value) => ({ label: operationalPriorityLabels[value], value })),
             },
             businessUserRelationship('owner', 'Responsável'),
-            { name: 'openedAt', type: 'date', label: 'Aberto em', required: true, index: true, admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
+            { name: 'openedAt', type: 'date', label: 'Aberto em', index: true, admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
             { name: 'closedAt', type: 'date', label: 'Encerrado em', index: true, admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
           ],
         },
