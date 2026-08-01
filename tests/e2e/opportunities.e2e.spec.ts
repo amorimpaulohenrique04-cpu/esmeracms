@@ -58,7 +58,8 @@ test.describe('Opportunity commercial source', () => {
 
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('http://localhost:3000/admin/sales?view=pipeline')
-    const card = page.locator(`a[href="/admin/collections/opportunities/${opportunityId}"]`)
+    const opportunityLink = page.locator(`a[href="/admin/collections/opportunities/${opportunityId}"]`)
+    const card = page.locator('article.esmera-opportunity-card').filter({ has: opportunityLink })
     await expect(card).toBeVisible()
     await expect(card).toContainText(customerName)
     await expect(card).toContainText(nextAction)
