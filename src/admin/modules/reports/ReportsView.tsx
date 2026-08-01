@@ -16,6 +16,7 @@ import {
 } from '../../views/shared'
 import { ReportExportControl } from './ReportExportControl'
 import { ReportsWorkspaceClient } from './ReportsWorkspaceClient'
+import './report-export.scss'
 import './reports.scss'
 
 type OptionRecord = {
