@@ -15,6 +15,7 @@ export const operationalLinks: ShellNavItem[] = [
   { href: '/admin/products', label: 'Produtos', icon: 'box', area: 'site' },
   { href: '/admin/categories', label: 'Categorias', icon: 'tag', area: 'site' },
   { href: '/admin/customers', label: 'Clientes', icon: 'users', area: 'business' },
+  { href: '/admin/privacy', label: 'Privacidade', icon: 'shield', area: 'business' },
   { href: '/admin/sales', label: 'Vendas', icon: 'receipt', area: 'business' },
   { href: '/admin/after-sales', label: 'Pós-venda', icon: 'heart', area: 'business' },
   { href: '/admin/reports', label: 'Relatórios', icon: 'chart', area: 'business' },

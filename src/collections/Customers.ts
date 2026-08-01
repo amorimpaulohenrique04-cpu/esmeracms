@@ -1,7 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
-import { commercialUsers } from '../access/roles'
+import { adminField, admins, commercialUsers } from '../access/roles'
 import { businessUserRelationship } from '../fields/userRelationship'
+import { applyCustomerPrivacyRules } from '../hooks/customers/applyCustomerPrivacyRules'
 import { normalizeCustomer } from '../hooks/customers/normalizeCustomer'
 
 export const customerOriginOptions = [
@@ -29,11 +30,11 @@ export const Customers: CollectionConfig = {
     read: commercialUsers,
     create: commercialUsers,
     update: commercialUsers,
-    delete: commercialUsers,
+    delete: admins,
     readVersions: commercialUsers,
   },
   versions: { maxPerDoc: 100 },
-  hooks: { beforeValidate: [normalizeCustomer] },
+  hooks: { beforeValidate: [normalizeCustomer, applyCustomerPrivacyRules] },
   fields: [
     {
       type: 'tabs',
@@ -127,10 +128,52 @@ export const Customers: CollectionConfig = {
               type: 'date',
               label: 'Consentimento registrado em',
               admin: {
+                readOnly: true,
                 condition: (_, siblingData) => siblingData?.marketingConsent === true,
                 date: { pickerAppearance: 'dayAndTime' },
               },
             },
+            {
+              name: 'consentWithdrawnAt',
+              type: 'date',
+              label: 'Consentimento retirado em',
+              admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
+            },
+            {
+              name: 'privacyRequestStatus',
+              type: 'select',
+              label: 'Solicitação LGPD',
+              defaultValue: 'none',
+              index: true,
+              access: { update: adminField },
+              options: [
+                { label: 'Nenhuma', value: 'none' },
+                { label: 'Solicitada', value: 'requested' },
+                { label: 'Em análise', value: 'reviewing' },
+                { label: 'Bloqueada por obrigação', value: 'blocked' },
+                { label: 'Concluída', value: 'completed' },
+              ],
+            },
+            {
+              name: 'privacyRequestAt',
+              type: 'date',
+              label: 'Solicitação registrada em',
+              admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
+            },
+            {
+              name: 'privacyRequestCompletedAt',
+              type: 'date',
+              label: 'Solicitação concluída em',
+              admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
+            },
+            {
+              name: 'retentionReviewAt',
+              type: 'date',
+              label: 'Revisar retenção em',
+              access: { update: adminField },
+              admin: { date: { pickerAppearance: 'dayAndTime' } },
+            },
+            { name: 'processingRestricted', type: 'checkbox', label: 'Tratamento restrito', defaultValue: false, access: { update: adminField } },
             { name: 'dataHandlingNotes', type: 'textarea', label: 'Observações de privacidade' },
           ],
         },

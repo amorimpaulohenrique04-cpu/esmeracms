@@ -9,6 +9,10 @@ body {
   background: var(--esmera-bg);
 }
 
+html {
+  scroll-padding-block: 88px 72px;
+}
+
 body {
   color: var(--esmera-text);
   font-family: var(--esmera-font-sans);
@@ -22,6 +26,32 @@ body {
 /* The Esmera shell owns the global header; Payload document controls remain inside each view. */
 .template-default .app-header {
   display: none;
+}
+
+.esmera-view :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--esmera-focus);
+  outline-offset: 2px;
+  box-shadow: var(--esmera-focus-ring);
+  scroll-margin-block: 88px 72px;
+}
+
+.esmera-view :where(button, select, summary, input[type='checkbox'], input[type='radio']) {
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.esmera-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 @media (max-width: 1023px) {
@@ -108,5 +138,20 @@ body {
 
   .esmera-shell-mobile-trigger {
     display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
   }
 }

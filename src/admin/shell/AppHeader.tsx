@@ -2,9 +2,10 @@
 
 import { useAuth } from '@payloadcms/ui'
 import Link from 'next/link'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 import type { EsmeraRole } from '../../access/roles'
+import { ADMIN_CREATE_EVENT } from '../state/AdminStateProvider'
 import { CommandPalette } from './CommandPalette'
 import { GlobalCreateMenu } from './GlobalCreateMenu'
 import { MobileNav } from './MobileNav'
@@ -22,6 +23,23 @@ function isTypingTarget(target: EventTarget | null) {
   return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
 }
 
+function isVisibleControl(element: HTMLElement) {
+  const style = getComputedStyle(element)
+  const rect = element.getBoundingClientRect()
+  return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+}
+
+function focusLocalSearch() {
+  const candidates = document.querySelectorAll<HTMLInputElement>(
+    '.esmera-view input[type="search"], .esmera-view input[name="q"], main input[type="search"], main input[name="q"]',
+  )
+  const target = Array.from(candidates).find((element) => !element.disabled && isVisibleControl(element))
+  if (!target) return false
+  target.focus({ preventScroll: false })
+  target.select()
+  return true
+}
+
 export function AppHeader() {
   const auth = useAuth()
   const user = auth.user as HeaderUser | null
@@ -29,30 +47,52 @@ export function AppHeader() {
   const name = user?.name || user?.email?.split('@')[0] || 'Esméra'
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const headerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
+    const headerNode = headerRef.current
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      const key = event.key.toLowerCase()
+
+      if ((event.metaKey || event.ctrlKey) && key === 'k') {
         event.preventDefault()
         setCommandOpen(true)
         return
       }
 
-      if (event.key === '/' && !isTypingTarget(event.target)) {
+      if (isTypingTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) return
+
+      if (event.key === '/') {
         event.preventDefault()
-        setCommandOpen(true)
+        if (!focusLocalSearch()) setCommandOpen(true)
+        return
+      }
+
+      if (key === 'n') {
+        event.preventDefault()
+        window.dispatchEvent(new Event(ADMIN_CREATE_EVENT))
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    headerNode?.setAttribute('data-shortcuts-ready', 'true')
+
+    return () => {
+      headerNode?.setAttribute('data-shortcuts-ready', 'false')
+      window.removeEventListener('keydown', onKeyDown)
+    }
   }, [])
 
   if (!user) return null
 
   return (
     <>
-      <header className="esmera-app-header" data-testid="esmera-app-header">
+      <header
+        ref={headerRef}
+        className="esmera-app-header"
+        data-testid="esmera-app-header"
+        data-shortcuts-ready="false"
+      >
         <div className="esmera-app-header__left">
           <button className="esmera-shell-mobile-trigger" type="button" onClick={() => setMobileNavOpen(true)} aria-label="Abrir navegação">
             <ShellIcon name="menu" />

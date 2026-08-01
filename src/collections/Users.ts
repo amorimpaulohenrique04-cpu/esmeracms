@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { adminField, admins, isAdmin, ownUserOrAdmin } from '../access/roles'
+import { adminField, admins, authenticated, isAdmin, ownUserOrAdmin } from '../access/roles'
 import { ensureUserRole } from '../hooks/users/ensureUserRole'
 
 export const Users: CollectionConfig = {
@@ -19,7 +19,7 @@ export const Users: CollectionConfig = {
     beforeValidate: [ensureUserRole],
   },
   access: {
-    admin: admins,
+    admin: authenticated,
     create: async ({ req }) => {
       if (isAdmin(req.user)) return true
       const existing = await req.payload.count({ collection: 'users', overrideAccess: true })

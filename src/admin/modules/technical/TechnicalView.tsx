@@ -1,5 +1,6 @@
 import type { AdminViewServerProps } from 'payload'
 
+import { PERFORMANCE_BUDGETS, performanceSnapshot } from '../../../server/performance'
 import {
   AccessDenied,
   ensureUser,
@@ -12,6 +13,7 @@ export async function TechnicalView(props: AdminViewServerProps) {
   const { user, role } = ensureUser(props)
   const site = role === 'admin' || role === 'editor'
   const business = role === 'admin' || role === 'commercial'
+  const measurements = role === 'admin' ? performanceSnapshot() : []
 
   if (!user) return <AccessDenied props={props} area="técnica" />
 
@@ -30,6 +32,7 @@ export async function TechnicalView(props: AdminViewServerProps) {
   const businessEntries = [
     ['Leads', '/admin/collections/leads', 'Pipeline, interesses, consentimento e próxima ação.'],
     ['Clientes', '/admin/collections/customers', 'Contato, preferências, relacionamento e privacidade.'],
+    ['Privacidade', '/admin/privacy', 'Consentimento, portabilidade, solicitações, retenção e anonimização.'],
     ['Vendas', '/admin/collections/sales', 'Itens, snapshots, valores, status e entrega.'],
     ['Pós-venda', '/admin/collections/after-sales', 'Follow-ups, entregas e ocorrências.'],
     ['Tarefas', '/admin/collections/tasks', 'Pendências operacionais vinculadas aos registros.'],
@@ -55,6 +58,7 @@ export async function TechnicalView(props: AdminViewServerProps) {
   const systemEntries = [
     ['Usuários', '/admin/collections/users', 'Acesso, autenticação e papéis de usuário.'],
     ['Jobs Queue', '/admin/collections/payload-jobs', 'Execuções, tentativas, erros, filas e agendamentos persistidos pelo Payload.'],
+    ['Telemetria JSON', '/api/admin-performance', 'Medições locais do processo sem filtros, nomes, e-mails, telefones ou outros dados pessoais.'],
   ]
 
   return (
@@ -66,7 +70,18 @@ export async function TechnicalView(props: AdminViewServerProps) {
       </div>
       {site ? <><h2 style={{ marginTop: 30 }}>Site e catálogo</h2>{renderEntries(siteEntries)}</> : null}
       {business ? <><h2 style={{ marginTop: 30 }}>Business</h2>{renderEntries(businessEntries)}</> : null}
-      {role === 'admin' ? <><h2 style={{ marginTop: 30 }}>Sistema</h2>{renderEntries(systemEntries)}</> : null}
+      {role === 'admin' ? <>
+        <h2 style={{ marginTop: 30 }}>Sistema</h2>
+        {renderEntries(systemEntries)}
+        <section className="esmera-card" style={{ marginTop: 20 }}>
+          <div className="esmera-card-body">
+            <span className="esmera-eyebrow">Performance medida</span>
+            <h2 style={{ marginTop: 8 }}>Orçamentos e P95 do processo atual</h2>
+            <p className="esmera-card-copy">Consultas operacionais têm alvo P95 de {PERFORMANCE_BUDGETS.operationalQueryP95Ms} ms; relatórios agregados, {PERFORMANCE_BUDGETS.reportingQueryP95Ms} ms. As amostras reiniciam com o processo.</p>
+            {!measurements.length ? <p className="esmera-card-copy">Ainda não existem amostras neste processo. Navegue pelas áreas operacionais e retorne para consultar os tempos medidos.</p> : <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Área</th><th>Operação</th><th>P95</th><th>Amostras</th><th>Orçamento</th><th>Estado</th></tr></thead><tbody>{measurements.map((item) => <tr key={`${item.area}:${item.name}`}><td>{item.area}</td><td>{item.name}</td><td>{item.p95Ms} ms</td><td>{item.sampleSize}</td><td>{item.budgetMs} ms</td><td>{item.withinBudget ? 'Dentro' : 'Acima'}</td></tr>)}</tbody></table></div>}
+          </div>
+        </section>
+      </> : null}
     </ViewFrame>
   )
 }

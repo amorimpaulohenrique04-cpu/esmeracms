@@ -2,9 +2,10 @@
 
 import { Menu } from '@base-ui/react/menu'
 import { useRouter } from 'next/navigation'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 import type { EsmeraRole } from '../../access/roles'
+import { ADMIN_CREATE_EVENT } from '../state/AdminStateProvider'
 import { ShellIcon } from './ShellIcon'
 
 type CreateAction = {
@@ -31,12 +32,19 @@ function canUse(role: EsmeraRole | null, area: CreateAction['area']) {
 export function GlobalCreateMenu({ role }: { role: EsmeraRole | null }) {
   const router = useRouter()
   const visible = actions.filter((action) => canUse(role, action.area))
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const openMenu = () => setOpen(true)
+    window.addEventListener(ADMIN_CREATE_EVENT, openMenu)
+    return () => window.removeEventListener(ADMIN_CREATE_EVENT, openMenu)
+  }, [])
 
   if (!visible.length) return null
 
   return (
-    <Menu.Root>
-      <Menu.Trigger className="esmera-shell-create" data-testid="esmera-global-create">
+    <Menu.Root open={open} onOpenChange={setOpen}>
+      <Menu.Trigger className="esmera-shell-create" data-testid="esmera-global-create" aria-label="Criar novo registro">
         <ShellIcon name="plus" />
         <span>Novo</span>
       </Menu.Trigger>
@@ -45,7 +53,14 @@ export function GlobalCreateMenu({ role }: { role: EsmeraRole | null }) {
           <Menu.Popup className="esmera-shell-menu-popup">
             <div className="esmera-shell-menu-label">Criar</div>
             {visible.map((action) => (
-              <Menu.Item className="esmera-shell-menu-item" key={action.href} onClick={() => router.push(action.href)}>
+              <Menu.Item
+                className="esmera-shell-menu-item"
+                key={action.href}
+                onClick={() => {
+                  setOpen(false)
+                  router.push(action.href)
+                }}
+              >
                 <span className="esmera-shell-menu-icon"><ShellIcon name={action.icon} /></span>
                 <span><strong>{action.label}</strong><small>{action.description}</small></span>
               </Menu.Item>
