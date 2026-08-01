@@ -287,7 +287,7 @@ function WorkspaceInner({ initialData, users, products, categories }: Props) {
     retry: 1,
   })
 
-  const data = reportQuery.data
+  const data = reportQuery.data || initialData
   const metrics = data.metrics.current
   const deltaMetrics = data.metrics.delta
   const chartOption = useMemo(() => commercialEvolutionOption(data.evolution, evolutionMode), [data.evolution, evolutionMode])
