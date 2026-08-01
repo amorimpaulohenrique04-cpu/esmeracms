@@ -67,7 +67,6 @@ export const Customers: CollectionConfig = {
               name: 'status',
               type: 'select',
               label: 'Status do cliente',
-              required: true,
               defaultValue: 'active',
               index: true,
               options: [
