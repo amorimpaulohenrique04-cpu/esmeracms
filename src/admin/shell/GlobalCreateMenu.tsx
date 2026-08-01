@@ -18,7 +18,8 @@ type CreateAction = {
 const actions: CreateAction[] = [
   { label: 'Novo produto', description: 'Criar um item do catálogo', href: '/admin/collections/products/create', area: 'site', icon: 'box' },
   { label: 'Novo cliente', description: 'Cadastrar relacionamento comercial', href: '/admin/collections/customers/create', area: 'business', icon: 'users' },
-  { label: 'Novo lead', description: 'Registrar uma nova entrada comercial', href: '/admin/collections/leads/create', area: 'business', icon: 'person' },
+  { label: 'Novo lead', description: 'Registrar entrada e qualificação', href: '/admin/collections/leads/create', area: 'business', icon: 'person' },
+  { label: 'Nova oportunidade', description: 'Iniciar negociação comercial', href: '/admin/collections/opportunities/create', area: 'business', icon: 'receipt' },
 ]
 
 function canUse(role: EsmeraRole | null, area: CreateAction['area']) {
