@@ -3,6 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { commercialUsers } from '../access/roles'
 import { businessUserRelationship } from '../fields/userRelationship'
 import { applySaleRules } from '../hooks/sales/applySaleRules'
+import { scheduleSaleJobs } from '../server/jobs'
 
 export const eligibleSaleStatuses = ['confirmed', 'production', 'ready', 'delivered'] as const
 
@@ -40,6 +41,7 @@ export const Sales: CollectionConfig = {
         return data
       },
     ],
+    afterChange: [scheduleSaleJobs],
   },
   fields: [
     {
