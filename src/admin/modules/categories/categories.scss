@@ -264,7 +264,8 @@
   .esmera-categories-workspace { display: block; }
   .esmera-categories-workspace.has-detail .esmera-category-master { display: none; }
   .esmera-categories-workspace:not(.has-detail) .esmera-category-detail { display: none; }
-  .esmera-category-back { display: inline-flex; }
+  .esmera-category-back { display: block; width: fit-content; margin-bottom: 12px; }
+  .esmera-category-detail__header .esmera-eyebrow { display: block; }
   .esmera-category-detail { width: 100%; }
   .esmera-category-row { grid-template-columns: 30px minmax(0, 1fr) 66px 72px; }
   .esmera-category-count { display: none; }
