@@ -99,6 +99,24 @@ test('capture current admin visual baseline', async ({ page }) => {
   const customerId = customerBody.id
   expect(customerId).toBeTruthy()
 
+  const createOpportunity = await page.request.post(`${baseURL}/api/opportunities`, {
+    data: {
+      customer: customerId,
+      source: 'instagram',
+      stage: 'proposal',
+      priority: 'high',
+      interestedProducts: [productId],
+      estimatedValueCents: 145_000,
+      nextAction: 'Enviar proposta revisada',
+      nextActionAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      expectedCloseAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  })
+  expect(createOpportunity.ok(), `Baseline opportunity create failed: HTTP ${createOpportunity.status()} ${await createOpportunity.text()}`).toBeTruthy()
+  const opportunityBody = await createOpportunity.json() as { id?: string | number; doc?: { id?: string | number } }
+  const opportunityId = opportunityBody.id ?? opportunityBody.doc?.id
+  expect(opportunityId).toBeTruthy()
+
   const createSale = await page.request.post(`${baseURL}/api/sales`, {
     data: {
       number: `BASE-SALE-${stamp}`,
@@ -167,6 +185,7 @@ test('capture current admin visual baseline', async ({ page }) => {
     { name: 'customer-sales', url: `/admin/customers?customer=${customerId}&tab=sales` },
     { name: 'customer-after-sales', url: `/admin/customers?customer=${customerId}&tab=after-sales` },
     { name: 'customer-notes', url: `/admin/customers?customer=${customerId}&tab=notes` },
+    { name: 'opportunity-document', url: `/admin/collections/opportunities/${opportunityId}` },
     { name: 'sales-list', url: '/admin/sales?view=list' },
     { name: 'sales-pipeline', url: '/admin/sales?view=pipeline' },
     { name: 'after-sales', url: '/admin/after-sales' },
