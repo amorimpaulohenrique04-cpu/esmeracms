@@ -235,8 +235,9 @@ test.describe('Admin Panel', () => {
     await page.goto('http://localhost:3000/admin/categories?status=active')
     await expect(page.getByRole('heading', { name: 'Categorias' }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: parentTitle })).toBeVisible()
-    await expect(page.getByRole('link', { name: childTitle })).toBeVisible()
-    await expect(page.getByText('1 prod.')).toBeVisible()
+    const childRow = page.getByRole('link', { name: childTitle }).locator('xpath=ancestor::li')
+    await expect(childRow).toBeVisible()
+    await expect(childRow.getByText('1 prod.', { exact: true })).toBeVisible()
 
     await page.goto(`http://localhost:3000/admin/categories?status=active&q=${encodeURIComponent(synonym)}`)
     await expect(page.getByRole('link', { name: childTitle })).toBeVisible()
