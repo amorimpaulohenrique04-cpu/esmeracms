@@ -81,6 +81,7 @@ export async function getDashboardSnapshot(req: PayloadRequest, now = new Date()
   const siteAllowed = canManageSite(req.user)
   const businessAllowed = canManageBusiness(req.user)
   const day = dashboardDayBounds(now)
+  const generatedAt = now.toISOString()
 
   const catalogPromise = Promise.all([
     countDocs(req, 'products', {
@@ -119,8 +120,8 @@ export async function getDashboardSnapshot(req: PayloadRequest, now = new Date()
     ? Promise.all([
         getDashboardReporting(req),
         countDocs(req, 'tasks', openTaskWhere()),
-        countDocs(req, 'tasks', taskWindowWhere(null, day.start)),
-        countDocs(req, 'tasks', taskWindowWhere(day.start, day.end)),
+        countDocs(req, 'tasks', taskWindowWhere(null, generatedAt)),
+        countDocs(req, 'tasks', taskWindowWhere(generatedAt, day.end)),
         findDocs<DashboardTask>(req, 'tasks', {
           where: openTaskWhere(),
           sort: 'dueAt',
@@ -142,7 +143,7 @@ export async function getDashboardSnapshot(req: PayloadRequest, now = new Date()
   const [catalog, business] = await Promise.all([catalogPromise, businessPromise])
 
   return {
-    generatedAt: now.toISOString(),
+    generatedAt,
     timeZone: DASHBOARD_TIME_ZONE,
     permissions: { site: siteAllowed, business: businessAllowed },
     catalog: {
