@@ -54,6 +54,7 @@ export const Activities: CollectionConfig = {
         { label: 'Mensagem', value: 'message' },
         { label: 'Proposta', value: 'proposal' },
         { label: 'Mudança de etapa', value: 'stage_change' },
+        { label: 'Venda', value: 'sale' },
         { label: 'Nota', value: 'note' },
         { label: 'Entrega', value: 'delivery' },
         { label: 'Follow-up', value: 'follow_up' },
