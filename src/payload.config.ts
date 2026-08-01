@@ -10,6 +10,7 @@ import { withActiveProductCategoryValidity } from './businessRules/products/cate
 import { Activities } from './collections/Activities'
 import { AfterSales } from './collections/AfterSales'
 import { Categories } from './collections/Categories'
+import { ClientInterests } from './collections/ClientInterests'
 import { Customers } from './collections/Customers'
 import { Leads } from './collections/Leads'
 import { Media } from './collections/Media'
@@ -107,6 +108,7 @@ export default buildConfig({
     OperationalProducts,
     Leads,
     Customers,
+    ClientInterests,
     Sales,
     AfterSales,
     Tasks,
