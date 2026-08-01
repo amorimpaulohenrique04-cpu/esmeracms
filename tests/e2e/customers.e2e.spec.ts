@@ -44,6 +44,7 @@ test.describe('Customer relational workspace', () => {
     const createResponse = await page.request.post('http://localhost:3000/api/admin-customers', {
       data: {
         action: 'create',
+        force: true,
         data: {
           name: customerName,
           company: 'Atelier E2E',
@@ -105,8 +106,9 @@ test.describe('Customer relational workspace', () => {
 
     await page.goto(`http://localhost:3000/admin/customers?customer=${customerId}&tab=overview`)
     await expect(page.getByRole('heading', { name: customerName })).toBeVisible()
+    const customerTabs = page.getByRole('navigation', { name: 'Seções do cliente' })
     for (const tab of ['Visão geral', 'Histórico', 'Interesses', 'Vendas', 'Pós-venda', 'Notas']) {
-      await expect(page.getByRole('link', { name: tab, exact: true })).toBeVisible()
+      await expect(customerTabs.getByRole('link', { name: tab, exact: true })).toBeVisible()
     }
     await expect(page.getByText('R$ 1.250,00')).toBeVisible()
     await expect(page.getByText('Disponível após a migração de Opportunities na Etapa 8')).toBeVisible()
