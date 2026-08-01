@@ -13,8 +13,9 @@ export const Sales: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'number',
-    defaultColumns: ['number', 'customer', 'status', 'totalCents', 'expectedDeliveryAt', 'updatedAt'],
+    defaultColumns: ['number', 'customer', 'opportunity', 'status', 'totalCents', 'expectedDeliveryAt', 'updatedAt'],
     listSearchableFields: ['number'],
+    description: 'Sale representa a transação ganha e seu fulfillment. Negociação comercial pertence a Opportunities.',
   },
   access: {
     admin: commercialUsers,
@@ -50,6 +51,15 @@ export const Sales: CollectionConfig = {
             { name: 'number', type: 'text', label: 'Número', required: true, unique: true, index: true },
             { name: 'customer', type: 'relationship', relationTo: 'customers', label: 'Cliente', required: true },
             {
+              name: 'opportunity',
+              type: 'relationship',
+              relationTo: 'opportunities',
+              label: 'Oportunidade de origem',
+              unique: true,
+              index: true,
+              admin: { description: 'Preenchida pelo workflow de ganho ou vinculada explicitamente em vendas legadas.' },
+            },
+            {
               name: 'channel',
               type: 'select',
               label: 'Canal',
@@ -73,8 +83,8 @@ export const Sales: CollectionConfig = {
               index: true,
               options: [
                 { label: 'Rascunho', value: 'draft' },
-                { label: 'Proposta enviada', value: 'proposal' },
-                { label: 'Negociação', value: 'negotiation' },
+                { label: 'Proposta enviada (legado)', value: 'proposal' },
+                { label: 'Negociação (legado)', value: 'negotiation' },
                 { label: 'Confirmada', value: 'confirmed' },
                 { label: 'Em produção', value: 'production' },
                 { label: 'Pronta para entrega', value: 'ready' },
