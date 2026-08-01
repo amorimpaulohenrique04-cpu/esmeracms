@@ -73,30 +73,44 @@ test.describe('Stage 9 operational Sales workspace', () => {
     const opportunityCode = opportunityBody.code ?? opportunityBody.doc?.code
     expect(opportunityId).toBeTruthy()
     expect(opportunityCode).toMatch(/^OPP-/)
+    const code = opportunityCode || ''
 
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto(`http://localhost:3000/admin/sales?view=pipeline&q=${encodeURIComponent(opportunityCode || '')}`)
+    await page.goto(`http://localhost:3000/admin/sales?view=pipeline&q=${encodeURIComponent(code)}`)
 
-    const card = page.locator('article.esmera-opportunity-card').filter({ hasText: opportunityCode })
+    const card = page.locator('article.esmera-opportunity-card').filter({ hasText: code })
     await expect(card).toBeVisible()
     await expect(card).toContainText(customerName)
     await expect(card).toContainText('R$ 3.200,00')
 
     await card.getByRole('button', { name: 'Inspecionar' }).click()
-    await expect(page.getByRole('heading', { name: opportunityCode })).toBeVisible()
+    await expect(page.getByRole('heading', { name: code })).toBeVisible()
     await expect(page.getByText(productTitle)).toBeVisible()
     await expect(page.getByRole('link', { name: 'Editar oportunidade' })).toBeVisible()
     await page.getByRole('button', { name: 'Fechar' }).click()
 
-    await card.getByLabel(`Mover ${opportunityCode} para etapa`).selectOption('negotiation')
-    await expect(page.getByRole('status')).toContainText('Etapa e ordem salvas.')
-    await expect(card.getByLabel(`Mover ${opportunityCode} para etapa`)).toHaveValue('negotiation')
+    const moveResponsePromise = page.waitForResponse((response) => {
+      const data = response.request().postData() || ''
+      return response.url().endsWith('/api/admin-sales') && data.includes('"move-stage"')
+    })
+    await card.getByLabel(`Mover ${code} para etapa`).selectOption('negotiation')
+    const moveResponse = await moveResponsePromise
+    expect(moveResponse.ok(), await moveResponse.text()).toBeTruthy()
 
-    await card.getByLabel(`Mover ${opportunityCode} para etapa`).selectOption('won')
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(card).toBeVisible()
+    await expect(card.getByLabel(`Mover ${code} para etapa`)).toHaveValue('negotiation')
+
+    await card.getByLabel(`Mover ${code} para etapa`).selectOption('won')
     await expect(page.getByRole('heading', { name: 'Confirmar venda ganha' })).toBeVisible()
     await expect(page.getByText(productTitle)).toBeVisible()
+    const winResponsePromise = page.waitForResponse((response) => {
+      const data = response.request().postData() || ''
+      return response.url().endsWith('/api/admin-sales') && data.includes('"win"')
+    })
     await page.getByRole('button', { name: 'Confirmar e criar venda' }).click()
-    await expect(page.getByRole('status')).toContainText(/Venda .* criada e oportunidade encerrada\./)
+    const winResponse = await winResponsePromise
+    expect(winResponse.ok(), await winResponse.text()).toBeTruthy()
     await expect(card).toHaveCount(0)
 
     const salesParams = new URLSearchParams({ limit: '10', depth: '0' })
@@ -110,8 +124,8 @@ test.describe('Stage 9 operational Sales workspace', () => {
     expect(sales.docs?.[0]?.items?.[0]?.snapshotTitle).toBe(productTitle)
     expect(sales.docs?.[0]?.items?.[0]?.unitPriceCents).toBe(320_000)
 
-    await page.goto(`http://localhost:3000/admin/sales?view=list&stage=won&q=${encodeURIComponent(opportunityCode || '')}`)
-    const row = page.getByRole('row').filter({ hasText: opportunityCode })
+    await page.goto(`http://localhost:3000/admin/sales?view=list&stage=won&q=${encodeURIComponent(code)}`)
+    const row = page.getByRole('row').filter({ hasText: code })
     await expect(row).toBeVisible()
     await expect(row).toContainText('Ganho')
     await row.getByRole('button', { name: 'Inspecionar' }).click()
@@ -149,17 +163,23 @@ test.describe('Stage 9 operational Sales workspace', () => {
     const body = await opportunityResponse.json() as { id?: string | number; code?: string; doc?: { id?: string | number; code?: string } }
     const opportunityId = body.id ?? body.doc?.id
     const opportunityCode = body.code ?? body.doc?.code
+    const code = opportunityCode || ''
 
-    await page.goto(`http://localhost:3000/admin/sales?view=pipeline&q=${encodeURIComponent(opportunityCode || '')}`)
-    const card = page.locator('article.esmera-opportunity-card').filter({ hasText: opportunityCode })
+    await page.goto(`http://localhost:3000/admin/sales?view=pipeline&q=${encodeURIComponent(code)}`)
+    const card = page.locator('article.esmera-opportunity-card').filter({ hasText: code })
     await expect(card).toBeVisible()
-    await card.getByLabel(`Mover ${opportunityCode} para etapa`).selectOption('lost')
+    await card.getByLabel(`Mover ${code} para etapa`).selectOption('lost')
 
     await expect(page.getByRole('heading', { name: 'Marcar como perdido' })).toBeVisible()
     await page.getByLabel('Motivo da perda').selectOption('budget')
     await page.getByLabel('Contexto').fill(`Orçamento não aprovado ${stamp}`)
+    const lossResponsePromise = page.waitForResponse((response) => {
+      const data = response.request().postData() || ''
+      return response.url().endsWith('/api/admin-sales') && data.includes('"lose"')
+    })
     await page.getByRole('button', { name: 'Confirmar perda' }).click()
-    await expect(page.getByRole('status')).toContainText('Oportunidade marcada como perdida.')
+    const lossResponse = await lossResponsePromise
+    expect(lossResponse.ok(), await lossResponse.text()).toBeTruthy()
     await expect(card).toHaveCount(0)
 
     const stored = await page.request.get(`http://localhost:3000/api/opportunities/${opportunityId}?depth=0`)
