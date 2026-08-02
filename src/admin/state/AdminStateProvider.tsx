@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import React, { useEffect, useRef, useState } from 'react'
 
+import { rememberAdminItem } from './continuity'
+
 const CONTEXT_PREFIX = 'esmera:context:'
 const ORIGIN_PREFIX = 'esmera:origin:'
 
@@ -109,6 +111,21 @@ function rememberEditOrigin(anchor: HTMLAnchorElement) {
   }
 }
 
+function rememberRecentAnchor(anchor: HTMLAnchorElement) {
+  try {
+    const url = new URL(anchor.href, window.location.href)
+    if (url.origin !== window.location.origin || !url.pathname.startsWith('/admin') || url.pathname.endsWith('/create')) return
+    const isCollectionRecord = /^\/admin\/collections\/[^/]+\/[^/]+\/?$/.test(url.pathname)
+    const isWorkspaceRecord = url.searchParams.has('product') || url.searchParams.has('customer') || url.searchParams.has('sale') || url.searchParams.has('inspect')
+    if (!isCollectionRecord && !isWorkspaceRecord) return
+    const label = anchor.dataset.esmeraRecentLabel || anchor.textContent?.replace(/\s+/g, ' ').trim()
+    if (!label || label.length > 120) return
+    rememberAdminItem({ href: `${url.pathname}${url.search}`, label, meta: anchor.dataset.esmeraRecentMeta })
+  } catch {
+    // Recent navigation is optional.
+  }
+}
+
 function transitionEligible(event: MouseEvent, anchor: HTMLAnchorElement) {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false
   if (anchor.target === '_blank' || anchor.hasAttribute('download') || anchor.dataset.noViewTransition === 'true') return false
@@ -209,6 +226,7 @@ export function AdminStateProvider({ children }: { children: React.ReactNode }) 
       if (!anchor || event.defaultPrevented) return
       storeContext()
       rememberEditOrigin(anchor)
+      rememberRecentAnchor(anchor)
 
       const transitionDocument = document as ViewTransitionDocument
       if (!transitionEligible(event, anchor) || !transitionDocument.startViewTransition || prefersReducedMotion()) return
