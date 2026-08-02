@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { DataTable, EmptyState, Status } from '../../design-system'
+import { EditorialPreviewPanel } from '../../editorial/EditorialPreviewPanel'
 import { CategoryDetailEditor } from './CategoryDetailEditor'
 import {
   categoryStatusLabels,
@@ -46,6 +47,12 @@ function backHref(filters: CategoryWorkspaceFilters) {
 }
 
 export function CategoryDetailView({ category, tab, filters, categories, media, termSuggestions, relatedProducts, relatedTotal }: Props) {
+  const editor = tab === 'general'
+    ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="general" />
+    : tab === 'media'
+      ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="media" />
+      : null
+
   return (
     <section className="esmera-category-detail" aria-label={`Detalhe de ${category.title || 'categoria'}`}>
       <header className="esmera-category-detail__header">
@@ -65,8 +72,13 @@ export function CategoryDetailView({ category, tab, filters, categories, media, 
         {tabs.map((item) => <Link key={item.id} className={tab === item.id ? 'is-active' : ''} aria-current={tab === item.id ? 'page' : undefined} href={hrefFor(filters, category.id, item.id)}>{item.label}</Link>)}
       </nav>
 
-      {tab === 'general' ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="general" /> : null}
-      {tab === 'media' ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="media" /> : null}
+      {editor ? (
+        <div className="esmera-editorial-preview-workspace esmera-category-preview-workspace">
+          {editor}
+          <EditorialPreviewPanel kind="category" recordId={category.id} title={category.title || 'Categoria sem título'} />
+        </div>
+      ) : null}
+
       {tab === 'products' ? (
         <div className="esmera-category-related">
           <div className="esmera-category-related__intro">
