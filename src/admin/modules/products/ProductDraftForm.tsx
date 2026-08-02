@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button, InlineFeedback, SavingState } from '../../design-system'
+import { EditorialPreviewPanel } from '../../editorial/EditorialPreviewPanel'
 import { announceAdmin, announceDraftChanged } from '../../state/AdminStateProvider'
 import { availabilityLabels } from './types'
 
@@ -121,32 +122,36 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
   }
 
   return (
-    <section className="esmera-product-draft-form" aria-label="Edição rápida do rascunho">
-      <div className="esmera-product-draft-form__status">
-        <div><strong>Edição rápida</strong><span>Draft oficial do Payload</span></div>
-        {saveState === 'saving' ? <SavingState state="saving" /> : null}
-        {saveState === 'saved' ? <SavingState state="saved" /> : null}
-        {saveState === 'error' ? <SavingState state="rollback" message="Falha ao salvar; estado anterior restaurado." /> : null}
-        {saveState === 'idle' && dirty ? <InlineFeedback tone="warning">Alterações aguardando salvamento automático.</InlineFeedback> : null}
-        {saveState === 'idle' && !dirty ? <InlineFeedback>Rascunho sincronizado.</InlineFeedback> : null}
-      </div>
-      <div className="esmera-product-draft-grid">
-        <label data-preview-field="title"><span>Título</span><input className="esmera-input" value={draft.title} onChange={(event) => field('title', event.target.value)} /></label>
-        <label data-preview-field="subtitle"><span>Subtítulo</span><input className="esmera-input" value={draft.subtitle} onChange={(event) => field('subtitle', event.target.value)} /></label>
-        <label data-preview-field="material"><span>Material</span><input className="esmera-input" value={draft.material} onChange={(event) => field('material', event.target.value)} /></label>
-        <label data-preview-field="edition"><span>Edição</span><input className="esmera-input" value={draft.edition} onChange={(event) => field('edition', event.target.value)} /></label>
-        <label data-preview-field="availability"><span>Disponibilidade</span><select className="esmera-input" value={draft.availability} onChange={(event) => field('availability', event.target.value)}>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label data-preview-field="priceMode"><span>Modo de preço</span><select className="esmera-input" value={draft.priceMode} onChange={(event) => field('priceMode', event.target.value)}><option value="inquiry">Sob consulta</option><option value="fixed">Preço fixo</option></select></label>
-        {draft.priceMode === 'fixed' ? <label data-preview-field="basePriceCents"><span>Preço base em centavos</span><input className="esmera-input" inputMode="numeric" value={draft.basePriceCents} onChange={(event) => field('basePriceCents', event.target.value.replace(/\D/g, ''))} /></label> : null}
-      </div>
-      <p className="esmera-product-draft-form__hint">Alterações nestes campos são salvas como rascunho após 700 ms. Publicar continua sendo uma ação separada. Descrição rica, opções e variantes completas permanecem no editor técnico.</p>
-      <div className="esmera-product-draft-form__actions">
-        <div className="esmera-actions">
-          <Button tone="primary" onClick={() => void action(published ? 'unpublish' : 'publish')}>{published ? 'Despublicar' : 'Publicar'}</Button>
-          <Button onClick={() => void action(archived ? 'restore' : 'archive')}>{archived ? 'Restaurar no catálogo' : 'Arquivar'}</Button>
+    <div className="esmera-editorial-preview-workspace">
+      <section className="esmera-product-draft-form" aria-label="Edição rápida do rascunho">
+        <div className="esmera-product-draft-form__status">
+          <div><strong>Edição rápida</strong><span>Draft oficial do Payload</span></div>
+          {saveState === 'saving' ? <SavingState state="saving" /> : null}
+          {saveState === 'saved' ? <SavingState state="saved" /> : null}
+          {saveState === 'error' ? <SavingState state="rollback" message="Falha ao salvar; estado anterior restaurado." /> : null}
+          {saveState === 'idle' && dirty ? <InlineFeedback tone="warning">Alterações aguardando salvamento automático.</InlineFeedback> : null}
+          {saveState === 'idle' && !dirty ? <InlineFeedback>Rascunho sincronizado.</InlineFeedback> : null}
         </div>
-        {feedback ? <InlineFeedback className={saveState === 'error' ? 'is-rollback' : ''} tone={saveState === 'error' || feedback.includes('Não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
-      </div>
-    </section>
+        <div className="esmera-product-draft-grid">
+          <label data-preview-field="title"><span>Título</span><input className="esmera-input" value={draft.title} onChange={(event) => field('title', event.target.value)} /></label>
+          <label data-preview-field="subtitle"><span>Subtítulo</span><input className="esmera-input" value={draft.subtitle} onChange={(event) => field('subtitle', event.target.value)} /></label>
+          <label data-preview-field="material"><span>Material</span><input className="esmera-input" value={draft.material} onChange={(event) => field('material', event.target.value)} /></label>
+          <label data-preview-field="edition"><span>Edição</span><input className="esmera-input" value={draft.edition} onChange={(event) => field('edition', event.target.value)} /></label>
+          <label data-preview-field="availability"><span>Disponibilidade</span><select className="esmera-input" value={draft.availability} onChange={(event) => field('availability', event.target.value)}>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label data-preview-field="priceMode"><span>Modo de preço</span><select className="esmera-input" value={draft.priceMode} onChange={(event) => field('priceMode', event.target.value)}><option value="inquiry">Sob consulta</option><option value="fixed">Preço fixo</option></select></label>
+          {draft.priceMode === 'fixed' ? <label data-preview-field="basePriceCents"><span>Preço base em centavos</span><input className="esmera-input" inputMode="numeric" value={draft.basePriceCents} onChange={(event) => field('basePriceCents', event.target.value.replace(/\D/g, ''))} /></label> : null}
+        </div>
+        <p className="esmera-product-draft-form__hint">Alterações nestes campos são salvas como rascunho após 700 ms. Publicar continua sendo uma ação separada. Descrição rica, opções e variantes completas permanecem no editor técnico.</p>
+        <div className="esmera-product-draft-form__actions">
+          <div className="esmera-actions">
+            <Button tone="primary" onClick={() => void action(published ? 'unpublish' : 'publish')}>{published ? 'Despublicar' : 'Publicar'}</Button>
+            <Button onClick={() => void action(archived ? 'restore' : 'archive')}>{archived ? 'Restaurar no catálogo' : 'Arquivar'}</Button>
+          </div>
+          {feedback ? <InlineFeedback className={saveState === 'error' ? 'is-rollback' : ''} tone={saveState === 'error' || feedback.includes('Não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
+        </div>
+      </section>
+
+      <EditorialPreviewPanel kind="product" recordId={productId} title={draft.title || 'Produto sem título'} />
+    </div>
   )
 }
