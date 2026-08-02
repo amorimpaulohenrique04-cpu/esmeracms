@@ -3,11 +3,31 @@
 import React, { useEffect, useRef, useState } from 'react'
 
 export type EChartOption = Record<string, unknown>
+export type EChartEvent = {
+  componentType?: string
+  seriesType?: string
+  seriesIndex?: number
+  seriesName?: string
+  name?: string
+  dataIndex?: number
+  value?: unknown
+  data?: unknown
+}
+
+export type EChartHighlight = {
+  seriesName?: string
+  dataIndex?: number
+} | null
+
+type ChartAction = Record<string, unknown> & { type: string }
 
 type ChartInstance = {
   setOption: (option: EChartOption, notMerge?: boolean) => void
   resize: () => void
   dispose: () => void
+  on: (event: string, handler: (params: EChartEvent) => void) => void
+  off: (event: string, handler?: (params: EChartEvent) => void) => void
+  dispatchAction: (action: ChartAction) => void
 }
 
 let themeRegistered = false
@@ -15,6 +35,9 @@ let themeRegistered = false
 function accessibleOption(option: EChartOption, ariaLabel: string): EChartOption {
   return {
     ...option,
+    animationDuration: 160,
+    animationDurationUpdate: 120,
+    animationEasingUpdate: 'cubicOut',
     aria: {
       enabled: true,
       description: ariaLabel,
@@ -27,11 +50,30 @@ function token(styles: CSSStyleDeclaration, name: string, fallback: string) {
   return styles.getPropertyValue(name).trim() || fallback
 }
 
-export function EChart({ option, ariaLabel, height = 300 }: { option: EChartOption; ariaLabel: string; height?: number }) {
+export function EChart({
+  option,
+  ariaLabel,
+  height = 300,
+  highlight = null,
+  onClick,
+  onHover,
+}: {
+  option: EChartOption
+  ariaLabel: string
+  height?: number
+  highlight?: EChartHighlight
+  onClick?: (event: EChartEvent) => void
+  onHover?: (event: EChartEvent | null) => void
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<ChartInstance | null>(null)
   const optionRef = useRef(option)
+  const handlersRef = useRef({ onClick, onHover })
   const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    handlersRef.current = { onClick, onHover }
+  }, [onClick, onHover])
 
   useEffect(() => {
     let cancelled = false
@@ -63,15 +105,15 @@ export function EChart({ option, ariaLabel, height = 300 }: { option: EChartOpti
 
       if (!themeRegistered) {
         const styles = getComputedStyle(container)
-        const primary = token(styles, '--esmera-primary', '#355e52')
-        const secondary = token(styles, '--esmera-text-secondary', '#6d8078')
-        const warning = token(styles, '--esmera-warning', '#a98557')
-        const info = token(styles, '--esmera-info', '#65788d')
-        const danger = token(styles, '--esmera-danger', '#9c5e57')
-        const text = token(styles, '--esmera-text', '#27312d')
-        const muted = token(styles, '--esmera-text-muted', '#69736f')
-        const line = token(styles, '--esmera-line', '#d9dfdc')
-        const subtle = token(styles, '--esmera-surface-muted', '#f4f6f5')
+        const primary = token(styles, '--esmera-chart-1', '#324f46')
+        const secondary = token(styles, '--esmera-chart-2', '#70847b')
+        const warning = token(styles, '--esmera-chart-3', '#a38357')
+        const info = token(styles, '--esmera-chart-4', '#65788d')
+        const danger = token(styles, '--esmera-chart-5', '#9c5e57')
+        const text = token(styles, '--esmera-text', '#17201c')
+        const muted = token(styles, '--esmera-chart-axis', '#6b7671')
+        const line = token(styles, '--esmera-line-default', '#d8dfdb')
+        const subtle = token(styles, '--esmera-chart-grid', '#e7ebe9')
 
         core.registerTheme('esmera-reporting', {
           color: [primary, secondary, warning, info, danger],
@@ -98,6 +140,13 @@ export function EChart({ option, ariaLabel, height = 300 }: { option: EChartOpti
       const chart = core.init(container, 'esmera-reporting', { renderer: 'svg' }) as ChartInstance
       chartRef.current = chart
       chart.setOption(accessibleOption(optionRef.current, ariaLabel), true)
+
+      const clickHandler = (params: EChartEvent) => handlersRef.current.onClick?.(params)
+      const hoverHandler = (params: EChartEvent) => handlersRef.current.onHover?.(params)
+      const leaveHandler = () => handlersRef.current.onHover?.(null)
+      chart.on('click', clickHandler)
+      chart.on('mouseover', hoverHandler)
+      chart.on('mouseout', leaveHandler)
       setReady(true)
 
       if (typeof ResizeObserver !== 'undefined') {
@@ -125,6 +174,15 @@ export function EChart({ option, ariaLabel, height = 300 }: { option: EChartOpti
     optionRef.current = option
     chartRef.current?.setOption(accessibleOption(option, ariaLabel), true)
   }, [ariaLabel, option])
+
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart || !ready) return
+    chart.dispatchAction({ type: 'downplay', seriesIndex: 'all' })
+    if (!highlight) return
+    chart.dispatchAction({ type: 'highlight', ...highlight })
+    if (typeof highlight.dataIndex === 'number') chart.dispatchAction({ type: 'showTip', ...highlight })
+  }, [highlight, ready])
 
   return (
     <div className="esmera-report-chart" style={{ minHeight: height }}>
