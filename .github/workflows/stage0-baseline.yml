@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - feat/admin-operational-rebuild
+      - agent/etapas-20-22-quality-gates
   pull_request:
     branches:
       - main
       - feat/admin-operational-rebuild
+      - agent/etapas-20-22-quality-gates
   workflow_dispatch:
 
 permissions:
@@ -21,7 +23,7 @@ concurrency:
 jobs:
   validate-and-capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     services:
       postgres:
