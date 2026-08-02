@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { Button } from '../../design-system'
+import { Button, InlineFeedback, SavingState } from '../../design-system'
 import { availabilityLabels } from './types'
 
 type DraftState = {
@@ -103,9 +103,13 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
 
   return (
     <section className="esmera-product-draft-form" aria-label="Edição rápida do rascunho">
-      <div className="esmera-product-draft-form__status" aria-live="polite">
-        <strong>Edição rápida</strong>
-        <span>{saveState === 'saving' ? 'Salvando rascunho…' : saveState === 'saved' ? 'Rascunho salvo' : saveState === 'error' ? 'Falha ao salvar' : dirty ? 'Alterações pendentes' : 'Rascunho sincronizado'}</span>
+      <div className="esmera-product-draft-form__status">
+        <div><strong>Edição rápida</strong><span>Draft oficial do Payload</span></div>
+        {saveState === 'saving' ? <SavingState state="saving" /> : null}
+        {saveState === 'saved' ? <SavingState state="saved" /> : null}
+        {saveState === 'error' ? <SavingState state="rollback" message="Falha ao salvar o rascunho." /> : null}
+        {saveState === 'idle' && dirty ? <InlineFeedback tone="warning">Alterações aguardando salvamento automático.</InlineFeedback> : null}
+        {saveState === 'idle' && !dirty ? <InlineFeedback>Rascunho sincronizado.</InlineFeedback> : null}
       </div>
       <div className="esmera-product-draft-grid">
         <label><span>Título</span><input className="esmera-input" value={draft.title} onChange={(event) => field('title', event.target.value)} /></label>
@@ -117,11 +121,13 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
         {draft.priceMode === 'fixed' ? <label><span>Preço base em centavos</span><input className="esmera-input" inputMode="numeric" value={draft.basePriceCents} onChange={(event) => field('basePriceCents', event.target.value.replace(/\D/g, ''))} /></label> : null}
       </div>
       <p className="esmera-product-draft-form__hint">Alterações nestes campos são salvas como rascunho após 700 ms. Publicar continua sendo uma ação separada. Descrição rica, opções e variantes completas permanecem no editor técnico.</p>
-      <div className="esmera-actions">
-        <Button tone="primary" onClick={() => void action(published ? 'unpublish' : 'publish')}>{published ? 'Despublicar' : 'Publicar'}</Button>
-        <Button onClick={() => void action(archived ? 'restore' : 'archive')}>{archived ? 'Restaurar no catálogo' : 'Arquivar'}</Button>
+      <div className="esmera-product-draft-form__actions">
+        <div className="esmera-actions">
+          <Button tone="primary" onClick={() => void action(published ? 'unpublish' : 'publish')}>{published ? 'Despublicar' : 'Publicar'}</Button>
+          <Button onClick={() => void action(archived ? 'restore' : 'archive')}>{archived ? 'Restaurar no catálogo' : 'Arquivar'}</Button>
+        </div>
+        {feedback ? <InlineFeedback tone={feedback.includes('Não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
       </div>
-      {feedback ? <div className="esmera-products-feedback" role="status" aria-live="polite">{feedback}</div> : null}
     </section>
   )
 }
