@@ -21,6 +21,8 @@ type SearchResponse = {
   error?: string
 }
 
+type SearchState = 'idle' | 'loading' | 'results' | 'empty' | 'error'
+
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const router = useRouter()
   const inputId = useId()
@@ -78,6 +80,26 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     return Array.from(groups.entries())
   }, [results])
 
+  const searchState: SearchState = error
+    ? 'error'
+    : loading
+      ? 'loading'
+      : results.length
+        ? 'results'
+        : query.trim()
+          ? 'empty'
+          : 'idle'
+
+  const stateLabel = searchState === 'loading'
+    ? 'Pesquisando registros…'
+    : searchState === 'results'
+      ? `${results.length} resultado${results.length === 1 ? '' : 's'}`
+      : searchState === 'empty'
+        ? 'Nenhum resultado'
+        : searchState === 'error'
+          ? 'Busca indisponível'
+          : 'Atalhos e busca global'
+
   const reset = () => {
     setQuery('')
     setResults([])
@@ -117,7 +139,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       <Dialog.Portal>
         <Dialog.Backdrop className="esmera-command-backdrop" />
         <Dialog.Viewport className="esmera-command-viewport">
-          <Dialog.Popup className="esmera-command" data-testid="esmera-command-palette">
+          <Dialog.Popup className="esmera-command" data-testid="esmera-command-palette" data-search-state={searchState} aria-busy={loading || undefined}>
             <Dialog.Title className="esmera-command-sr-title">Buscar no Esméra CMS</Dialog.Title>
             <div className="esmera-command-search">
               <ShellIcon name="search" />
@@ -133,13 +155,15 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 aria-controls={`${inputId}-results`}
                 aria-activedescendant={results[activeIndex] ? `${inputId}-result-${activeIndex}` : undefined}
               />
+              <span className={`esmera-command-indicator is-${searchState}`} role="status" aria-live="polite">{stateLabel}</span>
               <Dialog.Close className="esmera-command-close" aria-label="Fechar busca">Esc</Dialog.Close>
             </div>
 
             <div className="esmera-command-results" id={`${inputId}-results`} role="listbox" aria-label="Resultados da busca">
-              {loading && !results.length ? <div className="esmera-command-state">Pesquisando…</div> : null}
-              {error ? <div className="esmera-command-state esmera-command-state--error" role="alert">{error}</div> : null}
-              {!loading && !error && !results.length ? <div className="esmera-command-state">Nenhum resultado. Tente outro termo.</div> : null}
+              {loading && !results.length ? <div className="esmera-command-state is-loading"><span aria-hidden="true" />Pesquisando registros e ações…</div> : null}
+              {error ? <div className="esmera-command-state esmera-command-state--error" role="alert"><strong>Não foi possível pesquisar</strong><span>{error}</span></div> : null}
+              {!loading && !error && !results.length && query.trim() ? <div className="esmera-command-state"><strong>Nenhum resultado</strong><span>Tente nome, código, cliente, venda ou uma ação diferente.</span></div> : null}
+              {!loading && !error && !results.length && !query.trim() ? <div className="esmera-command-state"><strong>Busca global</strong><span>Digite para localizar registros ou use os atalhos de teclado do CMS.</span></div> : null}
               {grouped.map(([group, items]) => (
                 <section className="esmera-command-group" key={group} aria-label={group}>
                   <div className="esmera-command-group-label">{group}</div>
