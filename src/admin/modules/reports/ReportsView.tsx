@@ -94,8 +94,8 @@ export async function ReportsView(props: AdminViewServerProps) {
         eyebrow="Inteligência comercial"
         title="Relatórios"
         subtitle="Investigação orientada por métricas: comece pelo indicador, aprofunde o segmento e abra os registros reais sem perder o período."
+        actions={<ReportExportControl />}
       />
-      <ReportExportControl />
       <ReportsWorkspaceClient
         key={JSON.stringify(initialData.filters)}
         initialData={initialData}
