@@ -7,7 +7,7 @@ const root = process.cwd()
 const source = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
 describe('Rodada 3 — interações de assinatura', () => {
-  it('usa View Transition API com fallback e reduced motion', () => {
+  it('usa View Transition API com fallback, continuidade e reduced motion', () => {
     const provider = source('src/admin/state/AdminStateProvider.tsx')
     const styles = source('src/admin/design-system/interactions.scss')
     expect(provider).toContain('startAdminViewTransition')
@@ -15,6 +15,9 @@ describe('Rodada 3 — interações de assinatura', () => {
     expect(provider).toContain("prefers-reduced-motion: reduce")
     expect(provider).toContain('scrollRestoration')
     expect(provider).toContain('restoreContext')
+    expect(provider).toContain("event.key !== 'Escape'")
+    expect(provider).toContain(".esmera-context-inspector")
+    expect(provider).toContain("button[aria-label^=\"Fechar\"]")
     expect(styles).toContain('::view-transition-old(root)')
     expect(styles).toContain('::view-transition-new(root)')
     expect(styles).toContain('@media (prefers-reduced-motion: reduce)')
