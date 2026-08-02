@@ -170,14 +170,22 @@ test.describe('Stage 10 After-sales workspace', () => {
 
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(`http://localhost:3000/admin/after-sales?q=${encodeURIComponent(caseNumber || '')}&status=all`)
+    await expect(page.getByRole('table', { name: 'Fila operacional de pós-venda' })).toBeVisible()
     const mobileInspectorClose = page.getByRole('button', { name: 'Fechar inspector' })
+    await expect(mobileInspectorClose).toBeHidden()
+
+    const mobileInspect = page.getByRole('button', { name: 'Inspecionar' }).first()
+    await expect(mobileInspect).toBeVisible()
+    await mobileInspect.click()
+
     await expect(mobileInspectorClose).toBeVisible()
     await expect(page.getByRole('heading', { name: caseNumber })).toBeVisible()
     await expect(page.getByLabel(`Status de ${taskTitle}`)).toHaveValue('done')
     await expect(page.getByText(trackingCode, { exact: true }).locator('xpath=ancestor::article').getByLabel('Atualizar estado')).toHaveValue('delivered')
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBeLessThanOrEqual(1)
-    await mobileInspectorClose.evaluate((element) => (element as HTMLButtonElement).click())
+    await mobileInspectorClose.click()
     await expect(mobileInspectorClose).toBeHidden()
+    await expect(page.getByRole('table', { name: 'Fila operacional de pós-venda' })).toBeVisible()
   })
 })
