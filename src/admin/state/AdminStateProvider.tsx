@@ -42,6 +42,13 @@ function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
+function isVisibleElement(element: HTMLElement | null) {
+  if (!element) return false
+  const style = getComputedStyle(element)
+  const rect = element.getBoundingClientRect()
+  return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+}
+
 export function startAdminViewTransition(callback: () => void | Promise<void>, transitionName = 'default') {
   if (typeof document === 'undefined' || prefersReducedMotion()) {
     void callback()
@@ -244,12 +251,23 @@ export function AdminStateProvider({ children }: { children: React.ReactNode }) 
         router.push(destination)
       }), anchor.dataset.esmeraTransition || 'navigation')
     }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      const overlay = Array.from(document.querySelectorAll<HTMLElement>('.esmera-command, .esmera-dialog, .esmera-drawer')).find(isVisibleElement)
+      if (overlay) return
+      const inspector = Array.from(document.querySelectorAll<HTMLElement>('.esmera-context-inspector')).find(isVisibleElement)
+      const close = inspector?.querySelector<HTMLButtonElement>('button[aria-label^="Fechar"]')
+      if (!close || close.disabled) return
+      event.preventDefault()
+      close.click()
+    }
     const onPageHide = () => storeContext()
     const onPopState = () => {
       window.requestAnimationFrame(() => restoreContext())
     }
 
     document.addEventListener('click', onClick, { capture: true })
+    document.addEventListener('keydown', onKeyDown)
     window.addEventListener('pagehide', onPageHide)
     window.addEventListener('popstate', onPopState)
     restoreContext()
@@ -258,6 +276,7 @@ export function AdminStateProvider({ children }: { children: React.ReactNode }) 
       storeContext()
       history.scrollRestoration = previousRestoration
       document.removeEventListener('click', onClick, { capture: true })
+      document.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('pagehide', onPageHide)
       window.removeEventListener('popstate', onPopState)
       if (pendingNavigation.current) window.clearTimeout(pendingNavigation.current.timeout)
