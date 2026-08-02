@@ -1,0 +1,355 @@
+/* Etapa 24: fechamento visual e responsivo do Pós-venda.
+ * Mantém Tasks, entregas, ocorrências e todas as operações existentes;
+ * altera somente hierarquia, densidade e comportamento do inspector.
+ */
+
+.esmera-after-sales-metrics {
+  margin-bottom: 18px;
+  border: 1px solid var(--esmera-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.esmera-after-sales-metrics > a {
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label value'
+    'help value';
+  align-content: center;
+  column-gap: 16px;
+  padding: 14px 16px;
+}
+
+.esmera-after-sales-metrics span {
+  grid-area: label;
+  font-size: 11px;
+  letter-spacing: .01em;
+}
+
+.esmera-after-sales-metrics strong {
+  grid-area: value;
+  align-self: center;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 620;
+}
+
+.esmera-after-sales-metrics small {
+  grid-area: help;
+  margin-top: 3px;
+  font-size: 10px;
+}
+
+.esmera-after-sales-toolbar {
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.esmera-after-sales-filters {
+  grid-template-columns: minmax(240px, 1.7fr) repeat(4, minmax(118px, .8fr)) auto auto;
+  gap: 8px;
+}
+
+.esmera-after-sales-filters label > span {
+  font-size: 10px;
+  letter-spacing: .02em;
+}
+
+.esmera-after-sales-filters .esmera-input,
+.esmera-after-sales-filters .esmera-button {
+  min-height: 38px;
+}
+
+.esmera-after-sales-toolbar > .esmera-button {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.esmera-after-sales-workspace {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 410px);
+  gap: 16px;
+}
+
+.esmera-after-sales-queue,
+.esmera-after-sales-placeholder,
+.esmera-after-sales-inspector {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.esmera-after-sales-queue__heading {
+  min-height: 66px;
+  padding: 14px 18px;
+}
+
+.esmera-after-sales-queue__heading h2,
+.esmera-after-sales-inspector h2,
+.esmera-after-sales-section h3,
+.esmera-after-sales-placeholder h2 {
+  font-size: 16px;
+}
+
+.esmera-after-sales-queue .esmera-data-table th,
+.esmera-after-sales-queue .esmera-data-table td {
+  padding-block: 11px;
+}
+
+.esmera-after-sales-queue .esmera-data-table td small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
+.esmera-after-sales-queue .esmera-data-table .esmera-status {
+  white-space: nowrap;
+}
+
+/* O inspector passa a ser um painel contido no viewport, e não uma coluna que
+ * cresce até o fim de todo o documento. */
+.esmera-after-sales-inspector {
+  height: calc(100vh - var(--esmera-shell-header-height, 64px) - 32px);
+  max-height: calc(100vh - var(--esmera-shell-header-height, 64px) - 32px);
+  display: flex;
+  flex-direction: column;
+}
+
+.esmera-after-sales-inspector .esmera-inspector-header,
+.esmera-after-sales-inspector .esmera-inspector-footer {
+  flex: 0 0 auto;
+}
+
+.esmera-after-sales-inspector .esmera-inspector-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.esmera-after-sales-case-controls {
+  gap: 10px;
+  padding-bottom: 14px;
+}
+
+.esmera-after-sales-facts {
+  padding-block: 8px;
+}
+
+.esmera-after-sales-facts > div {
+  padding-block: 7px;
+}
+
+.esmera-after-sales-section {
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.esmera-after-sales-task-list li {
+  grid-template-columns: minmax(0, 1fr) 116px;
+}
+
+.esmera-shipment,
+.esmera-occurrence-list li {
+  padding: 12px;
+  background: var(--esmera-surface);
+}
+
+.esmera-after-sales-compose summary {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  color: var(--esmera-primary);
+  font-size: 12px;
+}
+
+.esmera-after-sales-placeholder {
+  min-height: 240px;
+  display: grid;
+  align-content: center;
+  padding: 28px;
+}
+
+@container esmera-workspace (max-width: 1180px) {
+  .esmera-after-sales-filters {
+    grid-template-columns: minmax(220px, 1.5fr) repeat(2, minmax(130px, 1fr)) auto auto;
+  }
+
+  .esmera-after-sales-search {
+    grid-column: span 2;
+  }
+
+  .esmera-after-sales-filters label:nth-of-type(4),
+  .esmera-after-sales-filters label:nth-of-type(5) {
+    grid-row: 2;
+  }
+
+  .esmera-after-sales-workspace {
+    grid-template-columns: minmax(0, 1fr) 370px;
+  }
+}
+
+@container esmera-workspace (max-width: 980px) {
+  .esmera-after-sales-queue .esmera-data-table th:nth-child(4),
+  .esmera-after-sales-queue .esmera-data-table td:nth-child(4),
+  .esmera-after-sales-queue .esmera-data-table th:nth-child(5),
+  .esmera-after-sales-queue .esmera-data-table td:nth-child(5) {
+    display: none;
+  }
+}
+
+@container esmera-workspace (max-width: 900px) {
+  .esmera-after-sales-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .esmera-after-sales-metrics > a {
+    min-height: 74px;
+  }
+
+  .esmera-after-sales-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .esmera-after-sales-search {
+    grid-column: 1 / -1;
+  }
+
+  .esmera-after-sales-filters label:nth-of-type(4),
+  .esmera-after-sales-filters label:nth-of-type(5) {
+    grid-row: auto;
+  }
+
+  .esmera-after-sales-workspace {
+    display: block;
+  }
+
+  /* O estado inicial continua mostrando a fila. O inspector só se torna modal
+   * após o comando Inspecionar receber foco; a navegação por teclado permanece
+   * íntegra e o foco dentro do painel mantém a superfície aberta. */
+  .esmera-after-sales-inspector {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: var(--esmera-z-modal);
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    background: var(--esmera-surface);
+  }
+
+  .esmera-after-sales-workspace:has(.esmera-after-sales-queue td:last-child .esmera-button:focus) .esmera-after-sales-inspector,
+  .esmera-after-sales-inspector:focus-within {
+    display: flex;
+  }
+
+  .esmera-after-sales-inspector .esmera-inspector-body {
+    height: auto;
+  }
+
+  .esmera-after-sales-inspector__close {
+    display: inline-flex;
+  }
+
+  .esmera-after-sales-placeholder {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  body:has(.esmera-after-sales-workspace .esmera-after-sales-queue td:last-child .esmera-button:focus),
+  body:has(.esmera-after-sales-inspector:focus-within) {
+    overflow: hidden;
+  }
+}
+
+@container esmera-workspace (max-width: 620px) {
+  .esmera-after-sales-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .esmera-after-sales-metrics > a {
+    min-height: 70px;
+    padding: 12px;
+  }
+
+  .esmera-after-sales-metrics > a:nth-child(odd) {
+    border-right: 1px solid var(--esmera-line);
+  }
+
+  .esmera-after-sales-metrics > a:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--esmera-line);
+  }
+
+  .esmera-after-sales-metrics strong {
+    font-size: 22px;
+  }
+
+  .esmera-after-sales-metrics small {
+    display: none;
+  }
+
+  .esmera-after-sales-toolbar {
+    gap: 12px;
+  }
+
+  .esmera-after-sales-filters {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--esmera-line);
+    border-radius: 8px;
+    background: var(--esmera-surface);
+  }
+
+  .esmera-after-sales-search {
+    grid-column: 1 / -1;
+  }
+
+  .esmera-after-sales-filters > .esmera-button,
+  .esmera-after-sales-toolbar > .esmera-button {
+    width: 100%;
+  }
+
+  .esmera-after-sales-queue {
+    border-radius: 8px;
+  }
+
+  .esmera-after-sales-queue .esmera-data-table tr {
+    padding: 14px;
+  }
+
+  .esmera-after-sales-queue .esmera-data-table td {
+    padding-block: 4px;
+  }
+
+  .esmera-after-sales-queue .esmera-data-table td:nth-child(3),
+  .esmera-after-sales-queue .esmera-data-table td:nth-child(5) {
+    color: var(--esmera-text-secondary);
+    font-size: 11px;
+  }
+
+  .esmera-after-sales-queue .esmera-data-table td:last-child {
+    padding-top: 10px;
+  }
+
+  .esmera-after-sales-inspector .esmera-inspector-header {
+    padding: 14px 16px;
+  }
+
+  .esmera-after-sales-inspector .esmera-inspector-body {
+    padding: 16px;
+  }
+
+  .esmera-after-sales-case-controls,
+  .esmera-after-sales-facts,
+  .esmera-after-sales-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .esmera-after-sales-task-list li {
+    grid-template-columns: 1fr;
+  }
+}
