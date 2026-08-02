@@ -1,7 +1,7 @@
 .esmera-editorial-preview-workspace {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(420px, .82fr) minmax(520px, 1.18fr);
+  grid-template-columns: minmax(360px, .75fr) minmax(440px, 1.25fr);
   gap: var(--esmera-space-5);
   align-items: start;
 }
@@ -86,7 +86,7 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--esmera-primary) 18%, transparent);
 }
 
-@container esmera-workspace (max-width: 1180px) {
+@container esmera-workspace (max-width: 900px) {
   .esmera-editorial-preview-workspace { grid-template-columns: 1fr; }
   .esmera-editorial-preview__stage { min-height: 620px; }
   .esmera-editorial-preview__stage iframe { height: 620px; }
