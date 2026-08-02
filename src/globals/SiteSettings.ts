@@ -1,12 +1,12 @@
 import type { GlobalConfig } from 'payload'
 
-import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
+import { canManageSite, siteEditors } from '../access/roles'
 
 export const SiteSettings: GlobalConfig = {
   slug: 'site-settings',
   label: 'Configurações do site',
   admin: { group: 'Site', hidden: ({ user }) => !canManageSite(user) },
-  access: { read: publishedGlobalOrAuthenticated, update: siteEditors, readVersions: siteEditors },
+  access: { read: siteEditors, update: siteEditors, readVersions: siteEditors },
   versions: { drafts: true, max: 30 },
   fields: [
     { name: 'siteName', type: 'text', label: 'Nome do site', defaultValue: 'Esméra' },
