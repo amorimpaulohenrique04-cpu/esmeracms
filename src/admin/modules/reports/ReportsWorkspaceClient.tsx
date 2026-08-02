@@ -3,7 +3,7 @@
 import { Drawer } from '@base-ui/react/drawer'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import { opportunityStageLabels } from '../../../businessRules/opportunities/stages'
 import type {
@@ -12,9 +12,18 @@ import type {
   ReportingDrilldownKind,
   ReportingSnapshot,
 } from '../../../server/reporting'
-import { DataTable, EmptyState } from '../../design-system'
+import {
+  DataTable,
+  EmptyState,
+  EmptyVisualization,
+  InlineFeedback,
+  SegmentedControl,
+  SegmentedControlButton,
+} from '../../design-system'
+import { announceAdmin, startAdminViewTransition } from '../../state/AdminStateProvider'
+import { saveAdminView } from '../../state/continuity'
 import { commercialEvolutionOption, type EvolutionMode } from './charts'
-import { EChart } from './EChart'
+import { EChart, type EChartEvent, type EChartHighlight } from './EChart'
 
 type OptionItem = { id: string | number; label: string }
 
@@ -39,6 +48,14 @@ type DrilldownRequest = {
   kind: ReportingDrilldownKind
   value: string | null
 }
+
+type HoverFocus = {
+  label: string
+  seriesName?: string
+  dataIndex?: number
+} | null
+
+type FilterKey = 'period' | 'compareWith' | 'ownerId' | 'source' | 'categoryId' | 'productId'
 
 const sourceLabels: Record<string, string> = {
   instagram: 'Instagram',
@@ -120,6 +137,24 @@ function searchParams(filters: NormalizedReportingFilters) {
   return params
 }
 
+function filtersFromLocation(fallback: NormalizedReportingFilters) {
+  const params = new URLSearchParams(window.location.search)
+  const from = params.get('from')
+  const to = params.get('to')
+  return {
+    period: from && to && !Number.isNaN(new Date(from).getTime()) && !Number.isNaN(new Date(to).getTime())
+      ? { from, to }
+      : fallback.period,
+    compareWith: params.get('compareWith') === 'previous_period' || params.get('compareWith') === 'previous_year'
+      ? params.get('compareWith') as NormalizedReportingFilters['compareWith']
+      : null,
+    ownerId: params.get('owner') || null,
+    source: params.get('source') || null,
+    categoryId: params.get('category') || null,
+    productId: params.get('product') || null,
+  } satisfies NormalizedReportingFilters
+}
+
 async function fetchReport(filters: NormalizedReportingFilters) {
   const response = await fetch(`/api/admin-reports?${searchParams(filters).toString()}`, {
     credentials: 'same-origin',
@@ -163,7 +198,7 @@ function shortDate(value: string | null | undefined) {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return date.toLocaleDateString('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function delta(value: number | null, format: 'number' | 'percent' | 'money' | 'days' = 'number') {
@@ -173,6 +208,11 @@ function delta(value: number | null, format: 'number' | 'percent' | 'money' | 'd
   if (format === 'money') return `${prefix}${money(value)}`
   if (format === 'days') return `${prefix}${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} dias`
   return `${prefix}${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}`
+}
+
+function optionLabel(items: OptionItem[], id: string | number | null) {
+  if (id === null) return null
+  return items.find((item) => String(item.id) === String(id))?.label || String(id)
 }
 
 function FilterBar({ draft, setDraft, users, products, categories, onApply, onClear, onShare, shareFeedback }: {
@@ -239,8 +279,8 @@ function DrilldownDrawer({ request, result, loading, error, onClose }: {
               </div>
               <div className="esmera-overlay-body">
                 {loading ? <div className="esmera-report-drilldown-loading"><span /><span /><span /></div> : null}
-                {error ? <div className="esmera-state esmera-state--error"><strong>Não foi possível abrir os registros</strong><p>{error.message}</p></div> : null}
-                {!loading && !error && result?.records.length ? <ul className="esmera-report-records">{result.records.map((record) => <li key={record.key}><div><strong>{record.title}</strong><span>{record.meta}</span><small>{record.status} · {shortDate(record.occurredAt)}{record.amountCents !== null ? ` · ${money(record.amountCents)}` : ''}</small></div><Link className="esmera-button" href={record.href}>Abrir registro</Link></li>)}</ul> : null}
+                {error ? <InlineFeedback tone="danger">{error.message}</InlineFeedback> : null}
+                {!loading && !error && result?.records.length ? <ul className="esmera-report-records">{result.records.map((record) => <li key={record.key}><div><strong>{record.title}</strong><span>{record.meta}</span><small>{record.status} · {shortDate(record.occurredAt)}{record.amountCents !== null ? ` · ${money(record.amountCents)}` : ''}</small></div><Link className="esmera-button" data-esmera-transition="record" data-esmera-recent-label={record.title} href={record.href}>Abrir registro</Link></li>)}</ul> : null}
                 {!loading && !error && result && !result.records.length ? <EmptyState title="Nenhum registro" copy="A consulta foi concluída e não encontrou documentos para este recorte." /> : null}
                 {result?.truncated ? <p className="esmera-report-drawer-note">Mostrando os 100 registros mais recentes deste recorte.</p> : null}
               </div>
@@ -260,9 +300,28 @@ function WorkspaceInner({ initialData, users, products, categories }: Props) {
   const [activeFilters, setActiveFilters] = useState(initialData.filters)
   const [draft, setDraft] = useState<DraftFilters>(() => draftFrom(initialData.filters))
   const [shareFeedback, setShareFeedback] = useState('')
+  const [actionFeedback, setActionFeedback] = useState('')
   const [evolutionMode, setEvolutionMode] = useState<EvolutionMode>('volume')
   const [catalogMode, setCatalogMode] = useState<'products' | 'categories'>('products')
   const [drilldownRequest, setDrilldownRequest] = useState<DrilldownRequest | null>(null)
+  const [historyDepth, setHistoryDepth] = useState(0)
+  const [hoverFocus, setHoverFocus] = useState<HoverFocus>(null)
+
+  useEffect(() => {
+    const currentDepth = Number(window.history.state?.esmeraReportDepth || 0)
+    setHistoryDepth(Number.isFinite(currentDepth) ? currentDepth : 0)
+    window.history.replaceState({ ...window.history.state, esmeraReportDepth: currentDepth }, '', window.location.href)
+
+    const onPopState = (event: PopStateEvent) => {
+      const next = filtersFromLocation(initialData.filters)
+      setActiveFilters(next)
+      setDraft(draftFrom(next))
+      setHistoryDepth(Number(event.state?.esmeraReportDepth || 0))
+      setDrilldownRequest(null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [initialData.filters])
 
   const reportQuery = useQuery({
     queryKey: ['reports', activeFilters],
@@ -293,10 +352,16 @@ function WorkspaceInner({ initialData, users, products, categories }: Props) {
   const hasTeam = data.team.length > 0
   const hasSecondaryAnalysis = hasLosses || hasSources || hasTeam
 
-  function navigate(next: NormalizedReportingFilters) {
-    setActiveFilters(next)
-    setDraft(draftFrom(next))
-    window.history.replaceState(window.history.state, '', `/admin/reports?${searchParams(next).toString()}`)
+  function navigate(next: NormalizedReportingFilters, options: { push?: boolean; label?: string } = {}) {
+    const url = `/admin/reports?${searchParams(next).toString()}${window.location.hash}`
+    const nextDepth = options.push ? historyDepth + 1 : 0
+    startAdminViewTransition(() => {
+      setActiveFilters(next)
+      setDraft(draftFrom(next))
+      setHistoryDepth(nextDepth)
+      if (options.push) window.history.pushState({ ...window.history.state, esmeraReportDepth: nextDepth, esmeraReportLabel: options.label }, '', url)
+      else window.history.replaceState({ ...window.history.state, esmeraReportDepth: 0 }, '', url)
+    }, options.push ? 'reports-drilldown' : 'reports-filter')
   }
 
   function applyFilters() { navigate(filtersFromDraft(draft)) }
@@ -307,24 +372,96 @@ function WorkspaceInner({ initialData, users, products, categories }: Props) {
   }
 
   async function share() {
-    const exactURL = `${window.location.origin}/admin/reports?${searchParams(activeFilters).toString()}`
+    const exactURL = `${window.location.origin}/admin/reports?${searchParams(activeFilters).toString()}${window.location.hash}`
     try {
       await navigator.clipboard.writeText(exactURL)
       setShareFeedback('URL exata copiada.')
+      announceAdmin('URL exata do relatório copiada.')
     } catch {
       setShareFeedback('Não foi possível copiar automaticamente.')
     }
   }
 
-  function patchFilters(patch: Partial<NormalizedReportingFilters>) { navigate({ ...activeFilters, ...patch }) }
-  function openDrilldown(kind: ReportingDrilldownKind, value: string | number | null = null) { setDrilldownRequest({ kind, value: value === null ? null : String(value) }) }
+  function saveCurrentView() {
+    const activeDimensions = [activeFilters.ownerId, activeFilters.source, activeFilters.categoryId, activeFilters.productId].filter(Boolean).length
+    const label = `Relatórios · ${shortDate(activeFilters.period.from)}–${shortDate(activeFilters.period.to)}${activeDimensions ? ` · ${activeDimensions} dimensão${activeDimensions === 1 ? '' : 'ões'}` : ''}`
+    saveAdminView({ kind: 'reports', label, href: `/admin/reports?${searchParams(activeFilters).toString()}${window.location.hash}` })
+    setActionFeedback('Recorte salvo na Command Palette.')
+    announceAdmin('Recorte de Relatórios salvo na Command Palette.')
+  }
+
+  function patchFilters(patch: Partial<NormalizedReportingFilters>, label: string) {
+    navigate({ ...activeFilters, ...patch }, { push: true, label })
+  }
+
+  function removeFilter(key: FilterKey) {
+    if (key === 'period') patchFilters({ period: defaultPeriod() }, 'Período removido')
+    if (key === 'compareWith') patchFilters({ compareWith: null }, 'Comparação removida')
+    if (key === 'ownerId') patchFilters({ ownerId: null }, 'Responsável removido')
+    if (key === 'source') patchFilters({ source: null }, 'Origem removida')
+    if (key === 'categoryId') patchFilters({ categoryId: null }, 'Categoria removida')
+    if (key === 'productId') patchFilters({ productId: null }, 'Produto removido')
+  }
+
+  function openDrilldown(kind: ReportingDrilldownKind, value: string | number | null = null) {
+    startAdminViewTransition(() => setDrilldownRequest({ kind, value: value === null ? null : String(value) }), 'inspector')
+  }
+
+  function focusEvolutionDay(event: EChartEvent) {
+    if (typeof event.dataIndex !== 'number') return
+    const point = data.evolution.current[event.dataIndex]
+    if (!point) return
+    const nextPeriod = { from: dateBoundary(point.date), to: dateBoundary(point.date, true) }
+    const series = event.seriesName || 'Série'
+    navigate({ ...activeFilters, period: nextPeriod }, { push: true, label: `${series} em ${shortDate(point.date)}` })
+    if (series.startsWith('Vendas') || series.startsWith('Receita')) setDrilldownRequest({ kind: 'sales', value: null })
+    if (series.startsWith('Oportunidades')) setDrilldownRequest({ kind: 'opportunities', value: null })
+  }
+
+  function hoverEvolution(event: EChartEvent | null) {
+    if (!event || typeof event.dataIndex !== 'number') {
+      setHoverFocus(null)
+      return
+    }
+    const point = data.evolution.current[event.dataIndex]
+    setHoverFocus({
+      label: `${event.seriesName || 'Série'} · ${point ? shortDate(point.date) : event.name || ''}`,
+      seriesName: event.seriesName,
+      dataIndex: event.dataIndex,
+    })
+  }
+
+  const chartHighlight: EChartHighlight = hoverFocus?.seriesName
+    ? { seriesName: hoverFocus.seriesName, dataIndex: hoverFocus.dataIndex }
+    : null
+
+  const filterSummary = [
+    { key: 'period' as const, label: `${shortDate(activeFilters.period.from)} — ${shortDate(activeFilters.period.to)}` },
+    activeFilters.compareWith ? { key: 'compareWith' as const, label: activeFilters.compareWith === 'previous_period' ? 'Comparação: período anterior' : 'Comparação: ano anterior' } : null,
+    activeFilters.ownerId !== null ? { key: 'ownerId' as const, label: `Responsável: ${optionLabel(users, activeFilters.ownerId)}` } : null,
+    activeFilters.source ? { key: 'source' as const, label: `Origem: ${sourceLabels[activeFilters.source] || activeFilters.source}` } : null,
+    activeFilters.categoryId !== null ? { key: 'categoryId' as const, label: `Categoria: ${optionLabel(categories, activeFilters.categoryId)}` } : null,
+    activeFilters.productId !== null ? { key: 'productId' as const, label: `Produto: ${optionLabel(products, activeFilters.productId)}` } : null,
+  ].filter((item): item is { key: FilterKey; label: string } => Boolean(item))
 
   return (
     <div className={`esmera-report-workspace${reportQuery.isFetching ? ' is-refreshing' : ''}`} data-testid="reports-workspace">
       <FilterBar draft={draft} setDraft={setDraft} users={users} products={products} categories={categories} onApply={applyFilters} onClear={clearFilters} onShare={() => void share()} shareFeedback={shareFeedback} />
 
-      <div className="esmera-report-refresh" aria-live="polite">{reportQuery.isFetching ? 'Atualizando dados sem ocultar o período anterior…' : `Atualizado em ${new Date(data.generatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}</div>
-      {reportQuery.error ? <div className="esmera-state esmera-state--error"><strong>Não foi possível atualizar os relatórios</strong><p>{reportQuery.error.message}</p><small>Os últimos dados válidos continuam visíveis.</small></div> : null}
+      <section className="esmera-report-investigation" aria-label="Resumo do recorte investigativo">
+        <div className="esmera-report-investigation__chips">
+          {filterSummary.map((item) => <button type="button" key={item.key} onClick={() => removeFilter(item.key)} title="Remover este filtro"><span>{item.label}</span><strong aria-hidden="true">×</strong></button>)}
+        </div>
+        <div className="esmera-report-investigation__actions">
+          {historyDepth > 0 ? <button className="esmera-button esmera-button--quiet" type="button" onClick={() => window.history.back()}>Voltar um nível</button> : null}
+          <button className="esmera-button" type="button" onClick={saveCurrentView}>Salvar recorte</button>
+        </div>
+      </section>
+
+      {actionFeedback ? <InlineFeedback tone="success">{actionFeedback}</InlineFeedback> : null}
+      <div className="esmera-report-refresh" aria-live="polite">{reportQuery.isFetching ? 'Atualizando somente as regiões afetadas…' : `Atualizado em ${new Date(data.generatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}</div>
+      {reportQuery.error ? <InlineFeedback tone="danger">{reportQuery.error.message} Os últimos dados válidos continuam visíveis.</InlineFeedback> : null}
+      {hoverFocus ? <div className="esmera-report-hover-focus" role="status" aria-live="polite"><span>Em foco</span><strong>{hoverFocus.label}</strong></div> : null}
 
       <section className="esmera-report-kpis" aria-label="Indicadores comerciais">
         <Kpi label="Oportunidades" value={metrics.opportunitiesCreated.toLocaleString('pt-BR')} meta={delta(deltaMetrics.opportunitiesCreated.absolute)} onClick={() => openDrilldown('opportunities')} />
@@ -333,33 +470,33 @@ function WorkspaceInner({ initialData, users, products, categories }: Props) {
         <Kpi label="Ciclo de venda" value={days(metrics.averageSalesCycleDays)} meta={metrics.averageSalesCycleDays === null ? 'Nenhuma venda concluída com ciclo mensurável' : delta(deltaMetrics.averageSalesCycleDays.absolute, 'days')} empty={metrics.averageSalesCycleDays === null} onClick={() => openDrilldown('cycle')} />
       </section>
 
-      <section className="esmera-report-section esmera-report-evolution">
-        <div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Evolução comercial</span><h2>Movimento no período</h2><p>Leads, oportunidades, vendas e receita com a comparação selecionada.</p></div><div className="esmera-report-segmented" aria-label="Métrica do gráfico"><button type="button" className={evolutionMode === 'volume' ? 'is-active' : ''} onClick={() => setEvolutionMode('volume')}>Volume</button><button type="button" className={evolutionMode === 'revenue' ? 'is-active' : ''} onClick={() => setEvolutionMode('revenue')}>Receita</button></div></div>
-        {hasEvolutionData ? <EChart option={chartOption} ariaLabel={evolutionMode === 'volume' ? 'Evolução diária de leads, oportunidades e vendas' : 'Evolução diária da receita'} height={300} /> : <div className="esmera-report-empty-visualization"><strong>Sem movimento no período</strong><p>Nenhum lead, oportunidade, venda ou receita foi confirmado neste recorte. Ajuste o período ou as dimensões para investigar outra base.</p></div>}
+      <section id="evolution" className="esmera-report-section esmera-report-evolution">
+        <div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Evolução comercial</span><h2>Movimento no período</h2><p>Clique em uma série para restringir o período ao dia e abrir os registros compatíveis.</p></div><SegmentedControl label="Métrica do gráfico"><SegmentedControlButton selected={evolutionMode === 'volume'} onClick={() => setEvolutionMode('volume')}>Volume</SegmentedControlButton><SegmentedControlButton selected={evolutionMode === 'revenue'} onClick={() => setEvolutionMode('revenue')}>Receita</SegmentedControlButton></SegmentedControl></div>
+        {hasEvolutionData ? <EChart option={chartOption} ariaLabel={evolutionMode === 'volume' ? 'Evolução diária de leads, oportunidades e vendas' : 'Evolução diária da receita'} height={300} highlight={chartHighlight} onClick={focusEvolutionDay} onHover={hoverEvolution} /> : <EmptyVisualization title="Sem movimento no período" description="Nenhum lead, oportunidade, venda ou receita foi confirmado neste recorte. Ajuste o período ou as dimensões para investigar outra base." />}
       </section>
 
-      <section className="esmera-report-section">
+      <section id="funnel" className="esmera-report-section">
         <div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Funil</span><h2>Progressão por etapa</h2><p>Volume alcançado, avanço e perda calculados pelo histórico real de Activities.</p></div><div className="esmera-report-terminal"><span>Conversão final</span><strong>{percent(data.funnel.terminalConversionRate)}</strong></div></div>
-        <div className="esmera-report-funnel" aria-label="Etapas do funil comercial">{data.funnel.stages.map((stage) => <button type="button" key={stage.stage} onClick={() => openDrilldown('funnel-stage', stage.stage)}><span>{opportunityStageLabels[stage.stage]}</span><strong>{stage.volume}</strong><dl><div><dt>Avanço</dt><dd>{stage.stage === 'won' ? 'Final' : percent(stage.conversionToNext)}</dd></div><div><dt>Drop-off</dt><dd>{stage.dropOff} · {percent(stage.dropOffRate)}</dd></div></dl></button>)}</div>
+        <div className="esmera-report-funnel" aria-label="Etapas do funil comercial">{data.funnel.stages.map((stage) => <button type="button" key={stage.stage} onMouseEnter={() => setHoverFocus({ label: `Etapa: ${opportunityStageLabels[stage.stage]}` })} onMouseLeave={() => setHoverFocus(null)} onClick={() => openDrilldown('funnel-stage', stage.stage)}><span>{opportunityStageLabels[stage.stage]}</span><strong>{stage.volume}</strong><dl><div><dt>Avanço</dt><dd>{stage.stage === 'won' ? 'Final' : percent(stage.conversionToNext)}</dd></div><div><dt>Drop-off</dt><dd>{stage.dropOff} · {percent(stage.dropOffRate)}</dd></div></dl></button>)}</div>
       </section>
 
       {hasLosses || hasSources ? <div className="esmera-report-two-column">
-        {hasLosses ? <section className="esmera-report-section"><div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Perdas</span><h2>Motivos registrados</h2><p>Ranking das razões estruturadas de perda.</p></div></div><div className="esmera-report-ranking">{data.losses.map((loss) => <button type="button" key={loss.reason} onClick={() => openDrilldown('loss-reason', loss.reason)}><div><span>{loss.label}</span><strong>{loss.volume}</strong></div><div className="esmera-report-ranking__track"><span style={{ width: `${Math.max(2, (loss.shareOfLosses || 0) * 100)}%` }} /></div><small>{percent(loss.shareOfLosses)}</small></button>)}</div></section> : null}
-        {hasSources ? <section className="esmera-report-section"><div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Origem</span><h2>Qualidade da aquisição</h2><p>Volume, conversão e receita atribuída por origem.</p></div></div><DataTable label="Performance por origem"><thead><tr><th>Origem</th><th>Volume</th><th>Conversão</th><th>Receita</th><th /></tr></thead><tbody>{data.sources.map((source) => <tr key={source.source}><td><button className="esmera-report-text-action" type="button" onClick={() => patchFilters({ source: source.source === 'unattributed' ? null : source.source })}>{sourceLabels[source.source] || source.source}</button></td><td>{source.opportunitiesCreated}</td><td>{percent(source.conversionRate)}</td><td>{money(source.revenueCents)}</td><td><button className="esmera-button esmera-button--quiet" type="button" onClick={() => openDrilldown('source', source.source)}>Registros</button></td></tr>)}</tbody></DataTable></section> : null}
+        {hasLosses ? <section className="esmera-report-section"><div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Perdas</span><h2>Motivos registrados</h2><p>Ranking das razões estruturadas de perda.</p></div></div><div className="esmera-report-ranking">{data.losses.map((loss) => <button type="button" key={loss.reason} onMouseEnter={() => setHoverFocus({ label: `Perda: ${loss.label}` })} onMouseLeave={() => setHoverFocus(null)} onClick={() => openDrilldown('loss-reason', loss.reason)}><div><span>{loss.label}</span><strong>{loss.volume}</strong></div><div className="esmera-report-ranking__track"><span style={{ width: `${Math.max(2, (loss.shareOfLosses || 0) * 100)}%` }} /></div><small>{percent(loss.shareOfLosses)}</small></button>)}</div></section> : null}
+        {hasSources ? <section className="esmera-report-section"><div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Origem</span><h2>Qualidade da aquisição</h2><p>Clicar na origem aplica o cross-filter e preserva a URL.</p></div></div><DataTable label="Performance por origem"><thead><tr><th>Origem</th><th>Volume</th><th>Conversão</th><th>Receita</th><th /></tr></thead><tbody>{data.sources.map((source) => <tr key={source.source} onMouseEnter={() => setHoverFocus({ label: `Origem: ${sourceLabels[source.source] || source.source}` })} onMouseLeave={() => setHoverFocus(null)}><td><button className="esmera-report-text-action" type="button" onClick={() => patchFilters({ source: source.source === 'unattributed' ? null : source.source }, `Origem: ${sourceLabels[source.source] || source.source}`)}>{sourceLabels[source.source] || source.source}</button></td><td>{source.opportunitiesCreated}</td><td>{percent(source.conversionRate)}</td><td>{money(source.revenueCents)}</td><td><button className="esmera-button esmera-button--quiet" type="button" onClick={() => openDrilldown('source', source.source)}>Registros</button></td></tr>)}</tbody></DataTable></section> : null}
       </div> : null}
 
       {!hasSecondaryAnalysis ? <section className="esmera-report-availability-summary"><div><span className="esmera-eyebrow">Disponibilidade analítica</span><h2>Sem perdas, origens ou responsáveis mensuráveis</h2></div><p>O sistema consultou as três dimensões e não encontrou base real no período. Elas voltarão a ocupar superfícies analíticas quando houver registros válidos.</p></section> : null}
 
-      <section className="esmera-report-section">
-        <div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Catálogo</span><h2>Produtos e categorias</h2><p>Volume comercial, conversão e receita bruta por item vendido.</p></div><div className="esmera-report-segmented" aria-label="Segmentação do catálogo"><button type="button" className={catalogMode === 'products' ? 'is-active' : ''} onClick={() => setCatalogMode('products')}>Produtos</button><button type="button" className={catalogMode === 'categories' ? 'is-active' : ''} onClick={() => setCatalogMode('categories')}>Categorias</button></div></div>
-        {catalogRows.length ? <DataTable label={catalogMode === 'products' ? 'Performance de produtos' : 'Performance de categorias'}><thead><tr><th>{catalogMode === 'products' ? 'Produto' : 'Categoria'}</th><th>Oportunidades</th><th>Conversão</th><th>Vendas</th><th>Receita bruta</th><th /></tr></thead><tbody>{catalogRows.slice(0, 20).map((row) => { const id = catalogMode === 'products' ? 'productId' in row ? row.productId : 0 : 'categoryId' in row ? row.categoryId : 0; return <tr key={`${catalogMode}:${id}`}><td><button className="esmera-report-text-action" type="button" onClick={() => catalogMode === 'products' ? patchFilters({ productId: id }) : patchFilters({ categoryId: id })}>{row.title}</button></td><td>{row.opportunitiesCreated}</td><td>{percent(row.conversionRate)}</td><td>{row.validSales}</td><td>{money(row.grossItemRevenueCents)}</td><td><button className="esmera-button esmera-button--quiet" type="button" onClick={() => openDrilldown(catalogMode === 'products' ? 'product' : 'category', id)}>Registros</button></td></tr> })}</tbody></DataTable> : <EmptyState title="Sem desempenho de catálogo" copy="Nenhum produto ou categoria corresponde ao período e aos filtros." />}
+      <section id="catalog" className="esmera-report-section">
+        <div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Catálogo</span><h2>Produtos e categorias</h2><p>Volume comercial, conversão e receita bruta por item vendido.</p></div><SegmentedControl label="Segmentação do catálogo"><SegmentedControlButton selected={catalogMode === 'products'} onClick={() => setCatalogMode('products')}>Produtos</SegmentedControlButton><SegmentedControlButton selected={catalogMode === 'categories'} onClick={() => setCatalogMode('categories')}>Categorias</SegmentedControlButton></SegmentedControl></div>
+        {catalogRows.length ? <DataTable label={catalogMode === 'products' ? 'Performance de produtos' : 'Performance de categorias'}><thead><tr><th>{catalogMode === 'products' ? 'Produto' : 'Categoria'}</th><th>Oportunidades</th><th>Conversão</th><th>Vendas</th><th>Receita bruta</th><th /></tr></thead><tbody>{catalogRows.slice(0, 20).map((row) => { const id = catalogMode === 'products' ? 'productId' in row ? row.productId : 0 : 'categoryId' in row ? row.categoryId : 0; return <tr key={`${catalogMode}:${id}`} onMouseEnter={() => setHoverFocus({ label: `${catalogMode === 'products' ? 'Produto' : 'Categoria'}: ${row.title}` })} onMouseLeave={() => setHoverFocus(null)}><td><button className="esmera-report-text-action" type="button" onClick={() => catalogMode === 'products' ? patchFilters({ productId: id }, `Produto: ${row.title}`) : patchFilters({ categoryId: id }, `Categoria: ${row.title}`)}>{row.title}</button></td><td>{row.opportunitiesCreated}</td><td>{percent(row.conversionRate)}</td><td>{row.validSales}</td><td>{money(row.grossItemRevenueCents)}</td><td><button className="esmera-button esmera-button--quiet" type="button" onClick={() => openDrilldown(catalogMode === 'products' ? 'product' : 'category', id)}>Registros</button></td></tr> })}</tbody></DataTable> : <EmptyState title="Sem desempenho de catálogo" copy="Nenhum produto ou categoria corresponde ao período e aos filtros." />}
         <p className="esmera-report-note">{catalogMode === 'products' ? data.notes.productRevenue : data.notes.categoryOverlap}</p>
       </section>
 
-      {hasTeam ? <section className="esmera-report-section"><div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Equipe</span><h2>Performance por responsável</h2><p>Oportunidades, conversão, vendas e receita sem ranking decorativo.</p></div></div><DataTable label="Performance por responsável"><thead><tr><th>Responsável</th><th>Oportunidades</th><th>Conversão</th><th>Vendas</th><th>Receita</th><th>Ticket</th><th /></tr></thead><tbody>{data.team.map((member) => <tr key={String(member.ownerId ?? 'unassigned')}><td>{member.ownerId === null ? member.ownerName : <button className="esmera-report-text-action" type="button" onClick={() => patchFilters({ ownerId: member.ownerId })}>{member.ownerName}</button>}</td><td>{member.opportunitiesCreated}</td><td>{percent(member.conversionRate)}</td><td>{member.validSales}</td><td>{money(member.revenueCents)}</td><td>{money(member.averageTicketCents)}</td><td>{member.ownerId !== null ? <button className="esmera-button esmera-button--quiet" type="button" onClick={() => openDrilldown('owner', member.ownerId)}>Registros</button> : null}</td></tr>)}</tbody></DataTable></section> : null}
+      {hasTeam ? <section id="team" className="esmera-report-section"><div className="esmera-report-section__header"><div><span className="esmera-eyebrow">Equipe</span><h2>Performance por responsável</h2><p>Oportunidades, conversão, vendas e receita sem ranking decorativo.</p></div></div><DataTable label="Performance por responsável"><thead><tr><th>Responsável</th><th>Oportunidades</th><th>Conversão</th><th>Vendas</th><th>Receita</th><th>Ticket</th><th /></tr></thead><tbody>{data.team.map((member) => <tr key={String(member.ownerId ?? 'unassigned')} onMouseEnter={() => setHoverFocus({ label: `Responsável: ${member.ownerName}` })} onMouseLeave={() => setHoverFocus(null)}><td>{member.ownerId === null ? member.ownerName : <button className="esmera-report-text-action" type="button" onClick={() => patchFilters({ ownerId: member.ownerId }, `Responsável: ${member.ownerName}`)}>{member.ownerName}</button>}</td><td>{member.opportunitiesCreated}</td><td>{percent(member.conversionRate)}</td><td>{member.validSales}</td><td>{money(member.revenueCents)}</td><td>{money(member.averageTicketCents)}</td><td>{member.ownerId !== null ? <button className="esmera-button esmera-button--quiet" type="button" onClick={() => openDrilldown('owner', member.ownerId)}>Registros</button> : null}</td></tr>)}</tbody></DataTable></section> : null}
 
       <footer className="esmera-report-contract"><strong>Contrato {data.semanticVersion}</strong><span>{shortDate(activeFilters.period.from)} — {shortDate(activeFilters.period.to)}</span><span>Cutover do funil: {shortDate(data.opportunityCutoverAt)}</span><span>Fonte: Payload/PostgreSQL</span><span>Nenhum percentual é fixo.</span></footer>
-      <DrilldownDrawer request={drilldownRequest} result={drilldownQuery.data} loading={drilldownQuery.isFetching} error={drilldownQuery.error} onClose={() => setDrilldownRequest(null)} />
+      <DrilldownDrawer request={drilldownRequest} result={drilldownQuery.data} loading={drilldownQuery.isFetching} error={drilldownQuery.error} onClose={() => startAdminViewTransition(() => setDrilldownRequest(null), 'inspector')} />
     </div>
   )
 }
