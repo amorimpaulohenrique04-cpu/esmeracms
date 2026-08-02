@@ -117,12 +117,12 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
     return () => window.cancelAnimationFrame(frame)
   }, [open])
 
-  const local = useMemo(() => localCommands(selection, currentHref), [currentHref, open, selection])
   const results = useMemo(() => {
+    const local = open ? localCommands(selection, currentHref) : []
     const needle = query.trim().toLocaleLowerCase('pt-BR')
     const filteredLocal = needle ? local.filter((item) => `${item.label} ${item.meta || ''} ${item.group}`.toLocaleLowerCase('pt-BR').includes(needle)) : local
     return uniqueResults([...filteredLocal, ...serverResults]).slice(0, 40)
-  }, [local, query, serverResults])
+  }, [currentHref, open, query, selection, serverResults])
 
   const grouped = useMemo(() => {
     const order = ['Seleção atual', 'Recentes', 'Filtros salvos', 'Ações contextuais', 'Ações', 'Seções de Relatórios', 'Produtos', 'Categorias', 'Clientes', 'Oportunidades', 'Leads', 'Vendas']
