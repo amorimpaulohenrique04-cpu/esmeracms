@@ -7,7 +7,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   occurrenceTypeLabels,
-  operationalPriorityLabels,
   shipmentStatusLabels,
   taskTypeLabels,
 } from '../../../businessRules/afterSales/model'
@@ -51,7 +50,10 @@ function WorkspaceInner(props: Props) {
   const queryClient = useQueryClient()
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
-  const [selectedCaseId, setSelectedCaseId] = useState<string | number | null>(null)
+  const [selectedCaseId, setSelectedCaseId] = useState<string | number | null>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('case')
+  })
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'dueAt', desc: false }])
 
@@ -93,11 +95,6 @@ function WorkspaceInner(props: Props) {
 
   const caseMap = useMemo(() => new Map(cases.map((item) => [String(item.id), item])), [cases])
 
-  useEffect(() => {
-    const caseId = new URLSearchParams(window.location.search).get('case')
-    if (caseId && caseMap.has(caseId)) setSelectedCaseId(caseId)
-  }, [caseMap])
-
   const openInspector = useCallback((caseId: string | number, trigger: HTMLButtonElement) => {
     triggerRef.current = trigger
     setSelectedCaseId(caseId)
@@ -130,7 +127,7 @@ function WorkspaceInner(props: Props) {
     }
   }, [closeInspector, mobileInspectorOpen])
 
-  const now = new Date()
+  const now = useMemo(() => new Date(), [])
   const today = dayKey(now)
   const openTasks = tasks.filter(openTask)
   const metrics = {
