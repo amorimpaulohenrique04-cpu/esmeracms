@@ -281,7 +281,7 @@ describe('Esméra access and data contract', () => {
       },
     })).rejects.toThrow()
 
-    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
     const media = await payload.create({
       collection: 'media',
       overrideAccess: true,
@@ -418,35 +418,31 @@ describe('Esméra access and data contract', () => {
     expect(cancelled.confirmedAt).toBe(snapshotSale.confirmedAt)
   })
 
-  it('requires a customer for won leads and controls closedAt', async () => {
-    await expect(payload.create({
+  it('keeps legacy Lead commercial fields inert', async () => {
+    const legacyLead = await payload.create({
       collection: 'leads',
       overrideAccess: true,
       data: {
-        name: `Lead ganho inválido ${stamp}`,
-        email: `won-invalid-${stamp}@example.com`,
+        name: `Lead legado inerte ${stamp}`,
+        email: `legacy-inert-${stamp}@example.com`,
         source: 'site',
         stage: 'won',
-      },
-    })).rejects.toThrow()
-
-    const won = await payload.create({
-      collection: 'leads',
-      overrideAccess: true,
-      data: {
-        name: `Lead ganho ${stamp}`,
-        email: `won-${stamp}@example.com`,
-        source: 'site',
-        stage: 'won',
-        customer: primaryCustomer.id,
         owner: commercialUser.id,
       },
     })
-    expect(won.closedAt).toBeTruthy()
-    const reopened = await payload.update({
-      collection: 'leads', id: won.id, overrideAccess: true, data: { stage: 'negotiation' },
+
+    expect(legacyLead.stage).toBe('won')
+    expect(legacyLead.customer).toBeNull()
+    expect(legacyLead.closedAt).toBeNull()
+
+    const changedLegacyStage = await payload.update({
+      collection: 'leads',
+      id: legacyLead.id,
+      overrideAccess: true,
+      data: { stage: 'lost' },
     })
-    expect(reopened.closedAt).toBeNull()
+    expect(changedLegacyStage.stage).toBe('lost')
+    expect(changedLegacyStage.closedAt).toBeNull()
   })
 
   it('sets task completion dates and clears them when reopened', async () => {
@@ -467,7 +463,7 @@ describe('Esméra access and data contract', () => {
     expect(reopened.completedAt).toBeNull()
   })
 
-  it('derives the after-sales customer from the sale and controls follow-up completion', async () => {
+  it('derives the after-sales customer from the sale without nested follow-up behavior', async () => {
     const otherCustomer = await payload.create({
       collection: 'customers',
       overrideAccess: true,
@@ -506,24 +502,10 @@ describe('Esméra access and data contract', () => {
         owner: commercialUser.id,
         status: 'following',
         priority: 'normal',
-        followUps: [{
-          moment: 'd3',
-          dueAt: new Date().toISOString(),
-          purpose: 'receipt',
-          status: 'done',
-        }],
       },
     })
     expect(typeof afterSale.customer === 'object' ? afterSale.customer.id : afterSale.customer).toBe(primaryCustomer.id)
-    expect(afterSale.followUps?.[0]?.completedAt).toBeTruthy()
-
-    const reopened = await payload.update({
-      collection: 'after-sales',
-      id: afterSale.id,
-      overrideAccess: true,
-      data: { followUps: afterSale.followUps?.map((item) => ({ ...item, status: 'pending' as const })) },
-    })
-    expect(reopened.followUps?.[0]?.completedAt).toBeNull()
+    expect(afterSale.followUps).toEqual([])
   })
 
   it('enforces editorial and commercial boundaries on APIs and globals', async () => {
