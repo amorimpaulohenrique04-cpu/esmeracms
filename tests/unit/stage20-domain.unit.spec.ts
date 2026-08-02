@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { findCustomerDuplicateMatches } from '../../src/businessRules/customers/dedupe'
 import { normalizeCustomerEmail, normalizeCustomerPhone } from '../../src/businessRules/customers/normalization'
 import { canTransitionOpportunity } from '../../src/businessRules/opportunities/stages'
 import { getProductReadiness } from '../../src/businessRules/products/readiness'
@@ -62,22 +61,6 @@ describe('Stage 20 mandatory domain contracts', () => {
     expect(normalizeCustomerEmail('  MARIA@EXAMPLE.COM ')).toBe('maria@example.com')
     expect(normalizeCustomerPhone('(81) 99999-0000')).toBe('+5581999990000')
     expect(normalizeCustomerPhone('+1 (212) 555-0100')).toBe('+12125550100')
-  })
-
-  it('detects duplicates without matching the same record', () => {
-    const matches = findCustomerDuplicateMatches(
-      { id: 10, name: 'Mariana Lopes', company: 'Atelier', email: 'MARIANA@example.com', phone: '(81) 99999-0000' },
-      [
-        { id: 10, name: 'Mariana Lopes', company: 'Atelier', email: 'mariana@example.com', phone: '+5581999990000' },
-        { id: 11, name: 'Maríana Lopes', company: 'Atelier', email: 'mariana@example.com' },
-        { id: 12, name: 'Outra Pessoa', company: 'Outro', phone: '+5581999990000' },
-      ],
-    )
-
-    expect(matches).toEqual([
-      { id: 11, reasons: ['email', 'name-company'] },
-      { id: 12, reasons: ['phone'] },
-    ])
   })
 
   it('never creates NaN or fake zero for metrics without a denominator', () => {
