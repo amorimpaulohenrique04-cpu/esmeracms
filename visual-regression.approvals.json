@@ -1,5 +1,5 @@
 {
-  "baseSha": "0cb23d3939dca2d68facc95c18b29e642a79cd80",
+  "baseSha": "1fb67a93dca4d0346f9432e67be2ec191308b26d",
   "reason": "Etapa 24 corrige overflow, densidade e responsividade exclusivamente em Categorias e Pós-venda, preservando domínio e operações.",
   "files": [
     "desktop-1440x900/categories-list.png",
