@@ -4,7 +4,8 @@ import { Combobox } from '@base-ui/react/combobox'
 import { useRouter } from 'next/navigation'
 import React, { useMemo, useState } from 'react'
 
-import { Button, Field, Status } from '../../design-system'
+import { Button, Field, InlineFeedback, Status } from '../../design-system'
+import { announceAdmin, announceDraftChanged } from '../../state/AdminStateProvider'
 import {
   categoryImageAlt,
   categoryImageURL,
@@ -59,7 +60,7 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
   }, [query, termSuggestions, terms])
 
   async function request(action: 'save-draft' | 'publish' | 'unpublish', data?: Record<string, unknown>) {
-    if (busy) return
+    if (busy) return false
     setBusy(true)
     setFeedback(null)
     try {
@@ -71,10 +72,17 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
       })
       const body = await response.json() as { error?: string }
       if (!response.ok) throw new Error(body.error || 'Não foi possível salvar a categoria.')
-      setFeedback(action === 'publish' ? 'Categoria publicada.' : action === 'unpublish' ? 'Categoria movida para rascunho.' : 'Rascunho salvo.')
+      const message = action === 'publish' ? 'Categoria publicada.' : action === 'unpublish' ? 'Categoria movida para rascunho.' : 'Rascunho salvo.'
+      setFeedback(message)
+      announceAdmin(message)
+      announceDraftChanged({ kind: 'category', id: category.id })
       router.refresh()
+      return true
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Não foi possível salvar a categoria.')
+      const message = error instanceof Error ? error.message : 'Não foi possível salvar a categoria.'
+      setFeedback(message)
+      announceAdmin(message, true)
+      return false
     } finally {
       setBusy(false)
     }
@@ -134,32 +142,32 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
 
       {section === 'general' ? (
         <form className="esmera-category-form" onSubmit={saveGeneral}>
-          <Field label="Nome"><input className="esmera-input" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
-          <Field label="Slug" hint="URL estável: letras minúsculas, números e hífens."><input className="esmera-input" value={slug} onChange={(event) => setSlug(event.target.value)} required pattern="[a-z0-9-]+" /></Field>
-          <Field label="Descrição" className="esmera-category-field--wide"><textarea className="esmera-input esmera-category-textarea" value={description} onChange={(event) => setDescription(event.target.value)} rows={5} /></Field>
+          <Field label="Nome" data-preview-field="title"><input className="esmera-input" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+          <Field label="Slug" hint="URL estável: letras minúsculas, números e hífens." data-preview-field="slug"><input className="esmera-input" value={slug} onChange={(event) => setSlug(event.target.value)} required pattern="[a-z0-9-]+" /></Field>
+          <Field label="Descrição" className="esmera-category-field--wide" data-preview-field="description"><textarea className="esmera-input esmera-category-textarea" value={description} onChange={(event) => setDescription(event.target.value)} rows={5} /></Field>
           <Field label="Categoria principal" hint="Ciclos são rejeitados no servidor.">
             <select className="esmera-input" value={parent} onChange={(event) => setParent(event.target.value)}>
               <option value="">Sem categoria principal</option>
               {categories.filter((item) => String(item.id) !== String(category.id)).map((item) => <option key={String(item.id)} value={String(item.id)}>{item.title || item.slug || item.id}</option>)}
             </select>
           </Field>
-          <Field label="Status"><select className="esmera-input" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Ativa</option><option value="archive">Arquivada</option></select></Field>
+          <Field label="Status" data-preview-field="status"><select className="esmera-input" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Ativa</option><option value="archive">Arquivada</option></select></Field>
           <Field label="Ordem editorial" hint="A lista normaliza a ordem automaticamente ao reordenar."><input className="esmera-input" type="number" min="0" step="1" value={order} onChange={(event) => setOrder(event.target.value)} /></Field>
           <div className="esmera-category-form__actions"><Button tone="primary" type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar rascunho'}</Button></div>
         </form>
       ) : (
         <form className="esmera-category-form" onSubmit={saveMedia}>
-          <div className="esmera-category-media-preview">
+          <div className="esmera-category-media-preview" data-preview-field="image">
             {currentImageURL ? <img src={currentImageURL} alt={categoryImageAlt(currentImage)} /> : <div className="esmera-category-media-placeholder">Sem imagem</div>}
           </div>
-          <Field label="Imagem da categoria" className="esmera-category-field--wide">
+          <Field label="Imagem da categoria" className="esmera-category-field--wide" data-preview-field="image">
             <select className="esmera-input" value={image} onChange={(event) => setImage(event.target.value)}>
               <option value="">Sem imagem</option>
               {media.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.filename || item.alt || `Mídia ${item.id}`}</option>)}
             </select>
           </Field>
 
-          <div className="esmera-category-field--wide">
+          <div className="esmera-category-field--wide" data-preview-field="searchTerms">
             <label className="esmera-field-label" htmlFor={`category-terms-${category.id}`}>Taxonomia & sinônimos</label>
             <div className="esmera-category-chips" aria-label="Sinônimos atuais">
               {terms.map((item) => (
@@ -193,10 +201,10 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
             <span className="esmera-field-hint">Digite um termo e escolha “Adicionar” para criar um novo sinônimo. Os chips possuem remoção explícita por teclado.</span>
           </div>
 
-          <Field label="Título SEO"><input className="esmera-input" value={seoTitle} maxLength={60} onChange={(event) => setSeoTitle(event.target.value)} /></Field>
-          <Field label="Descrição SEO" className="esmera-category-field--wide"><textarea className="esmera-input esmera-category-textarea" value={seoDescription} maxLength={160} rows={3} onChange={(event) => setSeoDescription(event.target.value)} /></Field>
-          <Field label="Imagem social"><select className="esmera-input" value={socialImage} onChange={(event) => setSocialImage(event.target.value)}><option value="">Sem imagem social</option>{media.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.filename || item.alt || `Mídia ${item.id}`}</option>)}</select></Field>
-          <label className="esmera-category-checkbox"><input type="checkbox" checked={noIndex} onChange={(event) => setNoIndex(event.target.checked)} /> Ocultar esta categoria dos buscadores</label>
+          <Field label="Título SEO" data-preview-field="seoTitle"><input className="esmera-input" value={seoTitle} maxLength={60} onChange={(event) => setSeoTitle(event.target.value)} /></Field>
+          <Field label="Descrição SEO" className="esmera-category-field--wide" data-preview-field="seoDescription"><textarea className="esmera-input esmera-category-textarea" value={seoDescription} maxLength={160} rows={3} onChange={(event) => setSeoDescription(event.target.value)} /></Field>
+          <Field label="Imagem social" data-preview-field="socialImage"><select className="esmera-input" value={socialImage} onChange={(event) => setSocialImage(event.target.value)}><option value="">Sem imagem social</option>{media.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.filename || item.alt || `Mídia ${item.id}`}</option>)}</select></Field>
+          <label className="esmera-category-checkbox" data-preview-field="noIndex"><input type="checkbox" checked={noIndex} onChange={(event) => setNoIndex(event.target.checked)} /> Ocultar esta categoria dos buscadores</label>
 
           <div className="esmera-category-seo-preview esmera-category-field--wide" aria-label="Preview básico de snippet">
             <span>Preview de busca</span>
@@ -208,7 +216,7 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
         </form>
       )}
 
-      {feedback ? <div className="esmera-products-feedback" role="status" aria-live="polite">{feedback}</div> : null}
+      {feedback ? <InlineFeedback tone={feedback.includes('Não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
     </div>
   )
 }
