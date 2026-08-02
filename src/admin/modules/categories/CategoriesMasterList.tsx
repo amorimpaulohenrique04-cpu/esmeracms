@@ -6,11 +6,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useState } from 'react'
 
-import { Button, EmptyState, Status } from '../../design-system'
+import { Button, EmptyState } from '../../design-system'
 import {
   categoryImageAlt,
   categoryImageURL,
-  categoryStatusLabels,
   type CategoryListItem,
   type CategoryWorkspaceFilters,
 } from './types'
@@ -59,37 +58,39 @@ function SortableCategory({
   const sortable = useSortable({ id: String(category.id), index })
   const image = categoryImageURL(category.image)
   const alt = categoryImageAlt(category.image)
+  const title = category.title || 'Categoria sem título'
 
   return (
     <li
       ref={sortable.ref}
       className={`esmera-category-row${selected ? ' is-selected' : ''}${sortable.isDragging ? ' is-dragging' : ''}`}
       style={{ '--category-depth': category.depth } as React.CSSProperties}
+      data-esmera-context-key={`category-${category.id}`}
     >
       <button
         ref={sortable.handleRef}
         type="button"
         className="esmera-category-drag"
-        aria-label={`Reordenar ${category.title || 'categoria'}`}
+        aria-label={`Reordenar ${title}`}
         disabled={disabled}
-      >⋮⋮</button>
+      >
+        <span aria-hidden="true">⋮⋮</span>
+      </button>
       <Link className="esmera-category-row__main" href={categoryHref(filters, category.id)}>
         <span className="esmera-category-thumb">{image ? <img src={image} alt={alt} /> : <span aria-hidden="true">◇</span>}</span>
         <span className="esmera-category-row__copy">
-          <strong>{category.title || 'Categoria sem título'}</strong>
+          <strong>{title}</strong>
           <small>/{category.slug || 'sem-slug'}{category.depth > 0 ? ` · nível ${category.depth + 1}` : ''}</small>
         </span>
       </Link>
       <span className="esmera-category-count">{category.productCount} prod.</span>
-      <Status tone={category.status === 'active' ? 'success' : 'neutral'}>{categoryStatusLabels[category.status || ''] || '—'}</Status>
-      <span className="esmera-category-order">{category.order ?? '—'}</span>
       <label className="esmera-category-position">
-        <span className="esmera-sr-only">Mover {category.title || 'categoria'} para posição</span>
+        <span className="esmera-sr-only">Mover {title} para posição</span>
         <select
           className="esmera-input"
           value={index + 1}
           disabled={disabled}
-          aria-label={`Mover ${category.title || 'categoria'} para posição`}
+          aria-label={`Mover ${title} para posição`}
           onChange={(event) => onMove(index, Number(event.target.value) - 1)}
         >
           {Array.from({ length: total }, (_, target) => <option key={target + 1} value={target + 1}>{target + 1}</option>)}
@@ -105,6 +106,7 @@ export function CategoriesMasterList({ categories, allOrderIds, filters, selecte
   const [fullOrder, setFullOrder] = useState(allOrderIds)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [feedbackTone, setFeedbackTone] = useState<'success' | 'error'>('success')
 
   function mergedFullOrder(nextVisible: CategoryListItem[]) {
     const visible = new Set(items.map((item) => String(item.id)))
@@ -128,12 +130,14 @@ export function CategoriesMasterList({ categories, allOrderIds, filters, selecte
       })
       const body = await response.json() as { error?: string }
       if (!response.ok) throw new Error(body.error || 'Não foi possível salvar a ordem.')
-      setFeedback('Ordem editorial salva.')
+      setFeedbackTone('success')
+      setFeedback('Ordem salva.')
       router.refresh()
     } catch (error) {
       setItems(previousItems)
       setFullOrder(previousFull)
-      setFeedback(error instanceof Error ? error.message : 'Não foi possível salvar a ordem.')
+      setFeedbackTone('error')
+      setFeedback(error instanceof Error ? `${error.message} A posição anterior foi restaurada.` : 'Não foi possível salvar a ordem. A posição anterior foi restaurada.')
     } finally {
       setSaving(false)
     }
@@ -151,20 +155,24 @@ export function CategoriesMasterList({ categories, allOrderIds, filters, selecte
   return (
     <section className="esmera-category-master" aria-label="Lista de categorias">
       <div className="esmera-category-master__toolbar">
-        <div className="esmera-category-segments" role="group" aria-label="Status da categoria">
-          <Link className={`esmera-button${filters.status === 'active' ? ' esmera-button--primary' : ''}`} aria-current={filters.status === 'active' ? 'page' : undefined} href={listHref(filters, { status: 'active' })}>Ativas</Link>
-          <Link className={`esmera-button${filters.status === 'archive' ? ' esmera-button--primary' : ''}`} aria-current={filters.status === 'archive' ? 'page' : undefined} href={listHref(filters, { status: 'archive' })}>Arquivadas</Link>
-        </div>
+        <nav className="esmera-category-segments" aria-label="Status da categoria">
+          <Link className={`esmera-category-segment${filters.status === 'active' ? ' is-active' : ''}`} aria-current={filters.status === 'active' ? 'page' : undefined} href={listHref(filters, { status: 'active' })}>Ativas</Link>
+          <Link className={`esmera-category-segment${filters.status === 'archive' ? ' is-active' : ''}`} aria-current={filters.status === 'archive' ? 'page' : undefined} href={listHref(filters, { status: 'archive' })}>Arquivadas</Link>
+        </nav>
         <form className="esmera-category-search" action="/admin/categories" method="get">
           <input type="hidden" name="status" value={filters.status} />
-          <label><span className="esmera-sr-only">Buscar categorias</span><input className="esmera-input" type="search" name="q" defaultValue={filters.q} placeholder="Título, slug ou sinônimo" /></label>
+          <label className="esmera-category-search__field">
+            <span className="esmera-sr-only">Buscar categorias</span>
+            <span className="esmera-category-search__icon" aria-hidden="true">⌕</span>
+            <input className="esmera-input" type="search" name="q" defaultValue={filters.q} placeholder="Título, slug ou sinônimo" />
+            {filters.q ? <Link className="esmera-category-search__clear" href={listHref(filters, { q: '' })} aria-label="Limpar busca">×</Link> : null}
+          </label>
           <Button type="submit">Buscar</Button>
-          {filters.q ? <Link className="esmera-button esmera-button--quiet" href={listHref(filters, { q: '' })}>Limpar</Link> : null}
         </form>
       </div>
 
       <div className="esmera-category-list-head" aria-hidden="true">
-        <span>Categoria</span><span>Produtos</span><span>Status</span><span>Ordem</span><span>Posição</span>
+        <span>Categoria</span><span>Produtos</span><span>Posição</span>
       </div>
 
       {!items.length ? <EmptyState title="Nenhuma categoria encontrada" copy={filters.q ? 'Ajuste a busca ou limpe o filtro.' : 'Crie uma categoria para estruturar o catálogo.'} /> : (
@@ -191,8 +199,8 @@ export function CategoriesMasterList({ categories, allOrderIds, filters, selecte
         </DragDropProvider>
       )}
 
-      <div className="esmera-category-master__footer" role="status" aria-live="polite">
-        <span>{items.length} categoria{items.length === 1 ? '' : 's'} · arraste ou use “Mover para posição”.</span>
+      <div className={`esmera-category-master__footer is-${feedbackTone}`} role="status" aria-live="polite">
+        <span>{items.length} categoria{items.length === 1 ? '' : 's'} · arraste ou use a posição.</span>
         {saving ? <strong>Salvando ordem…</strong> : feedback ? <strong>{feedback}</strong> : null}
       </div>
     </section>

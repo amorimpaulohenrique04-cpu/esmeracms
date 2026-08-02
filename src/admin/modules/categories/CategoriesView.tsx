@@ -24,7 +24,6 @@ import {
   type RelatedProduct,
 } from './types'
 import './categories.scss'
-import './categories.release.scss'
 
 const categoryTabs: CategoryTab[] = ['general', 'media', 'products']
 

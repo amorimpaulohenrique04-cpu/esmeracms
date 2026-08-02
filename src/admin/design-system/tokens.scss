@@ -7,9 +7,11 @@
   --esmera-bg: #f6f7f6;
   --esmera-surface: #ffffff;
   --esmera-surface-subtle: #f9faf9;
+  --esmera-surface-muted: var(--esmera-surface-subtle);
   --esmera-text: #17201c;
   --esmera-text-secondary: #3f4944;
   --esmera-muted: #65706b;
+  --esmera-text-muted: var(--esmera-muted);
   --esmera-line: #dde3e0;
   --esmera-line-strong: #c8d0cc;
 

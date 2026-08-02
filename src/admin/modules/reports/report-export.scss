@@ -1,68 +1,35 @@
-.esmera-report-export {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+.esmera-report-export-action {
   min-width: 0;
-  margin-bottom: 24px;
-  padding: 16px 18px;
-  border: 1px solid var(--esmera-line, #dfe4e1);
-  background: #f7f9f8;
-}
-
-.esmera-report-export > div:first-child {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.esmera-report-export strong {
-  color: #27332f;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.esmera-report-export span {
-  color: #68736f;
-  font-size: 10px;
-  line-height: 1.45;
-}
-
-.esmera-report-export__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
-  min-width: min(100%, 360px);
+  gap: 10px;
 }
 
-.esmera-report-export__actions [role='status'] {
-  min-width: 0;
+.esmera-report-export-action [role='status'] {
+  max-width: 300px;
+  color: var(--esmera-text-muted);
+  font-size: 10px;
+  line-height: 1.4;
   text-align: right;
 }
 
-.esmera-report-export__actions .esmera-button {
+.esmera-report-export-action .esmera-button {
   flex: 0 0 auto;
+  min-width: 116px;
 }
 
 @container esmera-workspace (max-width: 680px) {
-  .esmera-report-export {
+  .esmera-report-export-action {
+    width: 100%;
     align-items: stretch;
-    flex-direction: column;
-    gap: 14px;
+    flex-direction: column-reverse;
   }
 
-  .esmera-report-export__actions {
-    align-items: stretch;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .esmera-report-export__actions [role='status'] {
+  .esmera-report-export-action [role='status'] {
+    max-width: none;
     text-align: left;
   }
 
-  .esmera-report-export__actions .esmera-button {
-    width: 100%;
-  }
+  .esmera-report-export-action .esmera-button { width: 100%; }
 }
