@@ -23,15 +23,11 @@ function accessibleOption(option: EChartOption, ariaLabel: string): EChartOption
   }
 }
 
-export function EChart({
-  option,
-  ariaLabel,
-  height = 320,
-}: {
-  option: EChartOption
-  ariaLabel: string
-  height?: number
-}) {
+function token(styles: CSSStyleDeclaration, name: string, fallback: string) {
+  return styles.getPropertyValue(name).trim() || fallback
+}
+
+export function EChart({ option, ariaLabel, height = 300 }: { option: EChartOption; ariaLabel: string; height?: number }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<ChartInstance | null>(null)
   const optionRef = useRef(option)
@@ -66,26 +62,34 @@ export function EChart({
       ])
 
       if (!themeRegistered) {
+        const styles = getComputedStyle(container)
+        const primary = token(styles, '--esmera-primary', '#355e52')
+        const secondary = token(styles, '--esmera-text-secondary', '#6d8078')
+        const warning = token(styles, '--esmera-warning', '#a98557')
+        const info = token(styles, '--esmera-info', '#65788d')
+        const danger = token(styles, '--esmera-danger', '#9c5e57')
+        const text = token(styles, '--esmera-text', '#27312d')
+        const muted = token(styles, '--esmera-text-muted', '#69736f')
+        const line = token(styles, '--esmera-line', '#d9dfdc')
+        const subtle = token(styles, '--esmera-surface-muted', '#f4f6f5')
+
         core.registerTheme('esmera-reporting', {
-          color: ['#355e52', '#6d8078', '#a98557', '#7c899d', '#9c5e57'],
+          color: [primary, secondary, warning, info, danger],
           backgroundColor: 'transparent',
-          textStyle: {
-            color: '#27312d',
-            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
-          },
+          textStyle: { color: text, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' },
           line: { itemStyle: { borderWidth: 2 }, lineStyle: { width: 2 }, symbolSize: 6 },
           bar: { itemStyle: { borderRadius: 0 } },
           categoryAxis: {
-            axisLine: { lineStyle: { color: '#d9dfdc' } },
+            axisLine: { lineStyle: { color: line } },
             axisTick: { show: false },
-            axisLabel: { color: '#69736f' },
+            axisLabel: { color: muted },
             splitLine: { show: false },
           },
           valueAxis: {
             axisLine: { show: false },
             axisTick: { show: false },
-            axisLabel: { color: '#69736f' },
-            splitLine: { lineStyle: { color: '#e8ecea' } },
+            axisLabel: { color: muted },
+            splitLine: { lineStyle: { color: subtle } },
           },
         })
         themeRegistered = true
@@ -125,13 +129,7 @@ export function EChart({
   return (
     <div className="esmera-report-chart" style={{ minHeight: height }}>
       {!ready ? <div className="esmera-report-chart__loading" aria-hidden="true" /> : null}
-      <div
-        ref={containerRef}
-        className="esmera-report-chart__canvas"
-        role="img"
-        aria-label={ariaLabel}
-        style={{ height }}
-      />
+      <div ref={containerRef} className="esmera-report-chart__canvas" role="img" aria-label={ariaLabel} style={{ height }} />
     </div>
   )
 }
