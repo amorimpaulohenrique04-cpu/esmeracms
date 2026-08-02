@@ -69,11 +69,23 @@ export default defineConfig([
     files: [
       'src/admin/modules/categories/CategoriesMasterList.tsx',
       'src/admin/modules/categories/CategoryDetailEditor.tsx',
-      'src/app/(frontend)/preview/editorial/[kind]/[id]/EditorialPreviewDocument.tsx',
     ],
     rules: {
       '@next/next/no-img-element': 'off',
       'react-hooks/refs': 'off',
+    },
+  },
+  {
+    files: ['src/app/(frontend)/preview/editorial/**/EditorialPreviewDocument.tsx'],
+    rules: {
+      '@next/next/no-img-element': 'off',
+    },
+  },
+  {
+    files: ['src/admin/modules/reports/ReportsWorkspaceClient.tsx'],
+    rules: {
+      // This effect synchronizes React with the browser's external history state.
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
   {
