@@ -22,14 +22,15 @@ async function walk(directory: string): Promise<string[]> {
 
 function isGenerated(file: string) {
   const name = relative(file)
-  return name === 'src/payload-types.ts'
-    || name === 'src/app/(payload)/admin/importMap.js'
-    || name.endsWith('.d.ts')
+  return name === 'src/payload-types.ts' || name.endsWith('.d.ts')
 }
 
-function resolveRelativeImport(fromFile: string, specifier: string, fileSet: Set<string>) {
-  if (!specifier.startsWith('.')) return null
-  const base = path.resolve(path.dirname(fromFile), specifier)
+function resolveImport(fromFile: string, specifier: string, fileSet: Set<string>) {
+  let base: string
+  if (specifier.startsWith('.')) base = path.resolve(path.dirname(fromFile), specifier)
+  else if (specifier.startsWith('@/')) base = path.resolve(sourceRoot, specifier.slice(2))
+  else return null
+
   const candidates = [
     base,
     ...Array.from(codeExtensions, (extension) => `${base}${extension}`),
@@ -62,6 +63,7 @@ function isEntryPoint(file: string) {
   const name = relative(file)
   const basename = path.basename(file)
   return name === 'src/payload.config.ts'
+    || name === 'src/app/(payload)/admin/importMap.js'
     || name.startsWith('src/scripts/')
     || name.startsWith('src/migrations/')
     || (name.startsWith('src/app/') && /^(page|layout|route|loading|error|not-found)\./.test(basename))
@@ -90,7 +92,7 @@ for (const file of codeFiles) {
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true)
   const dependencies = new Set<string>()
   for (const specifier of importSpecifiers(source)) {
-    const resolved = resolveRelativeImport(file, specifier, fileSet)
+    const resolved = resolveImport(file, specifier, fileSet)
     if (resolved) dependencies.add(resolved)
   }
   graph.set(file, dependencies)
