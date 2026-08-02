@@ -88,7 +88,7 @@ export function PrivacyActions({ customerId, consent, requestStatus, isAdmin }: 
         ) : null}
       </QuickActionMenu>
 
-      {feedback ? <InlineFeedback compact tone={feedback.includes('Não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
+      {feedback ? <InlineFeedback tone={feedback.includes('Não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
 
       <Dialog.Root open={confirmAnonymize} onOpenChange={setConfirmAnonymize}>
         <Dialog.Portal>
