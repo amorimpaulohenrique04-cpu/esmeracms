@@ -1,5 +1,6 @@
 import {
   occurrenceSeverityLabels,
+  occurrenceStatusLabels,
   operationalPriorityLabels,
   shipmentStatusLabels,
   taskStatusLabels,
@@ -106,7 +107,7 @@ export function statusTone(kind: QueueKind, status: string): 'success' | 'warnin
 
 export function queueStatusLabel(row: QueueRow) {
   if (row.kind === 'task') return taskStatusLabels[row.status as TaskStatus]
-  if (row.kind === 'occurrence') return row.status === 'resolved' ? 'Resolvida' : row.status === 'closed' ? 'Encerrada' : row.status === 'investigating' ? 'Em análise' : 'Aberta'
+  if (row.kind === 'occurrence') return occurrenceStatusLabels[row.status as OccurrenceStatus]
   return shipmentStatusLabels[row.status as ShipmentStatus]
 }
 
