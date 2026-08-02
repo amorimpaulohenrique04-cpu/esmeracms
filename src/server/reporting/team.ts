@@ -4,6 +4,7 @@ import type { Payload } from 'payload'
 import { numberFromRow, nullableNumberFromRow, runReportingQuery, stringFromRow } from './db'
 import { closedOpportunityWhere, createdOpportunityWhere, salesWhere } from './filters'
 import { safeRatio, type NormalizedReportingFilters } from './metrics'
+import { sortCommercialRanking } from './ranking'
 
 export type TeamPerformanceRow = {
   ownerId: number | null
@@ -77,7 +78,7 @@ export async function getTeamPerformance(
     ORDER BY revenue_cents DESC, opportunities_created DESC, owner_name ASC
   `)
 
-  return rows.map((row) => {
+  return sortCommercialRanking(rows.map((row) => {
     const won = numberFromRow(row.won_opportunities)
     const lost = numberFromRow(row.lost_opportunities)
     return {
@@ -91,5 +92,5 @@ export async function getTeamPerformance(
       revenueCents: numberFromRow(row.revenue_cents),
       averageTicketCents: nullableNumberFromRow(row.average_ticket_cents),
     }
-  })
+  }))
 }

@@ -5,6 +5,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "analyze:bundle": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/analyze-bundle.ts",
+    "analyze:dead-code": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/analyze-dead-code.ts",
     "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build",
     "ci:production": "pnpm validate:production && pnpm migrate && pnpm build",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
@@ -27,13 +29,16 @@
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
     "typecheck": "tsc --noEmit",
-    "validate": "pnpm generate:types && pnpm generate:importmap && pnpm typecheck && pnpm lint --max-warnings=0 && pnpm test:int && pnpm build",
+    "validate": "pnpm generate:types && pnpm generate:importmap && pnpm typecheck && pnpm lint --max-warnings=0 && pnpm test:int && pnpm build && pnpm analyze:dead-code && pnpm analyze:bundle",
     "validate:release": "pnpm validate && pnpm test:e2e",
     "validate:production": "cross-env NODE_ENV=production NODE_OPTIONS=--no-deprecation tsx src/scripts/production-readiness.ts",
     "test": "pnpm run test:int && pnpm run test:e2e",
+    "test:unit": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts tests/unit",
     "test:e2e": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.config.ts",
     "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts",
-    "baseline:capture": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.baseline.config.ts"
+    "baseline:prepare": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/prepare-visual-baseline.ts",
+    "baseline:capture": "pnpm baseline:prepare && cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.baseline.config.ts",
+    "baseline:compare": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/compare-visual-baseline.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",

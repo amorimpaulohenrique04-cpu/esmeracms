@@ -1,6 +1,7 @@
 import type { AdminViewServerProps } from 'payload'
 
 import { PERFORMANCE_BUDGETS, performanceSnapshot } from '../../../server/performance'
+import { EmptyState, ErrorState, IntegrationState, LoadingState } from '../../design-system'
 import {
   AccessDenied,
   ensureUser,
@@ -73,12 +74,27 @@ export async function TechnicalView(props: AdminViewServerProps) {
       {role === 'admin' ? <>
         <h2 style={{ marginTop: 30 }}>Sistema</h2>
         {renderEntries(systemEntries)}
+        <section className="esmera-card" style={{ marginTop: 20 }} data-testid="state-contract">
+          <div className="esmera-card-body">
+            <span className="esmera-eyebrow">Contrato de estados</span>
+            <h2 style={{ marginTop: 8 }}>Loading, empty, integração e erro</h2>
+            <p className="esmera-card-copy">Referência única para todas as views operacionais. Erros nunca são convertidos em zero, NaN, placeholders ou KPIs demonstrativos.</p>
+            <div className="esmera-grid-3" style={{ marginTop: 18 }}>
+              <LoadingState label="Carregando consulta operacional" rows={3} />
+              <EmptyState title="Nenhum registro" copy="A consulta foi concluída com sucesso, mas não há documentos para este recorte." />
+              <IntegrationState title="Integração não configurada" copy="A fonte externa ainda não foi conectada. Nenhum valor substituto será exibido." action={<TechnicalLink href="/admin/settings">Ver configurações</TechnicalLink>} />
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <ErrorState title="Falha de consulta" detail="Os últimos dados válidos devem permanecer visíveis. Tente novamente ou consulte o registro técnico." action={<TechnicalLink href="/admin/technical">Tentar novamente</TechnicalLink>} />
+            </div>
+          </div>
+        </section>
         <section className="esmera-card" style={{ marginTop: 20 }}>
           <div className="esmera-card-body">
             <span className="esmera-eyebrow">Performance medida</span>
             <h2 style={{ marginTop: 8 }}>Orçamentos e P95 do processo atual</h2>
             <p className="esmera-card-copy">Consultas operacionais têm alvo P95 de {PERFORMANCE_BUDGETS.operationalQueryP95Ms} ms; relatórios agregados, {PERFORMANCE_BUDGETS.reportingQueryP95Ms} ms. As amostras reiniciam com o processo.</p>
-            {!measurements.length ? <p className="esmera-card-copy">Ainda não existem amostras neste processo. Navegue pelas áreas operacionais e retorne para consultar os tempos medidos.</p> : <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Área</th><th>Operação</th><th>P95</th><th>Amostras</th><th>Orçamento</th><th>Estado</th></tr></thead><tbody>{measurements.map((item) => <tr key={`${item.area}:${item.name}`}><td>{item.area}</td><td>{item.name}</td><td>{item.p95Ms} ms</td><td>{item.sampleSize}</td><td>{item.budgetMs} ms</td><td>{item.withinBudget ? 'Dentro' : 'Acima'}</td></tr>)}</tbody></table></div>}
+            {!measurements.length ? <EmptyState title="Sem amostras neste processo" copy="Navegue pelas áreas operacionais e retorne para consultar os tempos medidos." /> : <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Área</th><th>Operação</th><th>P95</th><th>Amostras</th><th>Orçamento</th><th>Estado</th></tr></thead><tbody>{measurements.map((item) => <tr key={`${item.area}:${item.name}`}><td>{item.area}</td><td>{item.name}</td><td>{item.p95Ms} ms</td><td>{item.sampleSize}</td><td>{item.budgetMs} ms</td><td>{item.withinBudget ? 'Dentro' : 'Acima'}</td></tr>)}</tbody></table></div>}
           </div>
         </section>
       </> : null}

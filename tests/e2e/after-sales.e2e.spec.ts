@@ -18,7 +18,7 @@ test.describe('Stage 10 After-sales workspace', () => {
   })
 
   test('operates a real task, discrete shipment and occurrence from the queue', async () => {
-    test.setTimeout(90_000)
+    test.setTimeout(120_000)
     const stamp = Date.now()
     const customerName = `Cliente Pós-venda E2E ${stamp}`
     const taskTitle = `Confirmar recebimento E2E ${stamp}`
@@ -93,6 +93,9 @@ test.describe('Stage 10 After-sales workspace', () => {
       },
     })
     expect(taskResponse.ok(), await taskResponse.text()).toBeTruthy()
+    const taskBody = await taskResponse.json() as { task?: { id?: string | number } }
+    const taskId = taskBody.task?.id
+    expect(taskId).toBeTruthy()
 
     const shipmentResponse = await page.request.post('http://localhost:3000/api/admin-after-sales', {
       data: {
@@ -106,6 +109,9 @@ test.describe('Stage 10 After-sales workspace', () => {
       },
     })
     expect(shipmentResponse.ok(), await shipmentResponse.text()).toBeTruthy()
+    const shipmentBody = await shipmentResponse.json() as { shipment?: { id?: string | number } }
+    const shipmentId = shipmentBody.shipment?.id
+    expect(shipmentId).toBeTruthy()
 
     const occurrenceResponse = await page.request.post('http://localhost:3000/api/admin-after-sales', {
       data: {
@@ -127,17 +133,59 @@ test.describe('Stage 10 After-sales workspace', () => {
     await expect(page.getByRole('heading', { name: caseNumber })).toBeVisible()
     await expect(page.getByText(trackingCode, { exact: true })).toBeVisible()
     await expect(page.getByText(occurrenceDescription, { exact: true }).first()).toBeVisible()
-    await expect(page.getByText('Pedido confirmado', { exact: true }).first()).toBeVisible()
-    await expect(page.getByText('Entregue', { exact: true }).first()).toBeVisible()
+
+    const taskUpdatePromise = page.waitForResponse((response) => {
+      const data = response.request().postData() || ''
+      return response.url().endsWith('/api/admin-after-sales') && data.includes('"update-task-status"')
+    })
+    await page.getByLabel(`Status de ${taskTitle}`).selectOption('done')
+    const taskUpdate = await taskUpdatePromise
+    expect(taskUpdate.ok(), await taskUpdate.text()).toBeTruthy()
+
+    const shipmentArticle = page.getByText(trackingCode, { exact: true }).locator('xpath=ancestor::article')
+    const shipmentUpdatePromise = page.waitForResponse((response) => {
+      const data = response.request().postData() || ''
+      return response.url().endsWith('/api/admin-after-sales') && data.includes('"update-shipment"')
+    })
+    await shipmentArticle.getByLabel('Atualizar estado').selectOption('delivered')
+    const shipmentUpdate = await shipmentUpdatePromise
+    expect(shipmentUpdate.ok(), await shipmentUpdate.text()).toBeTruthy()
+
+    const deliverSale = await page.request.patch(`http://localhost:3000/api/sales/${saleId}`, {
+      data: { status: 'delivered', deliveredAt: new Date().toISOString() },
+    })
+    expect(deliverSale.ok(), await deliverSale.text()).toBeTruthy()
+
+    const [storedTaskResponse, storedShipmentResponse, storedSaleResponse] = await Promise.all([
+      page.request.get(`http://localhost:3000/api/tasks/${taskId}?depth=0`),
+      page.request.get(`http://localhost:3000/api/shipments/${shipmentId}?depth=0`),
+      page.request.get(`http://localhost:3000/api/sales/${saleId}?depth=0`),
+    ])
+    expect(storedTaskResponse.ok()).toBeTruthy()
+    expect(storedShipmentResponse.ok()).toBeTruthy()
+    expect(storedSaleResponse.ok()).toBeTruthy()
+    expect((await storedTaskResponse.json() as { status?: string }).status).toBe('done')
+    expect((await storedShipmentResponse.json() as { status?: string }).status).toBe('delivered')
+    expect((await storedSaleResponse.json() as { status?: string; deliveredAt?: string }).status).toBe('delivered')
 
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto(`http://localhost:3000/admin/after-sales?q=${encodeURIComponent(taskTitle)}&status=all`)
+    await page.goto(`http://localhost:3000/admin/after-sales?q=${encodeURIComponent(caseNumber || '')}&status=all`)
+    await expect(page.getByRole('table', { name: 'Fila operacional de pós-venda' })).toBeVisible()
     const mobileInspectorClose = page.getByRole('button', { name: 'Fechar inspector' })
+    await expect(mobileInspectorClose).toBeHidden()
+
+    const mobileInspect = page.getByRole('button', { name: 'Inspecionar' }).first()
+    await expect(mobileInspect).toBeVisible()
+    await mobileInspect.click()
+
     await expect(mobileInspectorClose).toBeVisible()
     await expect(page.getByRole('heading', { name: caseNumber })).toBeVisible()
+    await expect(page.getByLabel(`Status de ${taskTitle}`)).toHaveValue('done')
+    await expect(page.getByText(trackingCode, { exact: true }).locator('xpath=ancestor::article').getByLabel('Atualizar estado')).toHaveValue('delivered')
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBeLessThanOrEqual(1)
-    await mobileInspectorClose.evaluate((element) => (element as HTMLButtonElement).click())
+    await mobileInspectorClose.click()
     await expect(mobileInspectorClose).toBeHidden()
+    await expect(page.getByRole('table', { name: 'Fila operacional de pós-venda' })).toBeVisible()
   })
 })

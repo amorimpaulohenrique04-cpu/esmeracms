@@ -39,9 +39,13 @@ test.describe('Reports workspace', () => {
     await expect(page.getByRole('button', { name: /Oportunidades/ }).first()).toBeVisible()
     await expect(page.getByTestId('reports-workspace')).not.toHaveClass(/is-refreshing/, { timeout: 15_000 })
     await page.unroute(/\/api\/admin-reports\?/)
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page).toHaveURL(/compareWith=previous_period/)
+    await expect(page.getByRole('combobox', { name: 'Comparar com' })).toHaveValue('previous_period')
   })
 
-  test('copies the exact filtered URL and drills down to real records', async () => {
+  test('copies, opens the exact filtered URL and drills down to real records', async () => {
     await page.goto('http://localhost:3000/admin/reports')
     await page.getByRole('combobox', { name: 'Origem' }).selectOption('site')
     await page.getByRole('button', { name: 'Aplicar filtros' }).click()
@@ -54,6 +58,10 @@ test.describe('Reports workspace', () => {
     expect(clipboard).toContain('source=site')
     expect(clipboard).toContain('from=')
     expect(clipboard).toContain('to=')
+
+    await page.goto(clipboard, { waitUntil: 'domcontentloaded' })
+    await expect(page).toHaveURL(/source=site/)
+    await expect(page.getByRole('combobox', { name: 'Origem' })).toHaveValue('site')
 
     await page.getByRole('button', { name: /Oportunidades/ }).first().click()
     await expect(page.getByRole('heading', { name: 'Oportunidades criadas' })).toBeVisible()
