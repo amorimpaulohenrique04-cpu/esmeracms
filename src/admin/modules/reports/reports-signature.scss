@@ -1,0 +1,120 @@
+.esmera-report-workspace.is-refreshing > :not(.esmera-report-refresh):not(.esmera-state) {
+  opacity: 1;
+}
+
+.esmera-report-investigation {
+  position: sticky;
+  top: 76px;
+  z-index: calc(var(--esmera-z-sticky) - 1);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esmera-space-3);
+  padding: 10px 12px;
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-panel-radius);
+  background: color-mix(in srgb, var(--esmera-surface-panel) 94%, transparent);
+  box-shadow: var(--esmera-shadow-min);
+  backdrop-filter: blur(12px);
+}
+
+.esmera-report-investigation__chips {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.esmera-report-investigation__chips button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 280px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-radius-round);
+  background: var(--esmera-surface-raised);
+  color: var(--esmera-text-secondary);
+  font-size: var(--esmera-font-meta);
+  cursor: pointer;
+  transition: border-color var(--esmera-motion-fast) var(--esmera-ease), background-color var(--esmera-motion-fast) var(--esmera-ease);
+}
+.esmera-report-investigation__chips button:hover { border-color: var(--esmera-line-strong); background: var(--esmera-surface-selected); }
+.esmera-report-investigation__chips button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.esmera-report-investigation__chips button strong { color: var(--esmera-text-muted); font-size: var(--esmera-font-ui-sm); }
+.esmera-report-investigation__actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+.esmera-report-investigation__actions .esmera-button { min-height: 32px; padding-inline: 10px; font-size: var(--esmera-font-meta); }
+
+.esmera-report-hover-focus {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -12px;
+  padding: 0 10px;
+  border-left: 2px solid var(--esmera-primary);
+  background: var(--esmera-primary-soft);
+  color: var(--esmera-text-secondary);
+  font-size: var(--esmera-font-meta);
+}
+.esmera-report-hover-focus span { color: var(--esmera-text-muted); }
+.esmera-report-hover-focus strong { color: var(--esmera-text); font-weight: var(--esmera-weight-semibold); }
+
+.esmera-report-section[id] { scroll-margin-top: 152px; }
+.esmera-report-chart__canvas { cursor: crosshair; }
+.esmera-report-chart::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -6px;
+  left: 0;
+  height: 2px;
+  background: transparent;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.esmera-report-workspace.is-refreshing .esmera-report-chart::after {
+  background: var(--esmera-primary);
+  animation: esmera-report-progress 1.2s var(--esmera-ease) infinite;
+}
+@keyframes esmera-report-progress {
+  0% { transform: scaleX(.08); opacity: .35; }
+  55% { transform: scaleX(.68); opacity: 1; }
+  100% { transform: scaleX(1); opacity: .25; }
+}
+
+.esmera-report-funnel button,
+.esmera-report-ranking button,
+.esmera-report-section tbody tr {
+  transition: background-color var(--esmera-motion-fast) var(--esmera-ease), box-shadow var(--esmera-motion-fast) var(--esmera-ease);
+}
+.esmera-report-section tbody tr:hover { background: var(--esmera-surface-hover); box-shadow: inset 2px 0 0 var(--esmera-selection-bar); }
+.esmera-report-ranking button:hover { padding-inline: 5px; margin-inline: -5px; background: var(--esmera-surface-hover); }
+.esmera-report-ranking button:focus-visible { outline: 2px solid var(--esmera-focus); outline-offset: 3px; }
+
+.esmera-command-result.is-local .esmera-command-result-icon {
+  background: var(--esmera-primary-soft);
+  border-color: color-mix(in srgb, var(--esmera-primary) 18%, var(--esmera-line-default));
+}
+
+@media (max-width: 900px) {
+  .esmera-report-investigation { top: 68px; align-items: stretch; flex-direction: column; }
+  .esmera-report-investigation__actions { width: 100%; justify-content: flex-end; }
+}
+
+@media (max-width: 560px) {
+  .esmera-report-investigation { position: static; }
+  .esmera-report-investigation__chips { display: grid; grid-template-columns: 1fr; }
+  .esmera-report-investigation__chips button { width: 100%; max-width: none; justify-content: space-between; border-radius: var(--esmera-control-radius); }
+  .esmera-report-investigation__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .esmera-report-investigation__actions .esmera-button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esmera-report-workspace.is-refreshing .esmera-report-chart::after { animation: none; transform: scaleX(1); }
+  .esmera-report-funnel button,
+  .esmera-report-ranking button,
+  .esmera-report-section tbody tr { transition: none; }
+}
