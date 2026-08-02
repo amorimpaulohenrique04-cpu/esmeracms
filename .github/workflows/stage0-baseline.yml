@@ -46,6 +46,7 @@ jobs:
       BASELINE_BASE_URL: http://localhost:3000
       BASELINE_ADMIN_EMAIL: baseline.admin@esmera.local
       BASELINE_ADMIN_PASSWORD: EsmeraBaseline-2026!
+      VISUAL_DATASET_VERSION: stage23-v1
       VISUAL_REFERENCE_DIR: artifacts/reference-baseline
       VISUAL_CURRENT_DIR: artifacts/admin-baseline
       VISUAL_REPORT_PATH: artifacts/visual-regression-report.json
@@ -136,7 +137,22 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" > /tmp/esmera-reference-baseline.zip
           unzip -q /tmp/esmera-reference-baseline.zip -d artifacts/reference-baseline
-          echo "Baseline aprovado ${ARTIFACT_ID} do run ${RUN_ID} carregado."
+
+          MANIFEST="artifacts/reference-baseline/baseline-manifest.json"
+          if [ ! -f "${MANIFEST}" ]; then
+            echo "Baseline ${ARTIFACT_ID} não possui versão de dataset; referência legada ignorada."
+            rm -rf artifacts/reference-baseline/*
+            exit 0
+          fi
+
+          REFERENCE_VERSION=$(node -e "const fs=require('fs'); const value=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); process.stdout.write(String(value.datasetVersion || ''));" "${MANIFEST}")
+          if [ "${REFERENCE_VERSION}" != "${VISUAL_DATASET_VERSION}" ]; then
+            echo "Baseline ${ARTIFACT_ID} usa dataset ${REFERENCE_VERSION:-desconhecido}; esperado ${VISUAL_DATASET_VERSION}. Referência ignorada."
+            rm -rf artifacts/reference-baseline/*
+            exit 0
+          fi
+
+          echo "Baseline aprovado ${ARTIFACT_ID} do run ${RUN_ID}, dataset ${REFERENCE_VERSION}, carregado."
 
       - name: Compare visual regression
         run: pnpm baseline:compare
