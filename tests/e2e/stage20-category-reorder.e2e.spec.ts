@@ -44,6 +44,9 @@ test.describe('Stage 20 category ordering', () => {
     await expect(firstHandle).toBeVisible()
     await expect(secondHandle).toBeVisible()
 
+    const desktopOverflow = await page.locator('.esmera-category-master').evaluate((element) => element.scrollWidth - element.clientWidth)
+    expect(desktopOverflow).toBeLessThanOrEqual(1)
+
     const firstBox = await firstHandle.boundingBox()
     const secondBox = await secondHandle.boundingBox()
     expect(firstBox).toBeTruthy()
@@ -59,6 +62,13 @@ test.describe('Stage 20 category ordering', () => {
     const firstPosition = firstItem.getByLabel(`Mover ${firstTitle} para posição`)
     await firstPosition.selectOption('1')
     await expect(page.getByText('Ordem editorial salva.').first()).toBeVisible({ timeout: 10_000 })
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('http://localhost:3000/admin/categories?status=active')
+    await expect(page.getByRole('button', { name: `Reordenar ${firstTitle}` }).first()).toBeVisible()
+    const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    expect(mobileOverflow).toBeLessThanOrEqual(1)
+    await expect(page.getByLabel(`Mover ${firstTitle} para posição`).first()).toBeVisible()
 
     for (const id of [firstId, secondId]) {
       if (!id) continue
