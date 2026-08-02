@@ -27,8 +27,53 @@ function relationLabel(value: unknown) {
   return ''
 }
 
-function actionsFor(user: unknown): SearchItem[] {
+function contextualActions(user: unknown, context: string): SearchItem[] {
+  const items: SearchItem[] = []
+  if (canManageSite(user) && context.startsWith('/admin/products')) {
+    items.push(
+      { id: 'context-new-product', group: 'Ações contextuais', label: 'Novo produto', meta: 'Criar item do catálogo', href: '/admin/collections/products/create', icon: 'plus' },
+      { id: 'context-open-categories', group: 'Ações contextuais', label: 'Abrir Categorias', meta: 'Gerenciar taxonomia do catálogo', href: '/admin/categories', icon: 'tag' },
+    )
+  }
+  if (canManageSite(user) && context.startsWith('/admin/categories')) {
+    items.push(
+      { id: 'context-new-category', group: 'Ações contextuais', label: 'Nova categoria', meta: 'Criar taxonomia editorial', href: '/admin/collections/categories/create', icon: 'plus' },
+      { id: 'context-open-products', group: 'Ações contextuais', label: 'Abrir Produtos', meta: 'Voltar ao catálogo operacional', href: '/admin/products', icon: 'box' },
+    )
+  }
+  if (canManageBusiness(user) && context.startsWith('/admin/customers')) {
+    items.push(
+      { id: 'context-new-customer', group: 'Ações contextuais', label: 'Novo cliente', meta: 'Cadastrar relacionamento comercial', href: '/admin/collections/customers/create', icon: 'plus' },
+      { id: 'context-new-opportunity', group: 'Ações contextuais', label: 'Nova oportunidade', meta: 'Iniciar negociação para um cliente', href: '/admin/collections/opportunities/create', icon: 'receipt' },
+    )
+  }
+  if (canManageBusiness(user) && context.startsWith('/admin/sales')) {
+    items.push(
+      { id: 'context-new-opportunity-sales', group: 'Ações contextuais', label: 'Nova oportunidade', meta: 'Adicionar ao Pipeline', href: '/admin/collections/opportunities/create', icon: 'plus' },
+      { id: 'context-confirm-sale', group: 'Ações contextuais', label: 'Confirmar venda pelo Pipeline', meta: 'Mover uma oportunidade para Ganha e gerar Sale real', href: '/admin/sales?view=pipeline', icon: 'receipt' },
+      { id: 'context-new-follow-up', group: 'Ações contextuais', label: 'Novo follow-up', meta: 'Criar Task operacional vinculável', href: '/admin/collections/tasks/create', icon: 'clock' },
+    )
+  }
+  if (canManageBusiness(user) && context.startsWith('/admin/after-sales')) {
+    items.push(
+      { id: 'context-new-after-sales-task', group: 'Ações contextuais', label: 'Novo follow-up de pós-venda', meta: 'Criar tarefa real para o atendimento', href: '/admin/collections/tasks/create', icon: 'clock' },
+      { id: 'context-open-shipments', group: 'Ações contextuais', label: 'Abrir entregas técnicas', meta: 'Consultar Shipments persistidos', href: '/admin/collections/shipments', icon: 'box' },
+    )
+  }
+  if (canManageBusiness(user) && context.startsWith('/admin/reports')) {
+    items.push(
+      { id: 'context-report-evolution', group: 'Ações contextuais', label: 'Ir para Evolução comercial', href: '/admin/reports#evolution', icon: 'chart' },
+      { id: 'context-report-funnel', group: 'Ações contextuais', label: 'Ir para Funil', href: '/admin/reports#funnel', icon: 'chart' },
+      { id: 'context-report-catalog', group: 'Ações contextuais', label: 'Ir para Catálogo', href: '/admin/reports#catalog', icon: 'box' },
+      { id: 'context-report-team', group: 'Ações contextuais', label: 'Ir para Equipe', href: '/admin/reports#team', icon: 'users' },
+    )
+  }
+  return items
+}
+
+function actionsFor(user: unknown, context: string): SearchItem[] {
   const items: SearchItem[] = [
+    ...contextualActions(user, context),
     { id: 'action-dashboard', group: 'Ações', label: 'Abrir Dashboard', href: '/admin', icon: 'grid' },
     { id: 'action-technical', group: 'Ações', label: 'Abrir Admin técnico', href: '/admin/technical', icon: 'database' },
   ]
@@ -38,6 +83,7 @@ function actionsFor(user: unknown): SearchItem[] {
       { id: 'action-products', group: 'Ações', label: 'Abrir Produtos', href: '/admin/products', icon: 'box' },
       { id: 'action-categories', group: 'Ações', label: 'Abrir Categorias', href: '/admin/categories', icon: 'tag' },
       { id: 'action-new-product', group: 'Ações', label: 'Novo produto', meta: 'Criar item do catálogo', href: '/admin/collections/products/create', icon: 'plus' },
+      { id: 'action-new-category', group: 'Ações', label: 'Nova categoria', meta: 'Criar taxonomia editorial', href: '/admin/collections/categories/create', icon: 'plus' },
     )
   }
 
@@ -51,6 +97,8 @@ function actionsFor(user: unknown): SearchItem[] {
       { id: 'action-new-customer', group: 'Ações', label: 'Novo cliente', href: '/admin/collections/customers/create', icon: 'plus' },
       { id: 'action-new-lead', group: 'Ações', label: 'Novo lead', meta: 'Registrar entrada e qualificação', href: '/admin/collections/leads/create', icon: 'person' },
       { id: 'action-new-opportunity', group: 'Ações', label: 'Nova oportunidade', meta: 'Iniciar negociação comercial', href: '/admin/collections/opportunities/create', icon: 'plus' },
+      { id: 'action-new-follow-up', group: 'Ações', label: 'Novo follow-up', meta: 'Criar Task operacional', href: '/admin/collections/tasks/create', icon: 'clock' },
+      { id: 'action-confirm-sale', group: 'Ações', label: 'Confirmar venda pelo Pipeline', meta: 'Gera Sale a partir de oportunidade ganha', href: '/admin/sales?view=pipeline', icon: 'receipt' },
     )
   }
 
@@ -66,10 +114,11 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url)
   const query = (url.searchParams.get('q') || '').trim().slice(0, 80)
+  const context = (url.searchParams.get('context') || '').trim().slice(0, 500)
   const needle = query.toLocaleLowerCase('pt-BR')
-  const actions = actionsFor(user).filter((item) => !needle || `${item.label} ${item.meta || ''}`.toLocaleLowerCase('pt-BR').includes(needle))
+  const actions = actionsFor(user, context).filter((item) => !needle || `${item.label} ${item.meta || ''}`.toLocaleLowerCase('pt-BR').includes(needle))
 
-  if (query.length < 2) return NextResponse.json({ results: actions.slice(0, 12) })
+  if (query.length < 2) return NextResponse.json({ results: actions.slice(0, 18) })
 
   const searches: Array<Promise<SearchItem[]>> = []
 
@@ -82,21 +131,32 @@ export async function GET(request: Request) {
         draft: true,
         depth: 0,
         limit: 6,
-        where: {
-          or: [
-            { title: { like: query } },
-            { code: { like: query } },
-            { slug: { like: query } },
-          ],
-        } as Where,
+        where: { or: [{ title: { like: query } }, { code: { like: query } }, { slug: { like: query } }] } as Where,
         select: { id: true, title: true, code: true, slug: true },
       }).then((result) => result.docs.map((doc) => ({
         id: `product-${doc.id}`,
         group: 'Produtos',
         label: text(doc.title) || 'Produto sem título',
         meta: text(doc.code) || text(doc.slug) || undefined,
-        href: `/admin/collections/products/${doc.id}`,
+        href: `/admin/products?product=${doc.id}&tab=overview`,
         icon: 'box',
+      }))),
+      payload.find({
+        collection: 'categories',
+        overrideAccess: false,
+        user,
+        draft: true,
+        depth: 0,
+        limit: 6,
+        where: { or: [{ title: { like: query } }, { slug: { like: query } }, { description: { like: query } }] } as Where,
+        select: { id: true, title: true, slug: true, status: true },
+      }).then((result) => result.docs.map((doc) => ({
+        id: `category-${doc.id}`,
+        group: 'Categorias',
+        label: text(doc.title) || 'Categoria sem título',
+        meta: [text(doc.slug), text(doc.status)].filter(Boolean).join(' · ') || undefined,
+        href: `/admin/categories?category=${doc.id}&section=general`,
+        icon: 'tag',
       }))),
     )
   }
@@ -109,13 +169,7 @@ export async function GET(request: Request) {
         user,
         depth: 0,
         limit: 6,
-        where: {
-          or: [
-            { name: { like: query } },
-            { phone: { like: query } },
-            { email: { like: query } },
-          ],
-        } as Where,
+        where: { or: [{ name: { like: query } }, { phone: { like: query } }, { email: { like: query } }] } as Where,
         select: { id: true, name: true, phone: true, email: true },
       }).then((result) => result.docs.map((doc) => ({
         id: `customer-${doc.id}`,
@@ -131,13 +185,7 @@ export async function GET(request: Request) {
         user,
         depth: 1,
         limit: 6,
-        where: {
-          or: [
-            { code: { like: query } },
-            { nextAction: { like: query } },
-            { 'customer.name': { like: query } },
-          ],
-        } as Where,
+        where: { or: [{ code: { like: query } }, { nextAction: { like: query } }, { 'customer.name': { like: query } }] } as Where,
         select: { id: true, code: true, stage: true, nextAction: true, customer: true },
       }).then((result) => result.docs.map((doc) => ({
         id: `opportunity-${doc.id}`,
@@ -153,13 +201,7 @@ export async function GET(request: Request) {
         user,
         depth: 0,
         limit: 6,
-        where: {
-          or: [
-            { name: { like: query } },
-            { phone: { like: query } },
-            { email: { like: query } },
-          ],
-        } as Where,
+        where: { or: [{ name: { like: query } }, { phone: { like: query } }, { email: { like: query } }] } as Where,
         select: { id: true, name: true, stage: true, source: true },
       }).then((result) => result.docs.map((doc) => ({
         id: `lead-${doc.id}`,
@@ -190,7 +232,7 @@ export async function GET(request: Request) {
 
   try {
     const groups = await Promise.all(searches)
-    return NextResponse.json({ results: [...actions, ...groups.flat()].slice(0, 30) })
+    return NextResponse.json({ results: [...actions, ...groups.flat()].slice(0, 36) })
   } catch (error) {
     payload.logger.error({ err: error }, 'admin command search failed')
     return NextResponse.json({ error: 'Não foi possível pesquisar agora.' }, { status: 500 })
