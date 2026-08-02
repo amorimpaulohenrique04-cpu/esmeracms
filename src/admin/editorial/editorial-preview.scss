@@ -1,0 +1,110 @@
+.esmera-editorial-preview-workspace {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(420px, .82fr) minmax(520px, 1.18fr);
+  gap: var(--esmera-space-5);
+  align-items: start;
+}
+
+.esmera-editorial-preview {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-panel-radius);
+  background: var(--esmera-surface-panel);
+}
+
+.esmera-editorial-preview__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--esmera-space-4);
+  padding: var(--esmera-space-4) var(--esmera-space-5);
+  border-bottom: 1px solid var(--esmera-line-default);
+}
+.esmera-editorial-preview__header h2 { margin: 4px 0 3px; font-size: var(--esmera-font-section); font-weight: var(--esmera-weight-semibold); }
+.esmera-editorial-preview__header p { margin: 0; color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); line-height: var(--esmera-line-body); }
+.esmera-editorial-preview__actions { display: flex; flex: 0 0 auto; gap: 6px; }
+.esmera-editorial-preview__actions .esmera-button { min-height: 32px; padding-inline: 10px; font-size: var(--esmera-font-meta); }
+
+.esmera-editorial-preview__toolbar {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esmera-space-3);
+  padding: 8px var(--esmera-space-4);
+  border-bottom: 1px solid var(--esmera-line-default);
+  background: var(--esmera-surface-raised);
+}
+.esmera-editorial-preview__toolbar .esmera-segmented-control__item { min-height: 30px; padding-inline: 9px; font-size: var(--esmera-font-caption); }
+.esmera-editorial-preview__toolbar > span { color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); line-height: 1.4; text-align: right; }
+
+.esmera-editorial-preview__stage {
+  position: relative;
+  min-height: 680px;
+  display: grid;
+  justify-items: center;
+  overflow: auto;
+  padding: 14px;
+  background: #dfe3e1;
+  transition: padding var(--esmera-motion-standard) var(--esmera-ease);
+}
+.esmera-editorial-preview__stage iframe {
+  width: 100%;
+  height: 680px;
+  display: block;
+  border: 0;
+  background: #f3f0e8;
+  box-shadow: 0 4px 18px rgba(20, 33, 29, .12);
+  transition: width var(--esmera-motion-slow) var(--esmera-ease);
+}
+.esmera-editorial-preview__stage.is-tablet iframe { width: min(768px, 100%); }
+.esmera-editorial-preview__stage.is-mobile iframe { width: min(390px, 100%); }
+.esmera-editorial-preview__loading {
+  position: absolute;
+  z-index: 2;
+  inset: 14px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--esmera-surface-panel) 92%, transparent);
+  color: var(--esmera-text-secondary);
+  font-size: var(--esmera-font-ui-sm);
+  backdrop-filter: blur(3px);
+}
+.esmera-editorial-preview__loading > span { width: 20px; height: 20px; border: 2px solid var(--esmera-line-default); border-top-color: var(--esmera-primary); border-radius: 50%; animation: esmera-preview-spin .7s linear infinite; }
+@keyframes esmera-preview-spin { to { transform: rotate(360deg); } }
+.esmera-editorial-preview > .esmera-inline-feedback { margin: 10px 12px 12px; }
+
+[data-preview-field] {
+  transition: background-color var(--esmera-motion-fast) var(--esmera-ease), box-shadow var(--esmera-motion-fast) var(--esmera-ease);
+}
+[data-preview-field][data-preview-focused='true'] {
+  background: var(--esmera-primary-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--esmera-primary) 18%, transparent);
+}
+
+@container esmera-workspace (max-width: 1180px) {
+  .esmera-editorial-preview-workspace { grid-template-columns: 1fr; }
+  .esmera-editorial-preview__stage { min-height: 620px; }
+  .esmera-editorial-preview__stage iframe { height: 620px; }
+}
+
+@container esmera-workspace (max-width: 620px) {
+  .esmera-editorial-preview__header,
+  .esmera-editorial-preview__toolbar { align-items: stretch; flex-direction: column; }
+  .esmera-editorial-preview__actions { width: 100%; }
+  .esmera-editorial-preview__actions > * { flex: 1; }
+  .esmera-editorial-preview__toolbar > span { text-align: left; }
+  .esmera-editorial-preview__stage { min-height: 580px; padding: 8px; }
+  .esmera-editorial-preview__stage iframe { height: 580px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esmera-editorial-preview__stage,
+  .esmera-editorial-preview__stage iframe,
+  [data-preview-field] { transition: none; }
+  .esmera-editorial-preview__loading > span { animation: none; }
+}
