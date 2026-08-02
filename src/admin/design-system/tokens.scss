@@ -1,21 +1,18 @@
 :root {
+  color-scheme: light;
   --esmera-font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
+  /* Brand and semantic contrast */
   --esmera-primary: #324f46;
   --esmera-primary-strong: #243f36;
   --esmera-primary-soft: #e8efec;
-  --esmera-bg: #f6f7f6;
-  --esmera-surface: #ffffff;
-  --esmera-surface-subtle: #f9faf9;
-  --esmera-surface-muted: var(--esmera-surface-subtle);
+  --esmera-on-primary: #ffffff;
   --esmera-text: #17201c;
   --esmera-text-secondary: #3f4944;
-  --esmera-muted: #65706b;
-  --esmera-text-muted: var(--esmera-muted);
-  --esmera-line: #dde3e0;
-  --esmera-line-strong: #c8d0cc;
+  --esmera-text-muted: #65706b;
+  --esmera-text-subtle: #7b8580;
 
-  --esmera-danger: #9b3d38;
+  --esmera-danger: #913f3a;
   --esmera-danger-soft: #fbefee;
   --esmera-warning: #765b2f;
   --esmera-warning-soft: #faf4e7;
@@ -24,42 +21,118 @@
   --esmera-success: #285443;
   --esmera-success-soft: #edf5f1;
 
-  --esmera-radius-control: 8px;
-  --esmera-radius-surface: 10px;
+  /* Surface hierarchy */
+  --esmera-surface-canvas: #f5f6f5;
+  --esmera-surface-panel: #ffffff;
+  --esmera-surface-raised: #fbfcfb;
+  --esmera-surface-selected: #eef2f0;
+  --esmera-surface-hover: #f7f9f8;
+  --esmera-surface-disabled: #f0f2f1;
+  --esmera-backdrop: rgba(15, 24, 20, .24);
+
+  /* Lines and selection */
+  --esmera-line-subtle: #e5e9e7;
+  --esmera-line-default: #d8dfdb;
+  --esmera-line-strong: #c5cfca;
+  --esmera-selection-bar: #324f46;
+  --esmera-selection-ring: 0 0 0 3px rgba(50, 79, 70, .18);
+
+  /* Charts */
+  --esmera-chart-1: #324f46;
+  --esmera-chart-2: #70847b;
+  --esmera-chart-3: #a38357;
+  --esmera-chart-4: #65788d;
+  --esmera-chart-5: #9c5e57;
+  --esmera-chart-grid: #e7ebe9;
+  --esmera-chart-axis: #6b7671;
+  --esmera-chart-empty: #eef1ef;
+
+  /* Typography: body remains visibly 14px */
+  --esmera-font-caption: 10px;
+  --esmera-font-meta: 11px;
+  --esmera-font-ui-sm: 12px;
+  --esmera-font-ui: 13px;
+  --esmera-font-body: 14px;
+  --esmera-font-section: 16px;
+  --esmera-font-subtitle: 18px;
+  --esmera-font-title: 22px;
+  --esmera-font-h1: clamp(28px, 2.4vw, 32px);
+  --esmera-line-body: 1.55;
+  --esmera-line-compact: 1.35;
+  --esmera-weight-regular: 450;
+  --esmera-weight-medium: 560;
+  --esmera-weight-semibold: 640;
+
+  /* Density */
+  --esmera-density-compact-gap: 8px;
+  --esmera-density-standard-gap: 12px;
+  --esmera-control-compact: 36px;
+  --esmera-control-standard: 40px;
+  --esmera-control-comfortable: 44px;
+  --esmera-row-compact: 52px;
+  --esmera-row-standard: 64px;
+
+  /* Geometry */
+  --esmera-radius-6: 6px;
+  --esmera-radius-8: 8px;
   --esmera-radius-round: 999px;
+  --esmera-panel-radius: var(--esmera-radius-8);
+  --esmera-control-radius: var(--esmera-radius-6);
 
-  --esmera-shadow-min: 0 1px 2px rgba(20, 33, 29, 0.025);
-  --esmera-shadow-overlay: 0 18px 48px rgba(20, 33, 29, 0.12);
+  /* Workspace widths */
+  --esmera-workspace-reading: 880px;
+  --esmera-workspace-standard: 1240px;
+  --esmera-workspace-wide: 1520px;
+  --esmera-workspace-fluid: none;
+  --esmera-inspector-width: 400px;
+  --esmera-sidebar-width: 260px;
+  --esmera-rail-width: 72px;
 
+  /* Spacing */
   --esmera-space-1: 4px;
   --esmera-space-2: 8px;
   --esmera-space-3: 12px;
   --esmera-space-4: 16px;
   --esmera-space-5: 20px;
   --esmera-space-6: 24px;
+  --esmera-space-7: 28px;
   --esmera-space-8: 32px;
   --esmera-space-10: 40px;
+  --esmera-space-12: 48px;
 
-  --esmera-control-sm: 32px;
-  --esmera-control-md: 38px;
-  --esmera-control-lg: 42px;
-
-  --esmera-font-meta: 11px;
-  --esmera-font-ui-sm: 12px;
-  --esmera-font-ui: 13px;
-  --esmera-font-section: 16px;
-  --esmera-font-h1: clamp(28px, 2.4vw, 32px);
-
+  /* Motion */
+  --esmera-motion-instant: 80ms;
   --esmera-motion-fast: 120ms;
   --esmera-motion-standard: 160ms;
-  --esmera-ease: cubic-bezier(0.2, 0, 0, 1);
+  --esmera-motion-slow: 220ms;
+  --esmera-ease: cubic-bezier(.2, 0, 0, 1);
+  --esmera-ease-enter: cubic-bezier(.16, 1, .3, 1);
+  --esmera-ease-exit: cubic-bezier(.4, 0, 1, 1);
+
+  /* Depth */
+  --esmera-shadow-min: 0 1px 2px rgba(20, 33, 29, .025);
+  --esmera-shadow-raised: 0 10px 28px rgba(20, 33, 29, .08);
+  --esmera-shadow-overlay: 0 18px 48px rgba(20, 33, 29, .12);
 
   --esmera-focus: #58786c;
-  --esmera-focus-ring: 0 0 0 3px rgba(50, 79, 70, 0.18);
+  --esmera-focus-ring: var(--esmera-selection-ring);
 
   --esmera-z-sticky: 20;
   --esmera-z-popover: 50;
   --esmera-z-overlay: 80;
   --esmera-z-modal: 90;
   --esmera-z-toast: 100;
+
+  /* Compatibility aliases: old modules continue to resolve through v2 tokens. */
+  --esmera-bg: var(--esmera-surface-canvas);
+  --esmera-surface: var(--esmera-surface-panel);
+  --esmera-surface-subtle: var(--esmera-surface-raised);
+  --esmera-surface-muted: var(--esmera-surface-raised);
+  --esmera-muted: var(--esmera-text-muted);
+  --esmera-line: var(--esmera-line-default);
+  --esmera-radius-control: var(--esmera-control-radius);
+  --esmera-radius-surface: var(--esmera-panel-radius);
+  --esmera-control-sm: 32px;
+  --esmera-control-md: var(--esmera-control-compact);
+  --esmera-control-lg: var(--esmera-control-standard);
 }
