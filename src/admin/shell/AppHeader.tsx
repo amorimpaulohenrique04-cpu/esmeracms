@@ -2,11 +2,12 @@
 
 import { useAuth } from '@payloadcms/ui'
 import Link from 'next/link'
+import { usePathname, useSearchParams } from 'next/navigation'
 import React, { useEffect, useState } from 'react'
 
 import type { EsmeraRole } from '../../access/roles'
-import { ADMIN_CREATE_EVENT } from '../state/AdminStateProvider'
-import { CommandPalette } from './CommandPalette'
+import { ADMIN_CREATE_EVENT, ADMIN_SELECTION_EVENT } from '../state/AdminStateProvider'
+import { CommandPalette, type CommandSelection } from './CommandPalette'
 import { GlobalCreateMenu } from './GlobalCreateMenu'
 import { MobileNav } from './MobileNav'
 import { ShellIcon } from './ShellIcon'
@@ -40,14 +41,49 @@ function focusLocalSearch() {
   return true
 }
 
+function inferSelection(pathname: string, searchParams: URLSearchParams): CommandSelection | null {
+  const title = document.querySelector<HTMLElement>('.esmera-context-inspector h2, .esmera-command-bar h1, .esmera-page-header h1')?.textContent?.trim()
+  const workspaceKeys = ['product', 'customer', 'sale', 'inspect'] as const
+  for (const key of workspaceKeys) {
+    const id = searchParams.get(key)
+    if (!id) continue
+    const kind = key === 'inspect' && pathname.includes('/products') ? 'product' : key
+    return { kind, id, label: title || `${kind} ${id}`, href: `${pathname}?${searchParams.toString()}` }
+  }
+
+  const collection = pathname.match(/^\/admin\/collections\/([^/]+)\/([^/]+)\/?$/)
+  if (collection && collection[2] !== 'create') {
+    return { kind: collection[1], id: collection[2], label: title || `${collection[1]} ${collection[2]}`, href: pathname }
+  }
+  return null
+}
+
 export function AppHeader() {
   const auth = useAuth()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const user = auth.user as HeaderUser | null
   const role = user?.role || null
   const name = user?.name || user?.email?.split('@')[0] || 'Esméra'
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [shortcutsReady, setShortcutsReady] = useState(false)
+  const [selection, setSelection] = useState<CommandSelection | null>(null)
+
+  useEffect(() => {
+    const onSelection = (event: Event) => {
+      const detail = (event as CustomEvent<CommandSelection | null>).detail
+      setSelection(detail || null)
+    }
+    window.addEventListener(ADMIN_SELECTION_EVENT, onSelection)
+    return () => window.removeEventListener(ADMIN_SELECTION_EVENT, onSelection)
+  }, [])
+
+  useEffect(() => {
+    if (!commandOpen) return
+    const inferred = inferSelection(pathname, new URLSearchParams(searchParams.toString()))
+    if (inferred) setSelection(inferred)
+  }, [commandOpen, pathname, searchParams])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -111,7 +147,12 @@ export function AppHeader() {
         </div>
       </header>
 
-      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+      <CommandPalette
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        selection={selection}
+        currentHref={`${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
+      />
       <MobileNav
         open={mobileNavOpen}
         onOpenChange={setMobileNavOpen}
