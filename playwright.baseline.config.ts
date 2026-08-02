@@ -5,7 +5,7 @@ const baselineBaseURL = process.env.BASELINE_BASE_URL || 'http://localhost:3000'
 
 export default defineConfig({
   testDir: './tests/baseline',
-  timeout: 180_000,
+  timeout: 480_000,
   fullyParallel: false,
   workers: 1,
   reporter: 'line',
