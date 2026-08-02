@@ -1,15 +1,10 @@
+/* eslint-disable react-hooks/incompatible-library -- TanStack Table exposes stateful helpers that React Compiler intentionally does not memoize. */
 'use client'
 
 import { Dialog } from '@base-ui/react/dialog'
 import { DragDropProvider, useDroppable } from '@dnd-kit/react'
 import { isSortable, useSortable } from '@dnd-kit/react/sortable'
-import {
-  QueryClient,
-  QueryClientProvider,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   flexRender,
   getCoreRowModel,
@@ -35,9 +30,12 @@ import {
 } from '../../../businessRules/opportunities/stages'
 import {
   Button,
+  DataSection,
   DataTable,
   DrawerPanel,
   EmptyState,
+  FilterPanel,
+  InlineFeedback,
   Status,
 } from '../../design-system'
 import type {
@@ -103,14 +101,14 @@ function shortDate(value: string | null | undefined) {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return date.toLocaleDateString('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function dateTime(value: string | null | undefined) {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleString('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 function stageTone(stage?: string | null): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
@@ -232,13 +230,11 @@ function InspectorContent({ opportunity, activities }: { opportunity: Opportunit
     {sale ? <section className="esmera-sales-generated-sale"><span className="esmera-eyebrow">Venda gerada</span><h3>{sale.number || sale.id}</h3><p>{money(sale.totalCents)} · {saleStatusLabels[sale.status || ''] || sale.status}</p><Link className="esmera-button" href={`/admin/collections/sales/${sale.id}`}>Abrir venda</Link></section> : null}
 
     <section>
-      <span className="esmera-eyebrow">Timeline</span>
+      <span className="esmera-eyebrow">Timeline operacional</span>
       {!timeline.length ? <p>Nenhuma atividade registrada.</p> : <ol className="esmera-sales-timeline">{timeline.map((activity) => <li key={String(activity.id)}><strong>{activity.summary || activity.eventType || 'Atividade'}</strong>{activity.details ? <p>{activity.details}</p> : null}<small>{dateTime(activity.occurredAt)} · {relationLabel(activity.owner, 'Sistema')}</small></li>)}</ol>}
     </section>
 
-    <div className="esmera-actions">
-      <Link className="esmera-button esmera-button--primary" href={`/admin/collections/opportunities/${opportunity.id}`}>Editar oportunidade</Link>
-    </div>
+    <div className="esmera-actions"><Link className="esmera-button esmera-button--primary" href={`/admin/collections/opportunities/${opportunity.id}`}>Editar oportunidade</Link></div>
   </div>
 }
 
@@ -320,12 +316,7 @@ function WinDialog({ opportunity, products, open, busy, onOpenChange, onSubmit }
           action: 'win',
           id: opportunity.id,
           channel,
-          items: items.map((item) => ({
-            product: item.product,
-            variantSku: item.variantSku || null,
-            unitPriceCents: item.unitPrice ? Math.round(Number(item.unitPrice.replace(',', '.')) * 100) : null,
-            quantity: item.quantity,
-          })),
+          items: items.map((item) => ({ product: item.product, variantSku: item.variantSku || null, unitPriceCents: item.unitPrice ? Math.round(Number(item.unitPrice.replace(',', '.')) * 100) : null, quantity: item.quantity })),
           discountCents: Math.max(0, Math.round(Number(discount.replace(',', '.')) * 100) || 0),
           shippingCents: Math.max(0, Math.round(Number(shipping.replace(',', '.')) * 100) || 0),
           expectedDeliveryAt: deliveryAt ? new Date(deliveryAt).toISOString() : null,
@@ -378,11 +369,7 @@ function OpportunityControls({ opportunity, index, total, onMove, onClose }: {
 }) {
   const current = (opportunity.stage || 'new') as OpportunityStage
   return <div className="esmera-opportunity-controls">
-    <label><span className="esmera-sr-only">Mover {opportunity.code} para etapa</span><select className="esmera-input" aria-label={`Mover ${opportunity.code || opportunity.id} para etapa`} value={current} onChange={(event) => {
-      const stage = event.target.value as OpportunityStage
-      if (stage === 'won' || stage === 'lost') onClose(stage)
-      else onMove(stage)
-    }}>{opportunityStages.map((stage) => <option key={stage} value={stage}>{opportunityStageLabels[stage]}</option>)}</select></label>
+    <label><span className="esmera-sr-only">Mover {opportunity.code} para etapa</span><select className="esmera-input" aria-label={`Mover ${opportunity.code || opportunity.id} para etapa`} value={current} onChange={(event) => { const stage = event.target.value as OpportunityStage; if (stage === 'won' || stage === 'lost') onClose(stage); else onMove(stage) }}>{opportunityStages.map((stage) => <option key={stage} value={stage}>{opportunityStageLabels[stage]}</option>)}</select></label>
     {openStageSet.has(current) ? <label><span className="esmera-sr-only">Mover {opportunity.code} para posição</span><select className="esmera-input" aria-label={`Mover ${opportunity.code || opportunity.id} para posição`} value={index + 1} onChange={(event) => onMove(current, Number(event.target.value) - 1)}>{Array.from({ length: total }, (_, target) => <option key={target + 1} value={target + 1}>{target + 1}</option>)}</select></label> : null}
   </div>
 }
@@ -441,21 +428,30 @@ function PipelineColumn({ stage, records, activities, products, onMove, onClose,
 }
 
 function Filters({ filters, users }: { filters: SalesWorkspaceFilters; users: UserRef[] }) {
-  return <form className="esmera-sales-filters" method="get" action="/admin/sales">
+  return <form method="get" action="/admin/sales">
     <input type="hidden" name="view" value={filters.view} />
-    <label className="esmera-sales-search"><span>Buscar</span><input className="esmera-input" type="search" name="q" defaultValue={filters.q} placeholder="Código, cliente ou próxima ação" /></label>
-    <label><span>Responsável</span><select className="esmera-input" name="owner" defaultValue={filters.owner}><option value="">Todos</option>{users.map((user) => <option key={String(user.id)} value={String(user.id)}>{user.name || user.email || user.id}</option>)}</select></label>
-    <label><span>Origem</span><select className="esmera-input" name="source" defaultValue={filters.source}><option value="">Todas</option>{Object.entries(sourceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-    <label><span>Etapa</span><select className="esmera-input" name="stage" defaultValue={filters.stage}><option value="">Todas</option>{opportunityStages.map((stage) => <option key={stage} value={stage}>{opportunityStageLabels[stage]}</option>)}</select></label>
-    <label><span>Próxima ação</span><select className="esmera-input" name="period" defaultValue={filters.period}><option value="all">Qualquer data</option><option value="overdue">Atrasadas</option><option value="today">Hoje</option><option value="7d">Próximos 7 dias</option><option value="30d">Próximos 30 dias</option></select></label>
     <input type="hidden" name="limit" value={filters.limit} />
-    <Button type="submit">Aplicar</Button>
-    <Link className="esmera-button esmera-button--quiet" href={`/admin/sales?view=${filters.view}`}>Limpar</Link>
+    <FilterPanel
+      className="esmera-sales-filters"
+      primary={<>
+        <label className="esmera-sales-search"><span>Buscar</span><input className="esmera-input" type="search" name="q" defaultValue={filters.q} placeholder="Código, cliente ou próxima ação" /></label>
+        <label><span>Responsável</span><select className="esmera-input" name="owner" defaultValue={filters.owner}><option value="">Todos</option>{users.map((user) => <option key={String(user.id)} value={String(user.id)}>{user.name || user.email || user.id}</option>)}</select></label>
+        <label><span>Próxima ação</span><select className="esmera-input" name="period" defaultValue={filters.period}><option value="all">Qualquer data</option><option value="overdue">Atrasadas</option><option value="today">Hoje</option><option value="7d">Próximos 7 dias</option><option value="30d">Próximos 30 dias</option></select></label>
+      </>}
+      advancedLabel="Origem e etapa"
+      advancedActive={Boolean(filters.source || filters.stage)}
+      advanced={<div className="esmera-sales-advanced-filters">
+        <label><span>Origem</span><select className="esmera-input" name="source" defaultValue={filters.source}><option value="">Todas</option>{Object.entries(sourceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label><span>Etapa</span><select className="esmera-input" name="stage" defaultValue={filters.stage}><option value="">Todas</option>{opportunityStages.map((stage) => <option key={stage} value={stage}>{opportunityStageLabels[stage]}</option>)}</select></label>
+        <Button type="submit">Aplicar recorte</Button>
+      </div>}
+      actions={<><Button type="submit" tone="primary">Aplicar</Button><Link className="esmera-button esmera-button--quiet" href={`/admin/sales?view=${filters.view}`}>Limpar</Link></>}
+    />
   </form>
 }
 
 function Transactions({ transactions }: { transactions: SalesTransaction[] }) {
-  return <section className="esmera-sales-transactions"><div className="esmera-sales-section-heading"><div><span className="esmera-eyebrow">Fulfillment</span><h2>Vendas confirmadas recentes</h2></div><Link href="/admin/collections/sales">Ver Admin técnico</Link></div>{transactions.length ? <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Venda</th><th>Cliente</th><th>Status</th><th>Total</th><th>Confirmada</th><th /></tr></thead><tbody>{transactions.map((sale) => <tr key={String(sale.id)}><td><strong>{sale.number || sale.id}</strong></td><td>{relationLabel(sale.customer, '—')}</td><td><Status tone={sale.status === 'delivered' ? 'success' : 'info'}>{saleStatusLabels[sale.status || ''] || sale.status}</Status></td><td>{money(sale.totalCents)}</td><td>{shortDate(sale.confirmedAt || sale.updatedAt)}</td><td><Link href={`/admin/collections/sales/${sale.id}`}>Abrir</Link></td></tr>)}</tbody></table></div> : <EmptyState title="Nenhuma venda confirmada" copy="Quando uma oportunidade for ganha, a Sale criada aparecerá aqui." />}</section>
+  return <DataSection className="esmera-sales-transactions" eyebrow="Fulfillment" title="Vendas confirmadas recentes" description="Sales transacionais criadas a partir de oportunidades ganhas." action={<Link href="/admin/collections/sales">Ver Admin técnico</Link>}>{transactions.length ? <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Venda</th><th>Cliente</th><th>Status</th><th>Total</th><th>Confirmada</th><th /></tr></thead><tbody>{transactions.map((sale) => <tr key={String(sale.id)}><td><strong>{sale.number || sale.id}</strong></td><td>{relationLabel(sale.customer, '—')}</td><td><Status tone={sale.status === 'delivered' ? 'success' : 'info'}>{saleStatusLabels[sale.status || ''] || sale.status}</Status></td><td>{money(sale.totalCents)}</td><td>{shortDate(sale.confirmedAt || sale.updatedAt)}</td><td><Link href={`/admin/collections/sales/${sale.id}`}>Abrir</Link></td></tr>)}</tbody></table></div> : <EmptyState title="Nenhuma venda confirmada" copy="Quando uma oportunidade for ganha, a Sale criada aparecerá aqui." />}</DataSection>
 }
 
 function WorkspaceInner(props: Props) {
@@ -483,10 +479,7 @@ function WorkspaceInner(props: Props) {
       if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
       setFeedback(error instanceof Error ? error.message : 'A alteração foi revertida.')
     },
-    onSuccess: () => {
-      setFeedback('Etapa e ordem salvas.')
-      router.refresh()
-    },
+    onSuccess: () => { setFeedback('Etapa e ordem salvas.'); router.refresh() },
   })
 
   const closeMutation = useMutation({
@@ -550,7 +543,7 @@ function WorkspaceInner(props: Props) {
 
   return <>
     <Filters filters={props.filters} users={props.users} />
-    {feedback ? <div className="esmera-sales-feedback" role="status" aria-live="polite">{feedback}</div> : null}
+    {feedback ? <InlineFeedback className="esmera-sales-feedback" busy={moveMutation.isPending || closeMutation.isPending} tone={feedback.includes('não') || feedback.includes('revertida') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
 
     {props.filters.view === 'pipeline' ? <>
       <DragDropProvider onDragEnd={(event) => {
@@ -580,6 +573,5 @@ function WorkspaceInner(props: Props) {
 }
 
 export function SalesWorkspaceClient(props: Props) {
-  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false }, mutations: { retry: 0 } } }))
-  return <QueryClientProvider client={client}><WorkspaceInner {...props} /></QueryClientProvider>
+  return <WorkspaceInner {...props} />
 }

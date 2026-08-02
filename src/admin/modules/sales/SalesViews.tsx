@@ -3,11 +3,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, Where } from 'payload'
 
-import {
-  openOpportunityStages,
-  opportunityStages,
-} from '../../../businessRules/opportunities/stages'
+import { openOpportunityStages, opportunityStages } from '../../../businessRules/opportunities/stages'
 import { eligibleSaleStatuses } from '../../../collections/Sales'
+import { SegmentedControl, SegmentedControlLink } from '../../design-system'
 import {
   AccessDenied,
   ensureUser,
@@ -67,11 +65,18 @@ function filtersFrom(params: Record<string, string | string[] | undefined>): Sal
 }
 
 function dayBounds(offsetDays = 0) {
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  start.setDate(start.getDate() + offsetDays)
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
+  const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Recife',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(now)
+  const year = Number(parts.find((part) => part.type === 'year')?.value)
+  const month = Number(parts.find((part) => part.type === 'month')?.value) - 1
+  const day = Number(parts.find((part) => part.type === 'day')?.value)
+  const start = new Date(Date.UTC(year, month, day + offsetDays, 3, 0, 0, 0))
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
   return { start: start.toISOString(), end: end.toISOString() }
 }
 
@@ -121,10 +126,10 @@ function ViewSwitch({ filters }: { filters: SalesWorkspaceFilters }) {
   }
   list.set('view', 'list')
   pipeline.set('view', 'pipeline')
-  return <div className="esmera-sales-switch" aria-label="Visualização de vendas">
-    <Link className={`esmera-sales-switch__item${filters.view === 'list' ? ' is-active' : ''}`} href={`/admin/sales?${list.toString()}`} aria-current={filters.view === 'list' ? 'page' : undefined}>Lista</Link>
-    <Link className={`esmera-sales-switch__item${filters.view === 'pipeline' ? ' is-active' : ''}`} href={`/admin/sales?${pipeline.toString()}`} aria-current={filters.view === 'pipeline' ? 'page' : undefined}>Pipeline</Link>
-  </div>
+  return <SegmentedControl className="esmera-sales-switch" label="Visualização de vendas">
+    <SegmentedControlLink selected={filters.view === 'list'} href={`/admin/sales?${list.toString()}`}>Lista</SegmentedControlLink>
+    <SegmentedControlLink selected={filters.view === 'pipeline'} href={`/admin/sales?${pipeline.toString()}`}>Pipeline</SegmentedControlLink>
+  </SegmentedControl>
 }
 
 export async function SalesWorkspace(props: AdminViewServerProps) {
@@ -140,14 +145,7 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
       const result = await findDocs<CustomerID>(req, 'customers', {
         depth: 0,
         limit: 200,
-        where: {
-          or: [
-            { name: { like: filters.q } },
-            { company: { like: filters.q } },
-            { phone: { like: filters.q } },
-            { email: { like: filters.q } },
-          ],
-        } as Where,
+        where: { or: [{ name: { like: filters.q } }, { company: { like: filters.q } }, { phone: { like: filters.q } }, { email: { like: filters.q } }] } as Where,
         select: { id: true },
       })
       matchingCustomers = result.docs
@@ -163,62 +161,36 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
         depth: 2,
         where: opportunityWhere(filters, matchingCustomers.map((customer) => customer.id)),
         select: {
-          id: true,
-          code: true,
-          stage: true,
-          rank: true,
-          customer: true,
-          owner: true,
-          source: true,
-          priority: true,
-          interestedProducts: true,
-          estimatedValueCents: true,
-          nextAction: true,
-          nextActionAt: true,
-          expectedCloseAt: true,
-          closedAt: true,
-          lossReason: true,
-          lossNotes: true,
-          wonSale: true,
-          createdAt: true,
-          updatedAt: true,
+          id: true, code: true, stage: true, rank: true, customer: true, owner: true, source: true, priority: true,
+          interestedProducts: true, estimatedValueCents: true, nextAction: true, nextActionAt: true, expectedCloseAt: true,
+          closedAt: true, lossReason: true, lossNotes: true, wonSale: true, createdAt: true, updatedAt: true,
         },
       }),
       findDocs<UserRef>(req, 'users', { sort: 'name', limit: 100, depth: 0, select: { id: true, name: true, email: true } }),
       findDocs<ProductRef>(req, 'products', {
-        sort: 'title',
-        limit: 500,
-        depth: 0,
-        draft: true,
-        where: { catalogStatus: { equals: 'active' } } as Where,
+        sort: 'title', limit: 500, depth: 0, draft: true, where: { catalogStatus: { equals: 'active' } } as Where,
         select: { id: true, title: true, code: true, slug: true, priceMode: true, basePriceCents: true, variants: true },
       }),
       findDocs<SalesTransaction>(req, 'sales', {
-        sort: '-confirmedAt',
-        limit: 30,
-        depth: 1,
-        where: { status: { in: [...eligibleSaleStatuses] } } as Where,
+        sort: '-confirmedAt', limit: 30, depth: 1, where: { status: { in: [...eligibleSaleStatuses] } } as Where,
         select: { id: true, number: true, status: true, totalCents: true, channel: true, customer: true, opportunity: true, confirmedAt: true, expectedDeliveryAt: true, updatedAt: true },
       }),
     ])
 
     const opportunityIds = opportunityResult.docs.map((opportunity) => opportunity.id)
     const activitiesResult = opportunityIds.length ? await findDocs<ActivityRecord>(req, 'activities', {
-      sort: '-occurredAt',
-      limit: 1000,
-      depth: 1,
-      where: { opportunity: { in: opportunityIds } } as Where,
+      sort: '-occurredAt', limit: 1000, depth: 1, where: { opportunity: { in: opportunityIds } } as Where,
       select: { id: true, eventType: true, summary: true, details: true, occurredAt: true, fromStage: true, toStage: true, lossReason: true, owner: true, opportunity: true },
     }) : { docs: [], totalDocs: 0 }
 
-    return <ViewFrame props={props}>
+    return <ViewFrame props={props} width="fluid">
       <PageHeader
         eyebrow="Comercial"
         title="Vendas"
         subtitle="Lista e Pipeline usam o mesmo domínio de Opportunities. Ganhos criam Sales transacionais; Leads permanecem restritos à aquisição e qualificação."
         actions={<><TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink><TechnicalLink href="/admin/collections/sales">Vendas confirmadas</TechnicalLink></>}
+        context={<ViewSwitch filters={filters} />}
       />
-      <ViewSwitch filters={filters} />
       <SalesWorkspaceClient
         opportunities={opportunityResult.docs}
         activities={activitiesResult.docs}
@@ -231,7 +203,7 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
       />
     </ViewFrame>
   } catch (error) {
-    return <ViewFrame props={props}><PageHeader title="Vendas" subtitle="Comercial" /><QueryError title="Não foi possível consultar o workspace de Vendas" error={error} /></ViewFrame>
+    return <ViewFrame props={props} width="fluid"><PageHeader title="Vendas" subtitle="Comercial" /><QueryError title="Não foi possível consultar o workspace de Vendas" error={error} /></ViewFrame>
   }
 }
 

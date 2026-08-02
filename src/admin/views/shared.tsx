@@ -4,11 +4,18 @@ import { redirect } from 'next/navigation'
 import React from 'react'
 
 import { canManageBusiness, canManageSite, roleOf } from '../../access/roles'
-import { ButtonLink, EmptyState as DesignEmptyState, ErrorState } from '../design-system'
+import {
+  ButtonLink,
+  EmptyState as DesignEmptyState,
+  ErrorState,
+  PageCommandBar,
+  PermissionState,
+} from '../design-system'
 export { countDocs, findAllDocs, findDocs } from '../../server/domain/shared/payload'
 import './views.scss'
 
 export type OperationalArea = 'all' | 'site' | 'business'
+export type WorkspaceWidth = 'reading' | 'standard' | 'wide' | 'fluid'
 
 export function hasAreaAccess(user: unknown, area: OperationalArea) {
   if (area === 'all') return Boolean(user)
@@ -30,14 +37,18 @@ export function ViewFrame({
   props,
   children,
   withTemplate = true,
+  width = 'wide',
+  className = '',
 }: {
   props: AdminViewServerProps
   children: React.ReactNode
   withTemplate?: boolean
+  width?: WorkspaceWidth
+  className?: string
 }) {
   const { initPageResult, params, searchParams } = props
   const content = (
-    <div className="esmera-workspace-frame">
+    <div className={`esmera-workspace-frame is-${width}${className ? ` ${className}` : ''}`}>
       <main className="esmera-view">{children}</main>
     </div>
   )
@@ -70,11 +81,8 @@ export function AccessDenied({
   withTemplate?: boolean
 }) {
   return (
-    <ViewFrame props={props} withTemplate={withTemplate}>
-      <div className="esmera-state esmera-state--warning">
-        <strong>Acesso restrito</strong>
-        <p>Seu papel não possui acesso à área {area}. A permissão é aplicada também nas Collections e APIs.</p>
-      </div>
+    <ViewFrame props={props} withTemplate={withTemplate} width="standard">
+      <PermissionState copy={`Seu papel não possui acesso à área ${area}. A permissão é aplicada também nas Collections e APIs.`} />
     </ViewFrame>
   )
 }
@@ -96,20 +104,20 @@ export function dateTime(value: string | null | undefined) {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleString('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 export function shortDate(value: string | null | undefined) {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short', year: 'numeric' })
+  return date.toLocaleDateString('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 export function monthStartISO() {
   const now = new Date()
   const localParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo',
+    timeZone: 'America/Recife',
     year: 'numeric',
     month: 'numeric',
   }).formatToParts(now)
@@ -127,22 +135,17 @@ export function PageHeader({
   title,
   subtitle,
   actions,
+  context,
+  sticky = false,
 }: {
   eyebrow?: string
   title: string
   subtitle: string
   actions?: React.ReactNode
+  context?: React.ReactNode
+  sticky?: boolean
 }) {
-  return (
-    <header className="esmera-page-header">
-      <div className="esmera-page-header__copy">
-        {eyebrow ? <span className="esmera-eyebrow">{eyebrow}</span> : null}
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
-      </div>
-      {actions ? <div className="esmera-actions">{actions}</div> : null}
-    </header>
-  )
+  return <PageCommandBar eyebrow={eyebrow} title={title} description={subtitle} actions={actions} context={context} sticky={sticky} />
 }
 
 type MetricIcon = 'box' | 'lead' | 'money' | 'alert' | 'draft'

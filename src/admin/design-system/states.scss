@@ -1,0 +1,57 @@
+.esmera-state-panel {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--esmera-space-3);
+  padding: var(--esmera-space-4);
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-panel-radius);
+  background: var(--esmera-surface-panel);
+}
+
+.esmera-state-panel.is-compact { padding: 9px 11px; }
+.esmera-state-panel__mark {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--esmera-line-strong);
+  border-radius: 50%;
+  background: var(--esmera-surface-panel);
+  box-shadow: inset 0 0 0 2px var(--esmera-surface-panel);
+}
+.esmera-state-panel__copy { min-width: 0; }
+.esmera-state-panel__copy strong { display: block; color: var(--esmera-text); font-size: var(--esmera-font-body); font-weight: var(--esmera-weight-semibold); }
+.esmera-state-panel__copy p { max-width: 68ch; margin: 3px 0 0; color: var(--esmera-text-muted); font-size: var(--esmera-font-ui-sm); line-height: var(--esmera-line-body); }
+.esmera-state-panel__copy small { display: block; margin-top: 3px; color: var(--esmera-text-subtle); font-size: var(--esmera-font-meta); line-height: var(--esmera-line-body); }
+.esmera-state-panel__action { justify-self: end; }
+
+.esmera-state-panel.is-loading .esmera-state-panel__mark,
+.esmera-state-panel.is-saving .esmera-state-panel__mark {
+  border-color: var(--esmera-line-strong);
+  border-top-color: var(--esmera-primary);
+  animation: esmera-state-spin .7s linear infinite;
+}
+.esmera-state-panel.is-empty-result,
+.esmera-state-panel.is-empty-system { background: var(--esmera-surface-raised); }
+.esmera-state-panel.is-empty-system { border-style: dashed; }
+.esmera-state-panel.is-integration-unconfigured .esmera-state-panel__mark,
+.esmera-state-panel.is-partial-data .esmera-state-panel__mark { border-color: var(--esmera-warning); background: var(--esmera-warning-soft); }
+.esmera-state-panel.is-permission-denied .esmera-state-panel__mark { border-color: var(--esmera-info); background: var(--esmera-info-soft); }
+.esmera-state-panel.is-recoverable-error { border-color: color-mix(in srgb, var(--esmera-danger) 24%, var(--esmera-line-default)); background: var(--esmera-danger-soft); }
+.esmera-state-panel.is-destructive-error { border-color: var(--esmera-danger); background: var(--esmera-danger-soft); }
+.esmera-state-panel.is-recoverable-error .esmera-state-panel__mark,
+.esmera-state-panel.is-destructive-error .esmera-state-panel__mark,
+.esmera-state-panel.is-rollback .esmera-state-panel__mark { border-color: var(--esmera-danger); background: var(--esmera-danger); }
+.esmera-state-panel.is-saved .esmera-state-panel__mark { border-color: var(--esmera-success); background: var(--esmera-success); }
+
+@keyframes esmera-state-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 560px) {
+  .esmera-state-panel { grid-template-columns: 16px minmax(0, 1fr); align-items: start; }
+  .esmera-state-panel__action { grid-column: 2; justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esmera-state-panel.is-loading .esmera-state-panel__mark,
+  .esmera-state-panel.is-saving .esmera-state-panel__mark { animation: none; }
+}

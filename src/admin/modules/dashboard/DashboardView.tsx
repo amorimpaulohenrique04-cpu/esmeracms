@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
 import Link from 'next/link'
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties } from 'react'
 import type { AdminViewServerProps } from 'payload'
 
 import {
@@ -18,6 +18,12 @@ import {
   type DashboardTaskRelation,
 } from '../../../server/dashboard'
 import {
+  DataSection,
+  IntegrationState,
+  MetricStrip,
+  MetricStripItem,
+} from '../../design-system'
+import {
   AccessDenied,
   dateTime,
   EmptyState,
@@ -33,14 +39,6 @@ import './dashboard.scss'
 type DashboardUser = {
   name?: string | null
   email?: string | null
-}
-
-type MetricProps = {
-  label: string
-  value: ReactNode
-  meta: string
-  href: string
-  tone?: 'neutral' | 'success' | 'attention'
 }
 
 function firstName(user: DashboardUser) {
@@ -83,9 +81,7 @@ function taskContext(task: DashboardTask) {
   }
 
   const occurrence = related(task, 'occurrences')
-  if (occurrence?.id) {
-    return { href: `/admin/after-sales?focus=occurrences&q=${encodeURIComponent(String(occurrence.id))}`, label: 'Abrir ocorrência' }
-  }
+  if (occurrence?.id) return { href: `/admin/after-sales?focus=occurrences&q=${encodeURIComponent(String(occurrence.id))}`, label: 'Abrir ocorrência' }
 
   const shipment = related(task, 'shipments')
   if (shipment?.id) {
@@ -117,29 +113,6 @@ function taskTimeState(task: DashboardTask, generatedAt: string) {
 
 function labelFor(map: Record<string, string>, value: string | null | undefined, fallback: string) {
   return value ? map[value] || fallback : fallback
-}
-
-function DashboardMetric({ label, value, meta, href, tone = 'neutral' }: MetricProps) {
-  return (
-    <Link className={`esmera-dashboard-metric is-${tone}`} href={href}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{meta}</small>
-      <span className="esmera-dashboard-metric__action" aria-hidden="true">Abrir →</span>
-    </Link>
-  )
-}
-
-function PanelHeader({ id, title, copy, action }: { id: string; title: string; copy: string; action?: ReactNode }) {
-  return (
-    <header className="esmera-dashboard-panel__header">
-      <div>
-        <h2 id={id}>{title}</h2>
-        <p>{copy}</p>
-      </div>
-      {action ? <div>{action}</div> : null}
-    </header>
-  )
 }
 
 function ProductRow({ product }: { product: DashboardProduct }) {
@@ -174,11 +147,13 @@ export default async function DashboardView(props: AdminViewServerProps) {
     const pipelineMax = reporting ? Math.max(0, ...reporting.pipeline.map((item) => item.volume)) : 0
     const dashboardUser = user as DashboardUser
     const actions = snapshot.permissions.business
-      ? <><TechnicalLink href="/admin/collections/opportunities/create" primary>+ Nova oportunidade</TechnicalLink>{snapshot.permissions.site ? <TechnicalLink href="/admin/collections/products/create">Novo produto</TechnicalLink> : null}</>
-      : <TechnicalLink href="/admin/collections/products/create" primary>+ Novo produto</TechnicalLink>
+      ? <><TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink>{snapshot.permissions.site ? <TechnicalLink href="/admin/collections/products/create">Novo produto</TechnicalLink> : null}</>
+      : <TechnicalLink href="/admin/collections/products/create" primary>Novo produto</TechnicalLink>
+
+    const metricColumns = reporting && tasks ? 4 : snapshot.permissions.site ? 2 : 1
 
     return (
-      <ViewFrame props={props} withTemplate={false}>
+      <ViewFrame props={props} withTemplate={false} width="wide">
         <PageHeader
           eyebrow={operationalDate(snapshot.generatedAt, snapshot.timeZone)}
           title={`Olá, ${firstName(dashboardUser)}.`}
@@ -186,55 +161,55 @@ export default async function DashboardView(props: AdminViewServerProps) {
           actions={actions}
         />
 
-        <section className={`esmera-dashboard-metrics esmera-metric-grid${reporting && tasks ? '' : ' is-editorial'}`} aria-label="Indicadores do Dashboard">
-          <DashboardMetric
+        <MetricStrip columns={metricColumns} className="esmera-dashboard-metrics" label="Indicadores do Dashboard">
+          <MetricStripItem
             label="Produtos ativos"
             value={snapshot.catalog.activeProducts}
             meta="Publicados e ativos no catálogo"
             href="/admin/products?status=active&publication=published"
           />
           {reporting && tasks ? <>
-            <DashboardMetric
+            <MetricStripItem
               label="Oportunidades abertas"
               value={reporting.openOpportunities}
               meta="Novo, curadoria, proposta e negociação"
               href="/admin/sales?view=pipeline"
             />
-            <DashboardMetric
+            <MetricStripItem
               label="Vendas no mês"
               value={reporting.sales.validSales}
               meta={`${money(reporting.sales.revenueCents)} em receita válida`}
               href="/admin/collections/sales"
               tone="success"
             />
-            <DashboardMetric
+            <MetricStripItem
               label="Pendências"
               value={tasks.open}
               meta={`${tasks.overdue} atrasadas · ${tasks.dueToday} vencem hoje`}
               href="/admin/after-sales?focus=all&status=open"
-              tone={tasks.overdue ? 'attention' : 'neutral'}
+              tone={tasks.overdue ? 'danger' : 'neutral'}
             />
           </> : snapshot.permissions.site ? (
-            <DashboardMetric
+            <MetricStripItem
               label="Pendências editoriais"
               value={snapshot.catalog.editorialPending}
               meta="Rascunhos com problemas reais de prontidão"
               href="/admin/products?publication=issues"
-              tone={snapshot.catalog.editorialPending ? 'attention' : 'neutral'}
+              tone={snapshot.catalog.editorialPending ? 'warning' : 'neutral'}
             />
           ) : null}
-        </section>
+        </MetricStrip>
 
         {reporting && tasks ? (
           <div className="esmera-dashboard-primary-grid">
-            <section className="esmera-dashboard-panel esmera-dashboard-pipeline" aria-labelledby="dashboard-pipeline-title">
-              <PanelHeader
-                id="dashboard-pipeline-title"
-                title="Pipeline compacto"
-                copy="Estado atual das Opportunities abertas. Cada etapa leva aos registros correspondentes em Vendas."
-                action={<Link className="esmera-dashboard-text-link" href="/admin/sales?view=pipeline">Ver pipeline completo</Link>}
-              />
-              <div className="esmera-dashboard-panel__body">
+            <DataSection
+              className="esmera-dashboard-section esmera-dashboard-pipeline"
+              eyebrow="Comercial"
+              title="Pipeline compacto"
+              description="Estado atual das Opportunities abertas. Cada etapa leva aos registros correspondentes em Vendas."
+              action={<Link className="esmera-dashboard-text-link" href="/admin/sales?view=pipeline">Ver pipeline completo</Link>}
+            >
+              <div className="esmera-dashboard-panel-body">
                 <ol className="esmera-dashboard-pipeline__list">
                   {reporting.pipeline.map(({ stage, volume }) => {
                     const share = pipelineMax ? Math.round((volume / pipelineMax) * 100) : 0
@@ -257,15 +232,15 @@ export default async function DashboardView(props: AdminViewServerProps) {
                 </ol>
                 <p className="esmera-dashboard-source">Fonte: Opportunities. Contrato {reporting.semanticVersion}. O Dashboard não recalcula métricas.</p>
               </div>
-            </section>
+            </DataSection>
 
-            <section className="esmera-dashboard-panel esmera-dashboard-tasks" aria-labelledby="dashboard-tasks-title">
-              <PanelHeader
-                id="dashboard-tasks-title"
-                title="Pendências do dia"
-                copy="Tasks reais ordenadas pelo prazo; atrasadas aparecem primeiro."
-                action={<Link className="esmera-dashboard-text-link" href="/admin/after-sales?focus=all&status=open">Abrir fila</Link>}
-              />
+            <DataSection
+              className="esmera-dashboard-section esmera-dashboard-tasks"
+              eyebrow="Operação"
+              title="Pendências do dia"
+              description="Tasks reais ordenadas pelo prazo; atrasadas aparecem primeiro."
+              action={<Link className="esmera-dashboard-text-link" href="/admin/after-sales?focus=all&status=open">Abrir fila</Link>}
+            >
               {tasks.items.length ? (
                 <ul className="esmera-dashboard-task-list">
                   {tasks.items.map((task) => {
@@ -279,9 +254,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
                         </div>
                         <div className="esmera-dashboard-task__copy">
                           <strong>{task.title || 'Tarefa sem título'}</strong>
-                          <small>
-                            {labelFor(taskTypeLabels as Record<string, string>, task.type, 'Tarefa')} · {labelFor(taskStatusLabels as Record<string, string>, task.status, 'Pendente')} · {labelFor(operationalPriorityLabels as Record<string, string>, task.priority, 'Normal')}
-                          </small>
+                          <small>{labelFor(taskTypeLabels as Record<string, string>, task.type, 'Tarefa')} · {labelFor(taskStatusLabels as Record<string, string>, task.status, 'Pendente')} · {labelFor(operationalPriorityLabels as Record<string, string>, task.priority, 'Normal')}</small>
                         </div>
                         <div className="esmera-dashboard-task__actions">
                           <Link href={context.href}>{context.label}</Link>
@@ -292,42 +265,44 @@ export default async function DashboardView(props: AdminViewServerProps) {
                   })}
                 </ul>
               ) : <EmptyState title="Nenhuma pendência aberta" copy="A consulta foi concluída e não existem Tasks pendentes ou em andamento." />}
-            </section>
+            </DataSection>
           </div>
         ) : null}
 
         <div className={`esmera-dashboard-secondary-grid${snapshot.permissions.site ? '' : ' is-single'}`}>
           {snapshot.permissions.site ? (
-            <section className="esmera-dashboard-panel" aria-labelledby="dashboard-catalog-title">
-              <PanelHeader
-                id="dashboard-catalog-title"
-                title="Catálogo recente"
-                copy="Últimos produtos atualizados no Payload, com acesso direto ao documento operacional."
-                action={<Link className="esmera-dashboard-text-link" href="/admin/products">Ver catálogo</Link>}
-              />
+            <DataSection
+              className="esmera-dashboard-section"
+              eyebrow="Editorial"
+              title="Catálogo recente"
+              description="Últimos produtos atualizados no Payload, com acesso direto ao documento operacional."
+              action={<Link className="esmera-dashboard-text-link" href="/admin/products">Ver catálogo</Link>}
+            >
               {snapshot.catalog.recentProducts.length ? (
                 <ul className="esmera-dashboard-product-list">
                   {snapshot.catalog.recentProducts.map((product) => <ProductRow key={String(product.id)} product={product} />)}
                 </ul>
               ) : <EmptyState title="Catálogo vazio" copy="Crie o primeiro produto para iniciar a operação editorial." />}
-            </section>
+            </DataSection>
           ) : null}
 
-          <section className="esmera-dashboard-panel esmera-dashboard-traffic" aria-labelledby="dashboard-traffic-title">
-            <PanelHeader id="dashboard-traffic-title" title="Tráfego" copy="Métricas de audiência só entram depois de uma integração verificável." />
-            <div className="esmera-dashboard-panel__body">
-              <div className="esmera-dashboard-traffic__status">
-                <span aria-hidden="true" />
-                <strong>Não configurado</strong>
-              </div>
-              <p>{snapshot.traffic.reason}</p>
-              <small>Nenhum percentual, visitante, sessão ou gráfico é estimado ou preenchido com placeholder.</small>
+          <DataSection
+            className="esmera-dashboard-section esmera-dashboard-traffic"
+            eyebrow="Integrações"
+            title="Tráfego"
+            description="Métricas de audiência só entram depois de uma integração verificável."
+          >
+            <div className="esmera-dashboard-panel-body">
+              <IntegrationState
+                copy={snapshot.traffic.reason}
+                action={<small>Nenhum percentual, visitante, sessão ou gráfico é estimado ou preenchido com placeholder.</small>}
+              />
             </div>
-          </section>
+          </DataSection>
         </div>
       </ViewFrame>
     )
   } catch (error) {
-    return <ViewFrame props={props} withTemplate={false}><PageHeader title="Dashboard" subtitle="Visão operacional" /><QueryError title="Não foi possível carregar o dashboard" error={error} /></ViewFrame>
+    return <ViewFrame props={props} withTemplate={false} width="wide"><PageHeader title="Dashboard" subtitle="Visão operacional" /><QueryError title="Não foi possível carregar o dashboard" error={error} /></ViewFrame>
   }
 }

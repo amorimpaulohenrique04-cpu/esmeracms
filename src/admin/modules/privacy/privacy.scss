@@ -1,0 +1,61 @@
+.esmera-privacy-governance {
+  margin-bottom: var(--esmera-space-4);
+}
+.esmera-privacy-governance strong,
+.esmera-privacy-governance span { display: block; }
+.esmera-privacy-governance strong { color: var(--esmera-text); }
+
+.esmera-privacy-filters { margin-bottom: var(--esmera-space-5); }
+.esmera-privacy-filters .esmera-filter-panel__primary {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.5fr) minmax(170px, .7fr);
+}
+.esmera-privacy-advanced-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: var(--esmera-space-3);
+}
+
+.esmera-privacy-register .esmera-data-section__body { min-width: 0; }
+.esmera-privacy-register .esmera-data-table { min-width: 980px; }
+.esmera-privacy-register td { vertical-align: top; }
+.esmera-privacy-register td > small { color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); line-height: 1.45; }
+
+.esmera-privacy-action-cell { min-width: 0; display: grid; justify-items: end; gap: 7px; }
+.esmera-privacy-actions .esmera-quick-actions__menu { width: min(300px, calc(100vw - 40px)); gap: 4px; padding: 6px; }
+.esmera-privacy-action-group { display: grid; gap: 2px; padding: 5px; }
+.esmera-privacy-action-group + .esmera-privacy-action-group { border-top: 1px solid var(--esmera-line-subtle); }
+.esmera-privacy-action-group > strong { padding: 6px 7px 4px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); font-weight: var(--esmera-weight-semibold); letter-spacing: .07em; text-transform: uppercase; }
+.esmera-privacy-action {
+  min-height: var(--esmera-control-compact);
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--esmera-control-radius);
+  background: transparent;
+  color: var(--esmera-text);
+  font: inherit;
+  font-size: var(--esmera-font-ui-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.esmera-privacy-action:hover { background: var(--esmera-surface-selected); }
+.esmera-privacy-action:disabled { opacity: .45; cursor: not-allowed; }
+.esmera-privacy-action.is-danger { color: var(--esmera-danger); }
+.esmera-privacy-action-group.is-critical { background: color-mix(in srgb, var(--esmera-danger-soft) 60%, transparent); }
+.esmera-privacy-action-group__note { padding: 7px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); line-height: 1.45; }
+.esmera-privacy-action-cell .esmera-inline-feedback { max-width: 280px; justify-self: end; }
+
+.esmera-privacy-critical-dialog { width: min(520px, calc(100vw - 32px)); }
+.esmera-privacy-critical-summary { margin-bottom: var(--esmera-space-5); padding: var(--esmera-space-4); border-left: 2px solid var(--esmera-danger); background: var(--esmera-danger-soft); }
+.esmera-privacy-critical-summary strong { color: var(--esmera-danger); }
+.esmera-privacy-critical-summary p { margin: 5px 0 0; color: var(--esmera-text-secondary); font-size: var(--esmera-font-ui-sm); line-height: var(--esmera-line-body); }
+
+@container esmera-workspace (max-width: 760px) {
+  .esmera-privacy-filters .esmera-filter-panel__primary { grid-template-columns: 1fr; }
+  .esmera-privacy-advanced-filters { grid-template-columns: 1fr; }
+}

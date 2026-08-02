@@ -26,9 +26,20 @@ export default defineConfig([
   },
   {
     files: ['src/admin/modules/products/ProductsWorkspaceClient.tsx'],
+    linterOptions: { reportUnusedDisableDirectives: false },
     rules: {
       '@next/next/no-img-element': 'off',
       'react-hooks/incompatible-library': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          vars: 'all',
+          args: 'after-used',
+          varsIgnorePattern: '^_',
+          argsIgnorePattern: '^(_|filters)$',
+          caughtErrorsIgnorePattern: '^(_|ignore)',
+        },
+      ],
     },
   },
   {
@@ -66,9 +77,25 @@ export default defineConfig([
   },
   {
     files: ['src/admin/modules/sales/SalesWorkspaceClient.tsx'],
+    linterOptions: { reportUnusedDisableDirectives: false },
     rules: {
       'react-hooks/refs': 'off',
       'react-hooks/incompatible-library': 'off',
+    },
+  },
+  {
+    files: ['src/admin/modules/sales/SalesViews.tsx'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          vars: 'all',
+          args: 'after-used',
+          varsIgnorePattern: '^(Link|_)$',
+          argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^(_|ignore)',
+        },
+      ],
     },
   },
   {

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import React from 'react'
 
-import { Status } from '../../design-system'
+import { InlineFeedback, SectionNav, SectionNavLink, Status } from '../../design-system'
 import { money, PageHeader, shortDate, TechnicalLink } from '../../views/shared'
 import { ProductDraftForm } from './ProductDraftForm'
 import { ProductMediaManager } from './ProductMediaManager'
@@ -9,8 +9,6 @@ import {
   availabilityLabels,
   coverItem,
   imageURL,
-  relationId,
-  roleLabels,
   type ProductCategory,
   type ProductDetail,
   type ProductDocumentTab,
@@ -80,7 +78,14 @@ function Overview({ product }: { product: ProductDetail }) {
         {coverURL ? <img src={coverURL} alt={cover?.alt || product.title || ''} /> : <div className="esmera-product-document-placeholder">Sem imagem de capa</div>}
       </section>
       <div className="esmera-product-document-stack">
-        <section className="esmera-card"><div className="esmera-card-header"><h2>Prontidão de publicação</h2><Status tone={product.publicationReady ? 'success' : 'warning'}>{product.publicationReady ? 'Pronto' : 'Com pendências'}</Status></div><div className="esmera-card-body">{product.publicationReady ? <p className="esmera-card-copy">O produto atende à regra única de prontidão calculada no servidor.</p> : <ul className="esmera-product-issues">{(product.publicationIssues || []).map((issue, index) => <li key={`${issue.message}-${index}`}>{issue.message}</li>)}</ul>}</div></section>
+        <section className="esmera-card">
+          <div className="esmera-card-header"><h2>Prontidão de publicação</h2></div>
+          <div className="esmera-card-body">
+            {product.publicationReady
+              ? <InlineFeedback tone="success">O produto atende à regra única de prontidão calculada no servidor.</InlineFeedback>
+              : <><InlineFeedback tone="warning">{product.publicationIssues?.length || 0} pendência{product.publicationIssues?.length === 1 ? '' : 's'} impedem a publicação.</InlineFeedback><ul className="esmera-product-issues">{(product.publicationIssues || []).map((issue, index) => <li key={`${issue.message}-${index}`}>{issue.message}</li>)}</ul></>}
+          </div>
+        </section>
         <section className="esmera-card"><div className="esmera-card-header"><h2>Identidade</h2></div><dl className="esmera-product-facts"><div><dt>Código</dt><dd>{product.code || '—'}</dd></div><div><dt>Slug</dt><dd>{product.slug || '—'}</dd></div><div><dt>Material</dt><dd>{product.material || '—'}</dd></div><div><dt>Edição</dt><dd>{product.edition || '—'}</dd></div><div><dt>Categorias</dt><dd>{categoryItems.length ? categoryItems.map((item) => item.title || item.slug || item.id).join(', ') : '—'}</dd></div></dl></section>
       </div>
       <div className="esmera-product-document-full"><ProductDraftForm productId={product.id} initial={{ title: product.title || '', subtitle: product.subtitle || '', material: product.material || '', edition: product.edition || '', availability: product.availability || 'available', priceMode: product.priceMode || 'inquiry', basePriceCents: typeof product.basePriceCents === 'number' ? String(product.basePriceCents) : '' }} published={product._status === 'published'} archived={product.catalogStatus === 'archived'} /></div>
@@ -116,11 +121,12 @@ function HistoryTab({ product }: { product: ProductDetail }) {
 
 export function ProductDocumentView({ product, tab, searchParams }: { product: ProductDetail; tab: ProductDocumentTab; searchParams: Record<string, string | string[] | undefined> }) {
   const back = returnHref(searchParams)
+  const context = <div className="esmera-product-document-status"><Status tone={product.catalogStatus === 'active' ? 'success' : 'neutral'}>{product.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</Status><Status tone={product._status === 'published' ? 'info' : 'neutral'}>{product._status === 'published' ? 'Publicado' : 'Rascunho'}</Status><span className={`esmera-product-readiness${product.publicationReady ? ' is-ready' : ' has-issues'}`}><span aria-hidden="true" />{product.publicationReady ? 'Pronto para publicar' : `${product.publicationIssues?.length || 0} pendência${product.publicationIssues?.length === 1 ? '' : 's'}`}</span></div>
+
   return (
     <>
-      <PageHeader eyebrow="Produto" title={product.title || 'Produto sem título'} subtitle={`${product.code || 'Sem código'} · ${availabilityLabels[product.availability || ''] || 'sem disponibilidade'}`} actions={<><Link className="esmera-button" href={back}>Voltar ao catálogo</Link><TechnicalLink href={`/admin/collections/products/${product.id}`}>Admin técnico</TechnicalLink></>} />
-      <div className="esmera-product-document-status"><Status tone={product.catalogStatus === 'active' ? 'success' : 'neutral'}>{product.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</Status><Status tone={product._status === 'published' ? 'info' : 'neutral'}>{product._status === 'published' ? 'Publicado' : 'Rascunho'}</Status><Status tone={product.publicationReady ? 'success' : 'warning'}>{product.publicationReady ? 'Pronto para publicar' : 'Com pendências'}</Status></div>
-      <nav className="esmera-product-tabs" aria-label="Seções do produto">{tabs.map((item) => <Link key={item.value} className={`esmera-product-tab${tab === item.value ? ' is-active' : ''}`} aria-current={tab === item.value ? 'page' : undefined} href={tabHref(product.id, item.value, searchParams)}>{item.label}</Link>)}</nav>
+      <PageHeader eyebrow="Produto" title={product.title || 'Produto sem título'} subtitle={`${product.code || 'Sem código'} · ${availabilityLabels[product.availability || ''] || 'sem disponibilidade'}`} actions={<><Link className="esmera-button" href={back}>Voltar ao catálogo</Link><TechnicalLink href={`/admin/collections/products/${product.id}`}>Admin técnico</TechnicalLink></>} context={context} />
+      <SectionNav className="esmera-product-tabs" label="Seções do produto">{tabs.map((item) => <SectionNavLink key={item.value} active={tab === item.value} href={tabHref(product.id, item.value, searchParams)}>{item.label}</SectionNavLink>)}</SectionNav>
       <div className="esmera-product-tab-content">
         {tab === 'overview' ? <Overview product={product} /> : null}
         {tab === 'media' ? <MediaTab product={product} /> : null}
