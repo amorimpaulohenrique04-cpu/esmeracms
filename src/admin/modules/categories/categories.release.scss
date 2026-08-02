@@ -147,6 +147,10 @@
     grid-template-columns: minmax(330px, .78fr) minmax(0, 1.22fr);
   }
 
+  .esmera-category-master__toolbar {
+    grid-template-columns: 1fr;
+  }
+
   .esmera-category-list-head {
     display: grid;
   }
