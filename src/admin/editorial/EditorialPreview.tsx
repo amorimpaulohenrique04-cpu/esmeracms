@@ -19,16 +19,16 @@ const viewportWidths: Record<PreviewViewport, number> = {
   mobile: 390,
 }
 
+function withRevision(url: string, revision: number) {
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}esmeraPreviewRevision=${revision}`
+}
+
 export function EditorialPreview({ title, previewURL, fullPreviewURL, updatedAt }: Props) {
   const [viewport, setViewport] = useState<PreviewViewport>('desktop')
   const [revision, setRevision] = useState(0)
   const [loading, setLoading] = useState(Boolean(previewURL))
-  const source = useMemo(() => {
-    if (!previewURL) return null
-    const url = new URL(previewURL, window.location.origin)
-    url.searchParams.set('esmeraPreviewRevision', String(revision))
-    return url.toString()
-  }, [previewURL, revision])
+  const source = useMemo(() => previewURL ? withRevision(previewURL, revision) : null, [previewURL, revision])
 
   useEffect(() => {
     if (!previewURL) return
