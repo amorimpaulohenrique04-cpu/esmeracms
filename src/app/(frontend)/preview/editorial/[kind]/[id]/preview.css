@@ -1,0 +1,149 @@
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: #f3f0e8;
+  color: #111210;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body > main { min-height: 100vh; }
+button { font: inherit; }
+
+.esmera-editorial-preview-route {
+  min-height: 100vh;
+  background: #f3f0e8;
+}
+
+.esmera-editorial-document {
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: #f3f0e8;
+  color: #111210;
+}
+
+.esmera-editorial-document__masthead {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 clamp(20px, 4vw, 64px);
+  border-bottom: 1px solid rgba(17, 18, 16, .18);
+}
+.esmera-editorial-document__masthead span { font-size: 15px; font-weight: 650; letter-spacing: .12em; }
+.esmera-editorial-document__masthead small { color: #65706b; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+
+.esmera-editorial-document__field {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.esmera-editorial-document__field::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 1px solid transparent;
+  pointer-events: none;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.esmera-editorial-document__field:hover::after,
+.esmera-editorial-document__field:focus-visible::after {
+  border-color: rgba(50, 79, 70, .48);
+  background: rgba(50, 79, 70, .035);
+}
+.esmera-editorial-document__field:focus-visible { outline: 0; }
+.esmera-editorial-document__edit {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  right: 4px;
+  padding: 4px 6px;
+  background: #324f46;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: .05em;
+  opacity: 0;
+  pointer-events: none;
+  text-transform: uppercase;
+  transform: translateY(-3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.esmera-editorial-document__field:hover > .esmera-editorial-document__edit,
+.esmera-editorial-document__field:focus-visible > .esmera-editorial-document__edit { opacity: 1; transform: translateY(0); }
+
+.esmera-editorial-product__hero {
+  min-height: calc(100vh - 69px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr);
+}
+.esmera-editorial-product__media { min-height: 620px; background: #e9e5dc; overflow: hidden; }
+.esmera-editorial-product__media img { width: 100%; height: 100%; min-height: 620px; display: block; object-fit: cover; }
+.esmera-editorial-document__media-empty { min-height: inherit; display: grid; place-items: center; color: #7b8580; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.esmera-editorial-product__summary { display: flex; flex-direction: column; justify-content: center; gap: 22px; padding: clamp(38px, 6vw, 88px); border-left: 1px solid rgba(17, 18, 16, .15); }
+.esmera-editorial-product__summary h1 { margin: 0; font-size: clamp(34px, 5vw, 72px); font-weight: 430; line-height: .98; letter-spacing: -.055em; }
+.esmera-editorial-product__availability span { display: inline-flex; padding-bottom: 5px; border-bottom: 1px solid #324f46; color: #324f46; font-size: 10px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
+.esmera-editorial-product__subtitle { margin: 0; color: #3f4944; font-size: 16px; line-height: 1.55; }
+.esmera-editorial-product__material { margin: 0; color: #65706b; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.esmera-editorial-product__price { display: block; font-size: 18px; font-weight: 560; }
+.esmera-editorial-product__cta { min-height: 50px; display: flex; align-items: center; justify-content: center; margin-top: 10px; background: #111210; color: #f3f0e8; font-size: 11px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
+
+.esmera-editorial-product__details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid rgba(17, 18, 16, .18); border-bottom: 1px solid rgba(17, 18, 16, .18); }
+.esmera-editorial-product__details .esmera-editorial-document__field { min-height: 180px; padding: 34px; box-sizing: border-box; border-right: 1px solid rgba(17, 18, 16, .14); }
+.esmera-editorial-product__details .esmera-editorial-document__field:last-child { border-right: 0; }
+.esmera-editorial-product__details span { display: block; margin-bottom: 12px; color: #65706b; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+.esmera-editorial-product__details strong { font-size: 15px; font-weight: 560; }
+.esmera-editorial-product__details p { margin: 0; color: #3f4944; font-size: 13px; line-height: 1.65; }
+.esmera-editorial-product__gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.esmera-editorial-product__gallery .esmera-editorial-document__field { aspect-ratio: 4 / 5; overflow: hidden; border-right: 1px solid rgba(17, 18, 16, .14); border-bottom: 1px solid rgba(17, 18, 16, .14); }
+.esmera-editorial-product__gallery img { width: 100%; height: 100%; object-fit: cover; }
+
+.esmera-editorial-category__hero { min-height: calc(100vh - 69px); display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(340px, .8fr); }
+.esmera-editorial-category__media { min-height: 600px; overflow: hidden; background: #111210; }
+.esmera-editorial-category__media img { width: 100%; height: 100%; min-height: 600px; display: block; object-fit: cover; }
+.esmera-editorial-category__copy { display: flex; flex-direction: column; justify-content: center; gap: 24px; padding: clamp(42px, 7vw, 96px); border-left: 1px solid rgba(17, 18, 16, .18); }
+.esmera-editorial-category__copy h1 { margin: 0; font-size: clamp(40px, 6vw, 82px); font-weight: 430; line-height: .95; letter-spacing: -.06em; }
+.esmera-editorial-category__copy p { margin: 0; color: #3f4944; font-size: 15px; line-height: 1.7; }
+.esmera-editorial-category__copy small { color: #65706b; font-size: 10px; letter-spacing: .08em; }
+.esmera-editorial-category__status { color: #324f46; font-size: 9px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
+.esmera-editorial-category__taxonomy { padding: 48px clamp(24px, 7vw, 100px); border-top: 1px solid rgba(17, 18, 16, .18); }
+.esmera-editorial-category__taxonomy > button > span { display: block; margin-bottom: 18px; color: #65706b; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+.esmera-editorial-category__taxonomy > button > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.esmera-editorial-category__taxonomy strong { padding: 8px 12px; border: 1px solid rgba(17, 18, 16, .22); font-size: 11px; font-weight: 520; }
+.esmera-editorial-category__taxonomy em { color: #65706b; font-size: 12px; }
+.esmera-editorial-category__seo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid rgba(17, 18, 16, .18); }
+.esmera-editorial-category__seo .esmera-editorial-document__field { min-height: 180px; padding: 36px; box-sizing: border-box; border-right: 1px solid rgba(17, 18, 16, .14); }
+.esmera-editorial-category__seo .esmera-editorial-document__field:last-child { border-right: 0; }
+.esmera-editorial-category__seo span { display: block; margin-bottom: 12px; color: #65706b; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+.esmera-editorial-category__seo strong { font-size: 16px; font-weight: 560; }
+.esmera-editorial-category__seo p { margin: 0; color: #3f4944; font-size: 13px; line-height: 1.65; }
+
+@media (max-width: 760px) {
+  .esmera-editorial-document__masthead { min-height: 58px; padding-inline: 16px; }
+  .esmera-editorial-product__hero,
+  .esmera-editorial-category__hero { grid-template-columns: 1fr; min-height: 0; }
+  .esmera-editorial-product__media,
+  .esmera-editorial-product__media img,
+  .esmera-editorial-category__media,
+  .esmera-editorial-category__media img { min-height: 440px; }
+  .esmera-editorial-product__summary,
+  .esmera-editorial-category__copy { padding: 34px 22px 48px; border-left: 0; border-top: 1px solid rgba(17, 18, 16, .15); }
+  .esmera-editorial-product__details,
+  .esmera-editorial-category__seo { grid-template-columns: 1fr; }
+  .esmera-editorial-product__details .esmera-editorial-document__field,
+  .esmera-editorial-category__seo .esmera-editorial-document__field { min-height: 130px; border-right: 0; border-bottom: 1px solid rgba(17, 18, 16, .14); }
+  .esmera-editorial-product__gallery { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esmera-editorial-document__field::after,
+  .esmera-editorial-document__edit { transition: none; }
+}
