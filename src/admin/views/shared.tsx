@@ -1,23 +1,14 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
-import { Gutter } from '@payloadcms/ui'
-import type { AdminViewServerProps, PayloadRequest, Where } from 'payload'
+import type { AdminViewServerProps } from 'payload'
 import { redirect } from 'next/navigation'
 import React from 'react'
 
 import { canManageBusiness, canManageSite, roleOf } from '../../access/roles'
+import { ButtonLink, EmptyState as DesignEmptyState, ErrorState } from '../design-system'
+export { countDocs, findAllDocs, findDocs } from '../../server/domain/shared/payload'
 import './views.scss'
 
 export type OperationalArea = 'all' | 'site' | 'business'
-
-type FindOptions = {
-  where?: Where
-  sort?: string
-  limit?: number
-  page?: number
-  depth?: number
-  draft?: boolean
-  select?: Record<string, true>
-}
 
 export function hasAreaAccess(user: unknown, area: OperationalArea) {
   if (area === 'all') return Boolean(user)
@@ -46,9 +37,9 @@ export function ViewFrame({
 }) {
   const { initPageResult, params, searchParams } = props
   const content = (
-    <Gutter>
+    <div className="esmera-workspace-frame">
       <main className="esmera-view">{children}</main>
-    </Gutter>
+    </div>
   )
 
   if (!withTemplate) return content
@@ -89,69 +80,11 @@ export function AccessDenied({
 }
 
 export function QueryError({ title, error }: { title: string; error: unknown }) {
-  return (
-    <div className="esmera-state esmera-state--error" role="alert">
-      <strong>{title}</strong>
-      <p>{error instanceof Error ? error.message : 'Não foi possível consultar a fonte de dados.'}</p>
-      <small>Nenhum erro de consulta é convertido em zero.</small>
-    </div>
-  )
+  return <ErrorState title={title} error={error} detail="Nenhum erro de consulta é convertido em zero." />
 }
 
 export function EmptyState({ title, copy }: { title: string; copy: string }) {
-  return <div className="esmera-empty"><strong>{title}</strong><span>{copy}</span></div>
-}
-
-export async function findDocs<T>(req: PayloadRequest, collection: string, options: FindOptions = {}) {
-  const result = await req.payload.find({
-    collection: collection as never,
-    depth: options.depth ?? 1,
-    limit: options.limit ?? 100,
-    page: options.page,
-    sort: options.sort as never,
-    where: options.where,
-    overrideAccess: false,
-    user: req.user,
-    req,
-    draft: options.draft,
-    select: options.select as never,
-  })
-  return result as unknown as {
-    docs: T[]
-    hasNextPage: boolean
-    limit: number
-    page: number
-    totalDocs: number
-    totalPages: number
-  }
-}
-
-export async function findAllDocs<T>(
-  req: PayloadRequest,
-  collection: string,
-  options: Omit<FindOptions, 'limit' | 'page'> = {},
-) {
-  const firstPage = await findDocs<T>(req, collection, { ...options, limit: 500, page: 1 })
-  if (!firstPage.hasNextPage) return firstPage.docs
-
-  const remainingPages = await Promise.all(
-    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
-      findDocs<T>(req, collection, { ...options, limit: 500, page: index + 2 }),
-    ),
-  )
-
-  return [firstPage, ...remainingPages].flatMap((result) => result.docs)
-}
-
-export async function countDocs(req: PayloadRequest, collection: string, where?: Where) {
-  const result = await req.payload.count({
-    collection: collection as never,
-    where,
-    overrideAccess: false,
-    user: req.user,
-    req,
-  })
-  return result.totalDocs
+  return <DesignEmptyState title={title} copy={copy} />
 }
 
 export function money(cents: number | null | undefined) {
@@ -182,7 +115,6 @@ export function monthStartISO() {
   }).formatToParts(now)
   const year = Number(localParts.find((part) => part.type === 'year')?.value)
   const month = Number(localParts.find((part) => part.type === 'month')?.value) - 1
-  // São Paulo is UTC-3 and Brazil currently has no daylight-saving time.
   return new Date(Date.UTC(year, month, 1, 3, 0, 0)).toISOString()
 }
 
@@ -203,7 +135,7 @@ export function PageHeader({
 }) {
   return (
     <header className="esmera-page-header">
-      <div>
+      <div className="esmera-page-header__copy">
         {eyebrow ? <span className="esmera-eyebrow">{eyebrow}</span> : null}
         <h1>{title}</h1>
         <p>{subtitle}</p>
@@ -259,5 +191,5 @@ export function MetricCard({
 }
 
 export function TechnicalLink({ href, children, primary = false }: { href: string; children: React.ReactNode; primary?: boolean }) {
-  return <a className={primary ? 'esmera-button esmera-button--primary' : 'esmera-button'} href={href}>{children}</a>
+  return <ButtonLink href={href} tone={primary ? 'primary' : 'default'}>{children}</ButtonLink>
 }

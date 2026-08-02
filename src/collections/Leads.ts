@@ -2,7 +2,6 @@ import type { CollectionConfig } from 'payload'
 
 import { commercialUsers } from '../access/roles'
 import { businessUserRelationship } from '../fields/userRelationship'
-import { applyLeadRules } from '../hooks/leads/applyLeadRules'
 
 const phoneValidation = (value: unknown, { siblingData }: { siblingData?: { email?: string } }) => {
   if (!value && !siblingData?.email) return 'Informe telefone ou e-mail.'
@@ -17,8 +16,9 @@ export const Leads: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'name',
-    defaultColumns: ['name', 'stage', 'source', 'owner', 'nextActionAt', 'updatedAt'],
+    defaultColumns: ['name', 'source', 'owner', 'opportunity', 'updatedAt'],
     listSearchableFields: ['name', 'phone', 'email', 'notes'],
+    description: 'Leads representam exclusivamente aquisição e qualificação. Negociação, etapa, próxima ação e fechamento pertencem a Opportunities.',
   },
   access: {
     admin: commercialUsers,
@@ -29,9 +29,6 @@ export const Leads: CollectionConfig = {
     readVersions: commercialUsers,
   },
   versions: { maxPerDoc: 50 },
-  hooks: {
-    beforeChange: [applyLeadRules],
-  },
   fields: [
     {
       type: 'tabs',
@@ -45,7 +42,7 @@ export const Leads: CollectionConfig = {
           ],
         },
         {
-          label: 'Pipeline',
+          label: 'Qualificação',
           fields: [
             {
               name: 'source',
@@ -62,50 +59,7 @@ export const Leads: CollectionConfig = {
                 { label: 'Outro', value: 'other' },
               ],
             },
-            {
-              name: 'stage',
-              type: 'select',
-              label: 'Etapa',
-              required: true,
-              defaultValue: 'new',
-              index: true,
-              options: [
-                { label: 'Novo', value: 'new' },
-                { label: 'Curadoria', value: 'curation' },
-                { label: 'Proposta', value: 'proposal' },
-                { label: 'Negociação', value: 'negotiation' },
-                { label: 'Ganho', value: 'won' },
-                { label: 'Perdido', value: 'lost' },
-              ],
-            },
-            businessUserRelationship('owner', 'Responsável'),
-            { name: 'nextAction', type: 'text', label: 'Próxima ação' },
-            { name: 'nextActionAt', type: 'date', label: 'Prazo da próxima ação', admin: { date: { pickerAppearance: 'dayAndTime' } } },
-            {
-              name: 'closedAt',
-              type: 'date',
-              label: 'Encerrado em',
-              index: true,
-              admin: { readOnly: true, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' } },
-            },
-            {
-              name: 'lossReason',
-              type: 'textarea',
-              label: 'Motivo da perda',
-              admin: { condition: (_, siblingData) => siblingData?.stage === 'lost' },
-            },
-            {
-              name: 'customer',
-              type: 'relationship',
-              relationTo: 'customers',
-              label: 'Cliente qualificado',
-              admin: { condition: (_, siblingData) => siblingData?.stage === 'won' },
-            },
-          ],
-        },
-        {
-          label: 'Interesse',
-          fields: [
+            businessUserRelationship('owner', 'Responsável pela qualificação'),
             {
               name: 'interestCategories',
               type: 'relationship',
@@ -120,7 +74,33 @@ export const Leads: CollectionConfig = {
               hasMany: true,
               label: 'Produtos de interesse',
             },
-            { name: 'notes', type: 'textarea', label: 'Notas' },
+            { name: 'notes', type: 'textarea', label: 'Notas de qualificação' },
+          ],
+        },
+        {
+          label: 'Relacionamentos',
+          fields: [
+            {
+              name: 'customer',
+              type: 'relationship',
+              relationTo: 'customers',
+              label: 'Cliente qualificado',
+              admin: { readOnly: true },
+            },
+            {
+              name: 'opportunity',
+              type: 'relationship',
+              relationTo: 'opportunities',
+              label: 'Oportunidade originada',
+              index: true,
+              admin: { readOnly: true },
+            },
+            {
+              name: 'opportunityMigratedAt',
+              type: 'date',
+              label: 'Migração comercial concluída em',
+              admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
+            },
           ],
         },
         {
@@ -140,5 +120,24 @@ export const Leads: CollectionConfig = {
         },
       ],
     },
+    {
+      name: 'stage',
+      type: 'select',
+      label: 'Etapa comercial legada',
+      index: true,
+      admin: { hidden: true },
+      options: [
+        { label: 'Novo', value: 'new' },
+        { label: 'Curadoria', value: 'curation' },
+        { label: 'Proposta', value: 'proposal' },
+        { label: 'Negociação', value: 'negotiation' },
+        { label: 'Ganho', value: 'won' },
+        { label: 'Perdido', value: 'lost' },
+      ],
+    },
+    { name: 'nextAction', type: 'text', label: 'Próxima ação legada', admin: { hidden: true } },
+    { name: 'nextActionAt', type: 'date', label: 'Prazo legado', admin: { hidden: true } },
+    { name: 'closedAt', type: 'date', label: 'Encerrado em', index: true, admin: { hidden: true } },
+    { name: 'lossReason', type: 'textarea', label: 'Motivo da perda legado', admin: { hidden: true } },
   ],
 }

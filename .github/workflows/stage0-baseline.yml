@@ -1,0 +1,189 @@
+name: Stage 0 - Security and Baseline
+
+on:
+  push:
+    branches:
+      - feat/admin-operational-rebuild
+      - agent/etapas-20-22-quality-gates
+  pull_request:
+    branches:
+      - main
+      - feat/admin-operational-rebuild
+      - agent/etapas-20-22-quality-gates
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: stage0-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: esmera_stage0
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d esmera_stage0"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      CI: true
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/esmera_stage0
+      PAYLOAD_SECRET: stage0-ci-only-secret-change-before-production-2026
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      BASELINE_BASE_URL: http://localhost:3000
+      BASELINE_ADMIN_EMAIL: baseline.admin@esmera.local
+      BASELINE_ADMIN_PASSWORD: EsmeraBaseline-2026!
+      VISUAL_DATASET_VERSION: stage23-v1
+      VISUAL_REFERENCE_DIR: artifacts/reference-baseline
+      VISUAL_CURRENT_DIR: artifacts/admin-baseline
+      VISUAL_REPORT_PATH: artifacts/visual-regression-report.json
+      VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+    steps:
+      - name: Checkout reconstruction branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Refresh dependency lock
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Commit refreshed lockfile when required
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "pnpm-lock.yaml already matches package.json"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "chore(stage0): refresh lockfile [skip ci]"
+          git push origin HEAD:${GITHUB_REF_NAME}
+
+      - name: Verify frozen install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Validate release gate
+        run: pnpm validate:release
+
+      - name: Capture current admin visual baseline
+        run: pnpm baseline:capture
+
+      - name: Download approved base-branch baseline
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/reference-baseline
+
+          RUN_ID=$(gh api --method GET \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/stage0-baseline.yml/runs" \
+            -f branch="${BASE_BRANCH}" \
+            -f status="success" \
+            -f per_page=30 \
+            --jq '[.workflow_runs[] | select(.id != '${{ github.run_id }}')][0].id // empty')
+
+          if [ -z "${RUN_ID}" ]; then
+            echo "Nenhum workflow aprovado encontrado para ${BASE_BRANCH}; as capturas atuais serão registradas como novas."
+            exit 0
+          fi
+
+          ARTIFACT_ID=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
+            --jq '[.artifacts[] | select(.expired == false and (.name | startswith("admin-baseline-")))][0].id // empty')
+
+          if [ -z "${ARTIFACT_ID}" ]; then
+            echo "O run ${RUN_ID} não possui artifact visual válido; as capturas atuais serão registradas como novas."
+            exit 0
+          fi
+
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" > /tmp/esmera-reference-baseline.zip
+          unzip -q /tmp/esmera-reference-baseline.zip -d artifacts/reference-baseline
+
+          MANIFEST="artifacts/reference-baseline/baseline-manifest.json"
+          if [ ! -f "${MANIFEST}" ]; then
+            echo "Baseline ${ARTIFACT_ID} não possui versão de dataset; referência legada ignorada."
+            rm -rf artifacts/reference-baseline/*
+            exit 0
+          fi
+
+          REFERENCE_VERSION=$(node -e "const fs=require('fs'); const value=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); process.stdout.write(String(value.datasetVersion || ''));" "${MANIFEST}")
+          if [ "${REFERENCE_VERSION}" != "${VISUAL_DATASET_VERSION}" ]; then
+            echo "Baseline ${ARTIFACT_ID} usa dataset ${REFERENCE_VERSION:-desconhecido}; esperado ${VISUAL_DATASET_VERSION}. Referência ignorada."
+            rm -rf artifacts/reference-baseline/*
+            exit 0
+          fi
+
+          echo "Baseline aprovado ${ARTIFACT_ID} do run ${RUN_ID}, dataset ${REFERENCE_VERSION}, carregado."
+
+      - name: Compare visual regression
+        run: pnpm baseline:compare
+
+      - name: Upload admin baseline screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-baseline-${{ github.run_id }}
+          path: artifacts/admin-baseline/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload visual regression report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-${{ github.run_id }}
+          path: artifacts/visual-regression-report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Playwright diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage0-playwright-diagnostics-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14

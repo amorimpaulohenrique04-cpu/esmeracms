@@ -1,17 +1,24 @@
 import type { CollectionConfig } from 'payload'
 
 import { commercialUsers } from '../access/roles'
+import {
+  afterSalesStatuses,
+  afterSalesStatusLabels,
+  operationalPriorities,
+  operationalPriorityLabels,
+} from '../businessRules/afterSales/model'
 import { businessUserRelationship } from '../fields/userRelationship'
 import { applyAfterSalesRules } from '../hooks/afterSales/applyAfterSalesRules'
 
 export const AfterSales: CollectionConfig = {
   slug: 'after-sales',
   trash: true,
-  labels: { singular: 'Pós-venda', plural: 'Pós-venda' },
+  labels: { singular: 'Caso de pós-venda', plural: 'Pós-venda' },
   admin: {
     group: 'Business',
-    useAsTitle: 'id',
-    defaultColumns: ['customer', 'sale', 'status', 'priority', 'expectedDeliveryAt', 'updatedAt'],
+    useAsTitle: 'caseNumber',
+    defaultColumns: ['caseNumber', 'customer', 'sale', 'status', 'priority', 'owner', 'updatedAt'],
+    listSearchableFields: ['caseNumber', 'summary'],
   },
   access: {
     admin: commercialUsers,
@@ -28,22 +35,20 @@ export const AfterSales: CollectionConfig = {
       type: 'tabs',
       tabs: [
         {
-          label: 'Acompanhamento',
+          label: 'Caso',
           fields: [
-            { name: 'sale', type: 'relationship', relationTo: 'sales', label: 'Venda', required: true },
-            { name: 'customer', type: 'relationship', relationTo: 'customers', label: 'Cliente', required: true },
+            { name: 'caseNumber', type: 'text', label: 'Código', unique: true, index: true, admin: { readOnly: true } },
+            { name: 'sale', type: 'relationship', relationTo: 'sales', label: 'Venda', required: true, index: true },
+            { name: 'customer', type: 'relationship', relationTo: 'customers', label: 'Cliente', required: true, index: true, admin: { readOnly: true } },
+            { name: 'summary', type: 'textarea', label: 'Contexto do acompanhamento' },
             {
               name: 'status',
               type: 'select',
               label: 'Status',
               required: true,
               defaultValue: 'open',
-              options: [
-                { label: 'Aberto', value: 'open' },
-                { label: 'Acompanhando', value: 'following' },
-                { label: 'Resolvido', value: 'resolved' },
-                { label: 'Encerrado', value: 'closed' },
-              ],
+              index: true,
+              options: afterSalesStatuses.map((value) => ({ label: afterSalesStatusLabels[value], value })),
             },
             {
               name: 'priority',
@@ -51,31 +56,26 @@ export const AfterSales: CollectionConfig = {
               label: 'Prioridade',
               required: true,
               defaultValue: 'normal',
-              options: [
-                { label: 'Baixa', value: 'low' },
-                { label: 'Normal', value: 'normal' },
-                { label: 'Alta', value: 'high' },
-                { label: 'Urgente', value: 'urgent' },
-              ],
+              index: true,
+              options: operationalPriorities.map((value) => ({ label: operationalPriorityLabels[value], value })),
             },
             businessUserRelationship('owner', 'Responsável'),
+            { name: 'openedAt', type: 'date', label: 'Aberto em', index: true, admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
+            { name: 'closedAt', type: 'date', label: 'Encerrado em', index: true, admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
           ],
         },
         {
-          label: 'Entrega',
+          label: 'Legado',
+          description: 'Campos preservados temporariamente para a migração idempotente. A fila operacional usa Tasks, Shipments e Occurrences.',
           fields: [
-            { name: 'expectedDeliveryAt', type: 'date', label: 'Entrega prevista', admin: { date: { pickerAppearance: 'dayAndTime' } } },
-            { name: 'deliveredAt', type: 'date', label: 'Entrega realizada', admin: { date: { pickerAppearance: 'dayAndTime' } } },
-            { name: 'deliveryNotes', type: 'textarea', label: 'Observações da entrega' },
-          ],
-        },
-        {
-          label: 'Follow-ups',
-          fields: [
+            { name: 'expectedDeliveryAt', type: 'date', label: 'Entrega prevista legada', admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
+            { name: 'deliveredAt', type: 'date', label: 'Entrega realizada legada', admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
+            { name: 'deliveryNotes', type: 'textarea', label: 'Observações de entrega legadas', admin: { readOnly: true } },
             {
               name: 'followUps',
               type: 'array',
-              label: 'Follow-ups',
+              label: 'Follow-ups legados',
+              admin: { readOnly: true, description: 'Novos follow-ups devem ser criados em Tasks. Este array permanece somente durante o ciclo de migração.' },
               fields: [
                 {
                   name: 'moment',
@@ -120,16 +120,12 @@ export const AfterSales: CollectionConfig = {
                 { name: 'completedAt', type: 'date', label: 'Concluído em', admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
               ],
             },
-          ],
-        },
-        {
-          label: 'Ocorrência',
-          fields: [
             {
               name: 'incidentType',
               type: 'select',
-              label: 'Tipo de ocorrência',
+              label: 'Tipo de ocorrência legado',
               defaultValue: 'none',
+              admin: { readOnly: true },
               options: [
                 { label: 'Sem ocorrência', value: 'none' },
                 { label: 'Avaria', value: 'damage' },
@@ -138,20 +134,8 @@ export const AfterSales: CollectionConfig = {
                 { label: 'Outro', value: 'other' },
               ],
             },
-            {
-              name: 'incidentDetails',
-              type: 'textarea',
-              label: 'Descrição da ocorrência',
-              admin: { condition: (_, siblingData) => Boolean(siblingData?.incidentType && siblingData.incidentType !== 'none') },
-              validate: (value: unknown, { siblingData }: { siblingData?: { incidentType?: string } }) =>
-                siblingData?.incidentType === 'none' || Boolean(String(value || '').trim()) || 'Descreva a ocorrência.',
-            },
-            {
-              name: 'resolution',
-              type: 'textarea',
-              label: 'Resolução',
-              admin: { condition: (_, siblingData) => Boolean(siblingData?.incidentType && siblingData.incidentType !== 'none') },
-            },
+            { name: 'incidentDetails', type: 'textarea', label: 'Descrição da ocorrência legada', admin: { readOnly: true } },
+            { name: 'resolution', type: 'textarea', label: 'Resolução legada', admin: { readOnly: true } },
           ],
         },
       ],

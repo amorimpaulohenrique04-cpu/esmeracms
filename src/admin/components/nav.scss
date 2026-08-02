@@ -1,52 +1,90 @@
+@use '../design-system/tokens';
+
 .esmera-nav {
   width: 100%;
   min-width: 0;
-  height: 100%;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 22px 14px 16px;
-  background: #f9f9ff;
-  border-right: 1px solid #dfe5e2;
-  color: #111c2d;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: var(--esmera-space-5) 12px var(--esmera-space-4);
   box-sizing: border-box;
+  border-right: 1px solid var(--esmera-line);
+  background: var(--esmera-bg);
+  color: var(--esmera-text);
+  font-family: var(--esmera-font-sans);
 }
-.esmera-nav-brand { display: flex; align-items: center; gap: 11px; padding: 2px 10px 28px; }
-.esmera-nav-brand strong { display: block; font-size: 15px; letter-spacing: -.015em; }
-.esmera-nav-brand span { display: block; color: #727975; font-size: 9px; margin-top: 3px; letter-spacing: .04em; }
-.esmera-brand-icon { width: 36px; height: 36px; display: inline-grid; place-items: center; border-radius: 10px; background: #4a675d; color: #fff; flex: 0 0 auto; }
+
+.esmera-nav-brand { display: flex; align-items: center; gap: 11px; padding: 2px 8px 26px; border-radius: var(--esmera-radius-control); color: inherit; text-decoration: none; }
+.esmera-nav-brand:focus-visible { outline: 2px solid var(--esmera-focus); outline-offset: 2px; box-shadow: var(--esmera-focus-ring); }
+.esmera-nav-brand strong { display: block; font-size: 15px; font-weight: 650; letter-spacing: -.015em; }
+.esmera-nav-brand span { display: block; margin-top: 3px; color: var(--esmera-muted); font-size: 9px; letter-spacing: .035em; }
+.esmera-brand-icon { width: 36px; height: 36px; display: inline-grid; place-items: center; flex: 0 0 auto; border-radius: var(--esmera-radius-control); background: var(--esmera-primary); color: #fff; }
 .esmera-brand-icon svg { width: 22px; height: 22px; }
-.esmera-nav-section { display: grid; gap: 5px; }
-.esmera-nav-link { min-height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 10px; color: #414845; font-size: 12px; font-weight: 600; text-decoration: none; transition: background-color .16s ease, color .16s ease; }
-.esmera-nav-link:hover { background: #eef3f1; color: #24342e; }
-.esmera-nav-link.is-active { background: #4a675d; color: #fff; box-shadow: 0 6px 18px rgba(50,79,70,.12); }
-.esmera-nav-icon { width: 19px; height: 19px; flex: 0 0 auto; }
-.esmera-nav-divider { height: 1px; background: #e3e7e5; margin: 15px 7px 11px; }
-.esmera-nav-caption { padding: 0 11px 8px; color: #727975; font-size: 9px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
-.esmera-nav-section--technical .esmera-nav-link { color: #6a7470; font-size: 11px; }
-.esmera-nav-footer { margin-top: auto; padding-top: 18px; border-top: 1px solid #e3e7e5; }
-.esmera-user { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 9px; align-items: center; padding: 7px 8px; color: inherit; text-decoration: none; }
+
+.esmera-nav-section { display: grid; gap: 3px; }
+.esmera-nav-link {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 11px;
+  border-radius: var(--esmera-radius-control);
+  color: var(--esmera-text-secondary);
+  font-size: var(--esmera-font-ui-sm);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color var(--esmera-motion-standard) var(--esmera-ease), color var(--esmera-motion-standard) var(--esmera-ease);
+}
+.esmera-nav-link:hover { background: #ecefed; color: var(--esmera-text); }
+.esmera-nav-link.is-active { background: var(--esmera-primary); color: #fff; }
+.esmera-nav-link:focus-visible,
+.esmera-user:focus-visible,
+.esmera-logout:focus-visible { outline: 2px solid var(--esmera-focus); outline-offset: 2px; box-shadow: var(--esmera-focus-ring); }
+.esmera-nav-icon { width: 18px; height: 18px; flex: 0 0 auto; }
+.esmera-nav-divider { height: 1px; margin: 15px 7px 11px; background: var(--esmera-line); }
+.esmera-nav-caption { padding: 0 11px 8px; color: var(--esmera-muted); font-size: 9px; font-weight: 650; letter-spacing: .11em; text-transform: uppercase; }
+.esmera-nav-section--technical .esmera-nav-link { color: var(--esmera-muted); font-size: 11px; }
+.esmera-nav-section--technical .esmera-nav-link.is-active { color: #fff; }
+
+.esmera-nav-footer { margin-top: auto; padding-top: var(--esmera-space-4); border-top: 1px solid var(--esmera-line); }
+.esmera-user { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 9px; align-items: center; padding: 7px 8px; border-radius: var(--esmera-radius-control); color: inherit; text-decoration: none; }
 .esmera-user strong { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 11px; white-space: nowrap; }
-.esmera-user small { display: block; color: #8a928f; font-size: 9px; margin-top: 2px; }
-.esmera-avatar { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #95b4a8; border-radius: 50%; background: #dcece6; color: #29473d; font-size: 10px; font-weight: 700; }
-.esmera-logout { width: 100%; margin-top: 6px; border: 0; background: transparent; color: #6b7470; text-align: left; padding: 8px; border-radius: 8px; font-size: 10px; cursor: pointer; }
-.esmera-logout:hover { background: #f0f2f1; color: #283730; }
+.esmera-user small { display: block; margin-top: 2px; color: var(--esmera-muted); font-size: 9px; }
+.esmera-avatar { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--esmera-line-strong); border-radius: 50%; background: var(--esmera-surface); color: var(--esmera-primary); font-size: 10px; font-weight: 650; }
+.esmera-logout { width: 100%; min-height: 36px; margin-top: 4px; padding: 0 8px; border: 0; border-radius: var(--esmera-radius-control); background: transparent; color: var(--esmera-muted); text-align: left; font-size: 10px; cursor: pointer; }
+.esmera-logout:hover { background: #ecefed; color: var(--esmera-text); }
+
 .esmera-login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .esmera-login-logo strong { display: block; font-size: 18px; }
-.esmera-login-logo span { display: block; color: #78817d; font-size: 10px; margin-top: 2px; }
+.esmera-login-logo span { display: block; margin-top: 2px; color: var(--esmera-muted); font-size: 10px; }
 
-@media (max-width: 1024px) {
-  .esmera-nav { width: 100%; }
+@media (min-width: 1280px) {
+  .template-default { grid-template-columns: 236px minmax(0, 1fr) !important; }
+  .template-default__nav-toggler-wrapper { display: none !important; }
 }
 
-@media (min-width: 1025px) {
-  .template-default {
-    grid-template-columns: 260px minmax(0, 1fr) !important;
-  }
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .template-default { grid-template-columns: 72px minmax(0, 1fr) !important; }
+  .template-default__nav-toggler-wrapper { display: none !important; }
+  .esmera-nav { padding: 14px 8px 12px; }
+  .esmera-nav-brand { justify-content: center; padding: 2px 0 20px; }
+  .esmera-nav-brand > div,
+  .esmera-nav-link > span,
+  .esmera-nav-caption,
+  .esmera-user-copy,
+  .esmera-logout { display: none; }
+  .esmera-nav-link { min-height: 42px; justify-content: center; padding: 0; }
+  .esmera-nav-link .esmera-nav-icon { width: 19px; height: 19px; }
+  .esmera-nav-divider { margin: 14px 5px 10px; }
+  .esmera-user { display: flex; justify-content: center; padding: 6px 0; }
+}
 
-  .template-default__nav-toggler-wrapper {
-    display: none !important;
-  }
+@media (max-width: 1023px) {
+  .esmera-nav { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esmera-nav-link { transition: none; }
 }

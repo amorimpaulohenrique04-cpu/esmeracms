@@ -3,8 +3,10 @@ import type { CollectionConfig } from 'payload'
 import { commercialUsers } from '../access/roles'
 import { businessUserRelationship } from '../fields/userRelationship'
 import { applySaleRules } from '../hooks/sales/applySaleRules'
+import { VALID_SALE_STATUSES } from '../server/reporting/metrics'
+import { scheduleSaleJobs } from '../server/jobs'
 
-export const eligibleSaleStatuses = ['confirmed', 'production', 'ready', 'delivered'] as const
+export const eligibleSaleStatuses = VALID_SALE_STATUSES
 
 export const Sales: CollectionConfig = {
   slug: 'sales',
@@ -13,8 +15,9 @@ export const Sales: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'number',
-    defaultColumns: ['number', 'customer', 'status', 'totalCents', 'expectedDeliveryAt', 'updatedAt'],
+    defaultColumns: ['number', 'customer', 'opportunity', 'status', 'totalCents', 'expectedDeliveryAt', 'updatedAt'],
     listSearchableFields: ['number'],
+    description: 'Sale representa a transação ganha e seu fulfillment. Negociação comercial pertence a Opportunities.',
   },
   access: {
     admin: commercialUsers,
@@ -39,6 +42,7 @@ export const Sales: CollectionConfig = {
         return data
       },
     ],
+    afterChange: [scheduleSaleJobs],
   },
   fields: [
     {
@@ -50,11 +54,21 @@ export const Sales: CollectionConfig = {
             { name: 'number', type: 'text', label: 'Número', required: true, unique: true, index: true },
             { name: 'customer', type: 'relationship', relationTo: 'customers', label: 'Cliente', required: true },
             {
+              name: 'opportunity',
+              type: 'relationship',
+              relationTo: 'opportunities',
+              label: 'Oportunidade de origem',
+              unique: true,
+              index: true,
+              admin: { description: 'Preenchida pelo workflow de ganho ou vinculada explicitamente em vendas legadas.' },
+            },
+            {
               name: 'channel',
               type: 'select',
               label: 'Canal',
               required: true,
               defaultValue: 'whatsapp',
+              index: true,
               options: [
                 { label: 'WhatsApp', value: 'whatsapp' },
                 { label: 'Instagram', value: 'instagram' },
@@ -73,8 +87,8 @@ export const Sales: CollectionConfig = {
               index: true,
               options: [
                 { label: 'Rascunho', value: 'draft' },
-                { label: 'Proposta enviada', value: 'proposal' },
-                { label: 'Negociação', value: 'negotiation' },
+                { label: 'Proposta enviada (legado)', value: 'proposal' },
+                { label: 'Negociação (legado)', value: 'negotiation' },
                 { label: 'Confirmada', value: 'confirmed' },
                 { label: 'Em produção', value: 'production' },
                 { label: 'Pronta para entrega', value: 'ready' },
@@ -82,7 +96,10 @@ export const Sales: CollectionConfig = {
                 { label: 'Cancelada', value: 'cancelled' },
               ],
             },
-            businessUserRelationship('owner', 'Responsável'),
+            {
+              ...businessUserRelationship('owner', 'Responsável'),
+              index: true,
+            },
             {
               name: 'confirmedAt',
               type: 'date',

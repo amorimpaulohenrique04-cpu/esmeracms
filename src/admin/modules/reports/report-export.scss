@@ -1,0 +1,68 @@
+.esmera-report-export {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-width: 0;
+  margin-bottom: 24px;
+  padding: 16px 18px;
+  border: 1px solid var(--esmera-line, #dfe4e1);
+  background: #f7f9f8;
+}
+
+.esmera-report-export > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.esmera-report-export strong {
+  color: #27332f;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.esmera-report-export span {
+  color: #68736f;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.esmera-report-export__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: min(100%, 360px);
+}
+
+.esmera-report-export__actions [role='status'] {
+  min-width: 0;
+  text-align: right;
+}
+
+.esmera-report-export__actions .esmera-button {
+  flex: 0 0 auto;
+}
+
+@container esmera-workspace (max-width: 680px) {
+  .esmera-report-export {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .esmera-report-export__actions {
+    align-items: stretch;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .esmera-report-export__actions [role='status'] {
+    text-align: left;
+  }
+
+  .esmera-report-export__actions .esmera-button {
+    width: 100%;
+  }
+}
