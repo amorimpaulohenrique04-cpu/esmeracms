@@ -1,0 +1,48 @@
+.esmera-technical-view .esmera-state-panel { margin-bottom: var(--esmera-space-5); }
+.esmera-technical-section { margin-top: var(--esmera-space-5); }
+.esmera-technical-section .esmera-data-section__body { min-width: 0; }
+
+.esmera-technical-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.esmera-technical-link {
+  position: relative;
+  min-width: 0;
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: center;
+  gap: 5px 12px;
+  padding: var(--esmera-space-4) var(--esmera-space-5);
+  border-right: 1px solid var(--esmera-line-default);
+  border-bottom: 1px solid var(--esmera-line-default);
+  color: var(--esmera-text);
+  text-decoration: none;
+  transition: background-color var(--esmera-motion-fast) var(--esmera-ease);
+}
+.esmera-technical-link:nth-child(3n) { border-right: 0; }
+.esmera-technical-link:hover { background: var(--esmera-surface-hover); }
+.esmera-technical-link > span { min-width: 0; font-size: var(--esmera-font-body); font-weight: var(--esmera-weight-semibold); }
+.esmera-technical-link > small { min-width: 0; grid-column: 1; color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); line-height: 1.45; }
+.esmera-technical-link > strong { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--esmera-primary); font-size: var(--esmera-font-ui); }
+
+.esmera-technical-state-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--esmera-space-3); padding: var(--esmera-space-5); }
+.esmera-technical-state-error { padding: 0 var(--esmera-space-5) var(--esmera-space-5); }
+.esmera-technical-section .esmera-data-table { min-width: 720px; }
+
+@container esmera-workspace (max-width: 980px) {
+  .esmera-technical-links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .esmera-technical-link:nth-child(3n) { border-right: 1px solid var(--esmera-line-default); }
+  .esmera-technical-link:nth-child(2n) { border-right: 0; }
+  .esmera-technical-state-grid { grid-template-columns: 1fr; }
+}
+
+@container esmera-workspace (max-width: 560px) {
+  .esmera-technical-links { grid-template-columns: 1fr; }
+  .esmera-technical-link,
+  .esmera-technical-link:nth-child(2n),
+  .esmera-technical-link:nth-child(3n) { border-right: 0; }
+  .esmera-technical-state-grid { padding: var(--esmera-space-4); }
+  .esmera-technical-state-error { padding: 0 var(--esmera-space-4) var(--esmera-space-4); }
+}
