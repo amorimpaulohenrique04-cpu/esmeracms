@@ -4,13 +4,6 @@ import { ValidationError, type CollectionBeforeValidateHook } from 'payload'
 
 import { relationshipID, sameRelationship, type RelationshipValue } from '../../businessRules/relationships'
 
-type FollowUp = {
-  id?: number | string | null
-  status?: string | null
-  completedAt?: string | null
-  [key: string]: unknown
-}
-
 type AfterSalesData = {
   caseNumber?: string | null
   sale?: RelationshipValue
@@ -18,16 +11,8 @@ type AfterSalesData = {
   status?: string | null
   openedAt?: string | null
   closedAt?: string | null
-  followUps?: FollowUp[] | null
   incidentType?: string | null
   incidentDetails?: string | null
-}
-
-function previousFollowUp(items: FollowUp[], item: FollowUp, index: number) {
-  if (item.id !== undefined && item.id !== null) {
-    return items.find((candidate) => candidate.id !== undefined && String(candidate.id) === String(item.id)) || items[index]
-  }
-  return items[index]
 }
 
 function caseNumber() {
@@ -71,17 +56,6 @@ export const applyAfterSalesRules: CollectionBeforeValidateHook = async ({ data,
   const incidentDetails = incoming.incidentDetails ?? original.incidentDetails
   if (incidentType !== 'none' && !String(incidentDetails || '').trim()) {
     errors.push({ path: 'incidentDetails', message: 'Descreva a ocorrência legada ou migre o registro para Occurrences.' })
-  }
-
-  if (Array.isArray(incoming.followUps)) {
-    const previousItems = original.followUps || []
-    incoming.followUps = incoming.followUps.map((followUp, index) => {
-      const previous = previousFollowUp(previousItems, followUp, index)
-      const wasDone = previous?.status === 'done'
-      if (followUp.status === 'done' && !wasDone) return { ...followUp, completedAt: new Date().toISOString() }
-      if (followUp.status === 'done' && previous?.completedAt) return { ...followUp, completedAt: previous.completedAt }
-      return { ...followUp, completedAt: null }
-    })
   }
 
   if (errors.length) throw new ValidationError({ collection: 'after-sales', id: id ?? undefined, req, errors })
