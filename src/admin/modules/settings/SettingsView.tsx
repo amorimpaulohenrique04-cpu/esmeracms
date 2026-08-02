@@ -1,5 +1,6 @@
 import type { AdminViewServerProps } from 'payload'
 
+import { DataSection, IntegrationState } from '../../design-system'
 import {
   AccessDenied,
   ensureUser,
@@ -12,12 +13,30 @@ export async function SettingsView(props: AdminViewServerProps) {
   const { allowed } = ensureUser(props, 'site')
   if (!allowed) return <AccessDenied props={props} area="editorial" />
 
-  return <ViewFrame props={props}>
-    <PageHeader eyebrow="Site" title="Configurações" subtitle="Atalhos seguros para configuração editorial. Status de infraestrutura não é presumido pela interface." />
+  return <ViewFrame props={props} width="standard">
+    <PageHeader eyebrow="Site" title="Configurações" subtitle="Parâmetros editoriais e canais oficiais. Estados de infraestrutura só aparecem quando existe verificação real." />
     <div className="esmera-grid-equal">
-      <section className="esmera-card"><div className="esmera-card-body"><h2>Configurações do site</h2><p className="esmera-card-copy">Canais oficiais, URL do frontend e defaults editoriais.</p><TechnicalLink href="/admin/globals/site-settings">Abrir configurações</TechnicalLink></div></section>
-      <section className="esmera-card"><div className="esmera-card-body"><h2>Navegação</h2><p className="esmera-card-copy">Links principais, categorias do submenu e utilitários.</p><TechnicalLink href="/admin/globals/navigation">Editar navegação</TechnicalLink></div></section>
+      <DataSection
+        eyebrow="Global"
+        title="Configurações do site"
+        description="Canais oficiais, URL pública, defaults editoriais e parâmetros usados pelas páginas do frontend."
+        action={<TechnicalLink href="/admin/globals/site-settings">Abrir configurações</TechnicalLink>}
+      >
+        <div className="esmera-card-body"><p className="esmera-card-copy">Edite somente valores que pertencem ao conteúdo e à operação editorial. Credenciais e segredos não são expostos nesta interface.</p></div>
+      </DataSection>
+      <DataSection
+        eyebrow="Global"
+        title="Navegação"
+        description="Links principais, categorias do submenu e utilitários compartilhados entre desktop e mobile."
+        action={<TechnicalLink href="/admin/globals/navigation">Editar navegação</TechnicalLink>}
+      >
+        <div className="esmera-card-body"><p className="esmera-card-copy">A navegação publicada permanece uma única estrutura editorial, evitando divergência entre os dispositivos.</p></div>
+      </DataSection>
     </div>
-    <div className="esmera-state esmera-state--warning"><strong>Infraestrutura</strong><p>Banco, storage, CORS, backups e credenciais são verificados fora desta UI. O painel não exibe selos de segurança sem health check real.</p></div>
+    <IntegrationState
+      title="Infraestrutura não é inferida"
+      copy="Banco, storage, CORS, backups, filas e credenciais são verificados fora desta tela. Selos de segurança ou disponibilidade só devem aparecer quando houver health check verificável."
+      action={<TechnicalLink href="/admin/technical">Abrir Admin técnico</TechnicalLink>}
+    />
   </ViewFrame>
 }
