@@ -2,7 +2,14 @@
 import Link from 'next/link'
 import type { AdminViewServerProps, Where } from 'payload'
 
-import { DataTable, EmptyState, Status } from '../../design-system'
+import {
+  DataSection,
+  DataTable,
+  EmptyState,
+  FilterPanel,
+  InlineFeedback,
+  Status,
+} from '../../design-system'
 import {
   AccessDenied,
   dateTime,
@@ -13,6 +20,7 @@ import {
   ViewFrame,
 } from '../../views/shared'
 import { PrivacyActions } from './PrivacyActions'
+import './privacy.scss'
 
 type PrivacyCustomer = {
   id: string | number
@@ -133,48 +141,65 @@ export async function PrivacyView(props: AdminViewServerProps) {
       },
     })
 
+    const requested = result.docs.filter((customer) => ['requested', 'reviewing', 'blocked'].includes(customer.privacyRequestStatus || 'none')).length
+    const restricted = result.docs.filter((customer) => customer.processingRestricted).length
+
     return (
-      <ViewFrame props={props}>
+      <ViewFrame props={props} width="wide">
         <PageHeader
           eyebrow="LGPD"
           title="Privacidade"
           subtitle="Consentimento, portabilidade, retificação, restrição, solicitações e anonimização operados sobre o registro real do cliente."
+          context={<span>{requested} solicitação{requested === 1 ? '' : 'ões'} aberta{requested === 1 ? '' : 's'} neste recorte · {restricted} tratamento{restricted === 1 ? '' : 's'} restrito{restricted === 1 ? '' : 's'}</span>}
         />
 
-        <div className="esmera-state">
-          <strong>Sem inferência de dados sensíveis</strong>
-          <p>Esta área registra apenas consentimento declarado e solicitações verificáveis. Anonimização exige papel de administrador e é bloqueada enquanto houver obrigações operacionais abertas.</p>
-        </div>
+        <InlineFeedback className="esmera-privacy-governance" tone="info">
+          <strong>Sem inferência de dados sensíveis.</strong>
+          <span>Esta área registra somente consentimento declarado e solicitações verificáveis. Ações irreversíveis exigem administrador e validação no servidor.</span>
+        </InlineFeedback>
 
-        <form className="esmera-filter-bar" method="get" action="/admin/privacy">
-          <label className="esmera-field"><span className="esmera-field-label">Buscar</span><input className="esmera-input" type="search" name="q" defaultValue={filters.q} placeholder="Nome, empresa, e-mail ou telefone" /></label>
-          <label className="esmera-field"><span className="esmera-field-label">Consentimento</span><select className="esmera-input" name="consent" defaultValue={filters.consent}><option value="all">Todos</option><option value="granted">Concedido</option><option value="withdrawn">Não concedido/retirado</option></select></label>
-          <label className="esmera-field"><span className="esmera-field-label">Solicitação</span><select className="esmera-input" name="request" defaultValue={filters.request}><option value="all">Todas</option>{Object.entries(requestLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <button className="esmera-button esmera-button--primary" type="submit">Aplicar</button>
-          <Link className="esmera-button esmera-button--quiet" href="/admin/privacy">Limpar</Link>
+        <form method="get" action="/admin/privacy">
+          <FilterPanel
+            className="esmera-privacy-filters"
+            primary={<>
+              <label className="esmera-field esmera-privacy-search"><span className="esmera-field-label">Buscar</span><input className="esmera-input" type="search" name="q" defaultValue={filters.q} placeholder="Nome, empresa, e-mail ou telefone" /></label>
+              <label className="esmera-field"><span className="esmera-field-label">Solicitação</span><select className="esmera-input" name="request" defaultValue={filters.request}><option value="all">Todas</option>{Object.entries(requestLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            </>}
+            advancedLabel="Consentimento"
+            advancedActive={filters.consent !== 'all'}
+            advanced={<div className="esmera-privacy-advanced-filters"><label className="esmera-field"><span className="esmera-field-label">Consentimento de marketing</span><select className="esmera-input" name="consent" defaultValue={filters.consent}><option value="all">Todos</option><option value="granted">Concedido</option><option value="withdrawn">Não concedido ou retirado</option></select></label><button className="esmera-button" type="submit">Aplicar recorte</button></div>}
+            actions={<><button className="esmera-button esmera-button--primary" type="submit">Aplicar</button><Link className="esmera-button esmera-button--quiet" href="/admin/privacy">Limpar</Link></>}
+          />
         </form>
 
-        {!result.docs.length ? <EmptyState title="Nenhum registro de privacidade encontrado" copy="Ajuste os filtros ou confirme se existem clientes acessíveis ao seu papel." /> : (
-          <DataTable label="Operações de privacidade dos clientes">
-            <thead><tr><th>Cliente</th><th>Consentimento</th><th>Solicitação</th><th>Retenção</th><th>Atualizado</th><th>Ações</th></tr></thead>
-            <tbody>{result.docs.map((customer) => {
-              const requestStatus = customer.privacyRequestStatus || 'none'
-              return <tr key={String(customer.id)}>
-                <td><strong>{customer.name || 'Cliente sem nome'}</strong><br /><small>{customer.company || customer.email || customer.phone || 'Sem contato complementar'}</small></td>
-                <td><Status tone={customer.marketingConsent ? 'success' : 'neutral'}>{customer.marketingConsent ? 'Concedido' : 'Não concedido'}</Status><br /><small>{customer.marketingConsent ? dateTime(customer.consentRecordedAt) : customer.consentWithdrawnAt ? `Retirado ${dateTime(customer.consentWithdrawnAt)}` : 'Sem registro de concessão'}</small></td>
-                <td><Status tone={requestTone(requestStatus)}>{requestLabels[requestStatus] || requestStatus}</Status><br /><small>{dateTime(customer.privacyRequestAt)}</small>{customer.processingRestricted ? <><br /><small>Tratamento restrito</small></> : null}</td>
-                <td>{dateTime(customer.retentionReviewAt)}</td>
-                <td>{dateTime(customer.updatedAt)}</td>
-                <td><PrivacyActions customerId={customer.id} consent={customer.marketingConsent === true} requestStatus={requestStatus} isAdmin={role === 'admin'} /></td>
-              </tr>
-            })}</tbody>
-          </DataTable>
-        )}
+        <DataSection
+          className="esmera-privacy-register"
+          eyebrow="Solicitações e consentimentos"
+          title="Registro operacional"
+          description="Consentimento é declarativo; solicitações seguem estados auditáveis. Ações críticas permanecem separadas das rotinas de atendimento."
+        >
+          {!result.docs.length ? <EmptyState title="Nenhum registro de privacidade encontrado" copy="Ajuste os filtros ou confirme se existem clientes acessíveis ao seu papel." /> : (
+            <DataTable label="Operações de privacidade dos clientes">
+              <thead><tr><th>Cliente</th><th>Consentimento</th><th>Solicitação</th><th>Retenção</th><th>Atualizado</th><th>Ações</th></tr></thead>
+              <tbody>{result.docs.map((customer) => {
+                const requestStatus = customer.privacyRequestStatus || 'none'
+                return <tr key={String(customer.id)}>
+                  <td><strong>{customer.name || 'Cliente sem nome'}</strong><br /><small>{customer.company || customer.email || customer.phone || 'Sem contato complementar'}</small></td>
+                  <td><Status tone={customer.marketingConsent ? 'success' : 'neutral'}>{customer.marketingConsent ? 'Concedido' : 'Não concedido'}</Status><br /><small>{customer.marketingConsent ? dateTime(customer.consentRecordedAt) : customer.consentWithdrawnAt ? `Retirado ${dateTime(customer.consentWithdrawnAt)}` : 'Sem registro de concessão'}</small></td>
+                  <td><Status tone={requestTone(requestStatus)}>{requestLabels[requestStatus] || requestStatus}</Status><br /><small>{dateTime(customer.privacyRequestAt)}</small>{customer.processingRestricted ? <><br /><small>Tratamento restrito</small></> : null}</td>
+                  <td>{dateTime(customer.retentionReviewAt)}</td>
+                  <td>{dateTime(customer.updatedAt)}</td>
+                  <td><PrivacyActions customerId={customer.id} consent={customer.marketingConsent === true} requestStatus={requestStatus} isAdmin={role === 'admin'} /></td>
+                </tr>
+              })}</tbody>
+            </DataTable>
+          )}
+        </DataSection>
 
         {result.totalPages > 1 ? <nav className="esmera-pagination" aria-label="Paginação de privacidade"><Link className="esmera-button" aria-disabled={filters.page <= 1} href={href(filters, { page: Math.max(1, filters.page - 1) })}>Anterior</Link><span>Página {filters.page} de {result.totalPages}</span><Link className="esmera-button" aria-disabled={filters.page >= result.totalPages} href={href(filters, { page: Math.min(result.totalPages, filters.page + 1) })}>Próxima</Link></nav> : null}
       </ViewFrame>
     )
   } catch (error) {
-    return <ViewFrame props={props}><PageHeader title="Privacidade" subtitle="Operações LGPD" /><QueryError title="Não foi possível carregar os registros de privacidade" error={error} /></ViewFrame>
+    return <ViewFrame props={props} width="wide"><PageHeader title="Privacidade" subtitle="Operações LGPD" /><QueryError title="Não foi possível carregar os registros de privacidade" error={error} /></ViewFrame>
   }
 }
