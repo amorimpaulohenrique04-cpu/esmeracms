@@ -1,0 +1,95 @@
+.esmera-editorial-preview {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-panel-radius);
+  background: var(--esmera-surface-panel);
+}
+
+.esmera-editorial-preview__toolbar {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esmera-space-4);
+  padding: var(--esmera-space-3) var(--esmera-space-4);
+  border-bottom: 1px solid var(--esmera-line-default);
+}
+
+.esmera-editorial-preview__toolbar strong {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--esmera-font-body);
+}
+
+.esmera-editorial-preview__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--esmera-space-2);
+}
+
+.esmera-editorial-preview > .esmera-inline-feedback {
+  margin: var(--esmera-space-3) var(--esmera-space-4) 0;
+}
+
+.esmera-editorial-preview__stage {
+  min-height: 560px;
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  padding: var(--esmera-space-4);
+  background:
+    linear-gradient(var(--esmera-line-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--esmera-line-subtle) 1px, transparent 1px),
+    var(--esmera-surface-raised);
+  background-size: 24px 24px;
+}
+
+.esmera-editorial-preview__viewport {
+  width: min(100%, var(--preview-width));
+  min-width: min(100%, var(--preview-width));
+  height: 720px;
+  overflow: hidden;
+  border: 1px solid var(--esmera-line-strong);
+  border-radius: var(--esmera-control-radius);
+  background: #fff;
+  box-shadow: var(--esmera-shadow-raised);
+  transition: width var(--esmera-transition-panel) var(--esmera-ease-enter);
+}
+
+.esmera-editorial-preview__viewport iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
+  background: #fff;
+}
+
+@media (max-width: 700px) {
+  .esmera-editorial-preview__toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .esmera-editorial-preview__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .esmera-editorial-preview__stage {
+    min-height: 480px;
+    padding: var(--esmera-space-3);
+  }
+
+  .esmera-editorial-preview__viewport {
+    height: 620px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esmera-editorial-preview__viewport {
+    transition: none;
+  }
+}
