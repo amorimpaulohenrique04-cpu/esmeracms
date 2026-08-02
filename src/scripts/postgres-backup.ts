@@ -1,3 +1,5 @@
+import 'dotenv/config'
+
 import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync } from 'node:fs'
 import path from 'node:path'

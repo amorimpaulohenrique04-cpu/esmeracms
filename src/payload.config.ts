@@ -1,3 +1,4 @@
+import { s3Storage } from '@payloadcms/storage-s3'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
@@ -33,10 +34,12 @@ import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
 import { canRunEsmeraJobs, esmeraJobTasks } from './server/jobs'
 import { GenerateReportExportJob } from './server/jobs/reportExport'
+import { requireDatabaseURL } from './server/env/postgres'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 const payloadSecret = process.env.PAYLOAD_SECRET || ''
+const databaseURL = requireDatabaseURL()
 
 if (process.env.NODE_ENV === 'production' && payloadSecret.length < 24) {
   throw new Error('PAYLOAD_SECRET deve possuir pelo menos 24 caracteres em produção.')
@@ -177,9 +180,33 @@ export default buildConfig({
   db: postgresAdapter({
     push: process.env.NODE_ENV !== 'production',
     pool: {
-      connectionString: process.env.DATABASE_URL || '',
+      connectionString: databaseURL,
     },
   }),
   sharp,
-  plugins: [],
+  plugins: [
+  s3Storage({
+    enabled: process.env.MEDIA_STORAGE_DRIVER === 'r2',
+
+    collections: {
+      media: true,
+      'report-export-files': true,
+    },
+
+    bucket: process.env.S3_BUCKET || '',
+
+    clientUploads: true,
+
+    config: {
+      credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+      },
+
+      region: process.env.S3_REGION || 'auto',
+      endpoint: process.env.S3_ENDPOINT,
+      forcePathStyle: true,
+    },
+  }),
+  ],
 })

@@ -7,6 +7,9 @@ const __filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(__filename)
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    '/*': ['./certs/supabase-prod-ca-2021.crt'],
+  },
   images: {
     localPatterns: [
       {

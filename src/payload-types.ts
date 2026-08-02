@@ -69,15 +69,22 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    'report-export-files': ReportExportFile;
     categories: Category;
     products: Product;
     leads: Lead;
     customers: Customer;
+    'client-interests': ClientInterest;
+    opportunities: Opportunity;
     sales: Sale;
     'after-sales': AfterSale;
     tasks: Task;
+    shipments: Shipment;
+    occurrences: Occurrence;
     activities: Activity;
+    'report-exports': ReportExport;
     'payload-kv': PayloadKv;
+    'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -86,15 +93,22 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    'report-export-files': ReportExportFilesSelect<false> | ReportExportFilesSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
+    'client-interests': ClientInterestsSelect<false> | ClientInterestsSelect<true>;
+    opportunities: OpportunitiesSelect<false> | OpportunitiesSelect<true>;
     sales: SalesSelect<false> | SalesSelect<true>;
     'after-sales': AfterSalesSelect<false> | AfterSalesSelect<true>;
     tasks: TasksSelect<false> | TasksSelect<true>;
+    shipments: ShipmentsSelect<false> | ShipmentsSelect<true>;
+    occurrences: OccurrencesSelect<false> | OccurrencesSelect<true>;
     activities: ActivitiesSelect<false> | ActivitiesSelect<true>;
+    'report-exports': ReportExportsSelect<false> | ReportExportsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
+    'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -110,6 +124,7 @@ export interface Config {
     'collection-page': CollectionPage;
     navigation: Navigation;
     'site-settings': SiteSetting;
+    'after-sales-automation': AfterSalesAutomation;
   };
   globalsSelect: {
     home: HomeSelect<false> | HomeSelect<true>;
@@ -118,6 +133,7 @@ export interface Config {
     'collection-page': CollectionPageSelect<false> | CollectionPageSelect<true>;
     navigation: NavigationSelect<false> | NavigationSelect<true>;
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    'after-sales-automation': AfterSalesAutomationSelect<false> | AfterSalesAutomationSelect<true>;
   };
   locale: null;
   widgets: {
@@ -125,7 +141,15 @@ export interface Config {
   };
   user: User;
   jobs: {
-    tasks: unknown;
+    tasks: {
+      createAfterSalesTask: TaskCreateAfterSalesTask;
+      syncActiveShipments: TaskSyncActiveShipments;
+      generateReportExport: TaskGenerateReportExport;
+      inline: {
+        input: unknown;
+        output: unknown;
+      };
+    };
     workflows: unknown;
   };
 }
@@ -229,13 +253,39 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "report-export-files".
+ */
+export interface ReportExportFile {
+  id: number;
+  semanticVersion: string;
+  generatedAt: string;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "categories".
  */
 export interface Category {
   id: number;
   title: string;
   slug: string;
+  /**
+   * Status controla participação no catálogo. Publicação é controlada separadamente pelo workflow do Payload.
+   */
   status: 'active' | 'archive';
+  /**
+   * A hierarquia é validada no servidor; relações cíclicas são rejeitadas.
+   */
   parent?: (number | null) | Category;
   description?: string | null;
   image?: (number | null) | Media;
@@ -392,6 +442,8 @@ export interface Product {
   _status?: ('draft' | 'published') | null;
 }
 /**
+ * Leads representam exclusivamente aquisição e qualificação. Negociação, etapa, próxima ação e fechamento pertencem a Opportunities.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "leads".
  */
@@ -401,18 +453,20 @@ export interface Lead {
   phone?: string | null;
   email?: string | null;
   source: 'instagram' | 'referral' | 'site' | 'architect' | 'organic' | 'whatsapp' | 'other';
-  stage: 'new' | 'curation' | 'proposal' | 'negotiation' | 'won' | 'lost';
   owner?: (number | null) | User;
+  interestCategories?: (number | Category)[] | null;
+  interestedProducts?: (number | Product)[] | null;
+  notes?: string | null;
+  customer?: (number | null) | Customer;
+  opportunity?: (number | null) | Opportunity;
+  opportunityMigratedAt?: string | null;
+  marketingConsent?: boolean | null;
+  consentRecordedAt?: string | null;
+  stage?: ('new' | 'curation' | 'proposal' | 'negotiation' | 'won' | 'lost') | null;
   nextAction?: string | null;
   nextActionAt?: string | null;
   closedAt?: string | null;
   lossReason?: string | null;
-  customer?: (number | null) | Customer;
-  interestCategories?: (number | Category)[] | null;
-  interestedProducts?: (number | Product)[] | null;
-  notes?: string | null;
-  marketingConsent?: boolean | null;
-  consentRecordedAt?: string | null;
   updatedAt: string;
   createdAt: string;
   deletedAt?: string | null;
@@ -424,11 +478,28 @@ export interface Lead {
 export interface Customer {
   id: number;
   name: string;
+  company?: string | null;
   phone?: string | null;
   email?: string | null;
   city?: string | null;
   state?: string | null;
+  normalizedPhone?: string | null;
+  normalizedEmail?: string | null;
+  status?: ('active' | 'follow_up' | 'inactive' | 'archived') | null;
+  origin?: ('instagram' | 'referral' | 'site' | 'architect' | 'organic' | 'whatsapp' | 'other') | null;
+  owner?: (number | null) | User;
   sourceLead?: (number | null) | Lead;
+  interestProfile?: {
+    categories?: (number | Category)[] | null;
+    materials?:
+      | {
+          value: string;
+          id?: string | null;
+        }[]
+      | null;
+    investmentMinCents?: number | null;
+    investmentMaxCents?: number | null;
+  };
   preferences?:
     | {
         value: string;
@@ -442,8 +513,16 @@ export interface Customer {
       }[]
     | null;
   relationshipNotes?: string | null;
+  mergedInto?: (number | null) | Customer;
+  mergedAt?: string | null;
   marketingConsent?: boolean | null;
   consentRecordedAt?: string | null;
+  consentWithdrawnAt?: string | null;
+  privacyRequestStatus?: ('none' | 'requested' | 'reviewing' | 'blocked' | 'completed') | null;
+  privacyRequestAt?: string | null;
+  privacyRequestCompletedAt?: string | null;
+  retentionReviewAt?: string | null;
+  processingRestricted?: boolean | null;
   dataHandlingNotes?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -451,12 +530,62 @@ export interface Customer {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "opportunities".
+ */
+export interface Opportunity {
+  id: number;
+  /**
+   * Gerado automaticamente pelo domínio comercial.
+   */
+  code: string;
+  /**
+   * Pode permanecer vazio durante qualificação; torna-se obrigatório ao ganhar.
+   */
+  customer?: (number | null) | Customer;
+  source: 'instagram' | 'referral' | 'site' | 'architect' | 'organic' | 'whatsapp' | 'other';
+  stage: 'new' | 'curation' | 'proposal' | 'negotiation' | 'won' | 'lost';
+  /**
+   * Usado para ordenar cards no Pipeline.
+   */
+  rank: number;
+  owner?: (number | null) | User;
+  priority?: ('low' | 'normal' | 'high' | 'urgent') | null;
+  interestedProducts?: (number | Product)[] | null;
+  /**
+   * Valor informado pelo operador. Nunca é estimado automaticamente.
+   */
+  estimatedValueCents?: number | null;
+  nextAction?: string | null;
+  nextActionAt?: string | null;
+  expectedCloseAt?: string | null;
+  closedAt?: string | null;
+  lossReason?:
+    ('price' | 'budget' | 'timing' | 'no_response' | 'product_fit' | 'competitor' | 'changed_mind' | 'other') | null;
+  lossNotes?: string | null;
+  wonSale?: (number | null) | Sale;
+  /**
+   * Vínculo mantido durante o ciclo de compatibilidade.
+   */
+  sourceLead?: (number | null) | Lead;
+  migrationVersion?: string | null;
+  migratedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Sale representa a transação ganha e seu fulfillment. Negociação comercial pertence a Opportunities.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "sales".
  */
 export interface Sale {
   id: number;
   number: string;
   customer: number | Customer;
+  /**
+   * Preenchida pelo workflow de ganho ou vinculada explicitamente em vendas legadas.
+   */
+  opportunity?: (number | null) | Opportunity;
   channel: 'whatsapp' | 'instagram' | 'site' | 'referral' | 'architect' | 'other';
   status: 'draft' | 'proposal' | 'negotiation' | 'confirmed' | 'production' | 'ready' | 'delivered' | 'cancelled';
   owner?: (number | null) | User;
@@ -498,18 +627,43 @@ export interface Sale {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "client-interests".
+ */
+export interface ClientInterest {
+  id: number;
+  customer: number | Customer;
+  product: number | Product;
+  status: 'active' | 'curation' | 'purchased' | 'paused' | 'archived';
+  source: 'manual' | 'lead' | 'sale' | 'after_sale';
+  owner?: (number | null) | User;
+  notes?: string | null;
+  addedAt: string;
+  closedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "after-sales".
  */
 export interface AfterSale {
   id: number;
+  caseNumber?: string | null;
   sale: number | Sale;
   customer: number | Customer;
+  summary?: string | null;
   status: 'open' | 'following' | 'resolved' | 'closed';
   priority: 'low' | 'normal' | 'high' | 'urgent';
   owner?: (number | null) | User;
+  openedAt?: string | null;
+  closedAt?: string | null;
   expectedDeliveryAt?: string | null;
   deliveredAt?: string | null;
   deliveryNotes?: string | null;
+  /**
+   * Novos follow-ups devem ser criados em Tasks. Este array permanece somente durante o ciclo de migração.
+   */
   followUps?:
     | {
         moment: 'd3' | 'd15' | 'd90' | 'custom';
@@ -535,6 +689,7 @@ export interface AfterSale {
 export interface Task {
   id: number;
   title: string;
+  type?: ('delivery_confirmation' | 'satisfaction' | 'testimonial' | 'maintenance' | 'curation' | 'custom') | null;
   status: 'pending' | 'in_progress' | 'done' | 'cancelled';
   priority: 'low' | 'normal' | 'high' | 'urgent';
   dueAt: string;
@@ -550,6 +705,10 @@ export interface Task {
             value: number | Customer;
           }
         | {
+            relationTo: 'opportunities';
+            value: number | Opportunity;
+          }
+        | {
             relationTo: 'sales';
             value: number | Sale;
           }
@@ -557,10 +716,64 @@ export interface Task {
             relationTo: 'after-sales';
             value: number | AfterSale;
           }
+        | {
+            relationTo: 'shipments';
+            value: number | Shipment;
+          }
+        | {
+            relationTo: 'occurrences';
+            value: number | Occurrence;
+          }
       )[]
     | null;
   notes?: string | null;
   completedAt?: string | null;
+  /**
+   * Garante idempotência para Tasks criadas pela Payload Jobs Queue.
+   */
+  automationKey?: string | null;
+  legacySourceKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "shipments".
+ */
+export interface Shipment {
+  id: number;
+  afterSalesCase: number | AfterSale;
+  sale: number | Sale;
+  customer: number | Customer;
+  carrier?: string | null;
+  trackingCode?: string | null;
+  status: 'confirmed' | 'collected' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'cancelled';
+  estimatedDelivery?: string | null;
+  deliveredAt?: string | null;
+  lastEvent?: string | null;
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  deletedAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "occurrences".
+ */
+export interface Occurrence {
+  id: number;
+  afterSalesCase: number | AfterSale;
+  sale: number | Sale;
+  customer: number | Customer;
+  type: 'damage' | 'adjustment' | 'maintenance' | 'delivery_delay' | 'return' | 'other';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'open' | 'investigating' | 'waiting_customer' | 'resolved' | 'closed';
+  owner?: (number | null) | User;
+  description: string;
+  resolution?: string | null;
+  openedAt: string;
+  closedAt?: string | null;
   updatedAt: string;
   createdAt: string;
   deletedAt?: string | null;
@@ -571,11 +784,35 @@ export interface Task {
  */
 export interface Activity {
   id: number;
-  kind: 'contact' | 'message' | 'proposal' | 'stage_change' | 'note' | 'delivery' | 'follow_up';
+  eventType?:
+    | (
+        | 'opportunity.created'
+        | 'opportunity.migrated'
+        | 'sale.created'
+        | 'opportunity.stage_changed'
+        | 'interest.added'
+        | 'task.created'
+        | 'task.status_changed'
+        | 'followup.completed'
+        | 'shipment.status_changed'
+        | 'shipment.delivered'
+        | 'occurrence.opened'
+        | 'occurrence.status_changed'
+        | 'occurrence.resolved'
+        | 'note.created'
+        | 'contact.logged'
+      )
+    | null;
+  kind: 'contact' | 'message' | 'proposal' | 'stage_change' | 'sale' | 'note' | 'delivery' | 'follow_up' | 'occurrence';
   occurredAt: string;
   summary: string;
   details?: string | null;
   owner?: (number | null) | User;
+  opportunity?: (number | null) | Opportunity;
+  fromStage?: ('new' | 'curation' | 'proposal' | 'negotiation' | 'won' | 'lost') | null;
+  toStage?: ('new' | 'curation' | 'proposal' | 'negotiation' | 'won' | 'lost') | null;
+  lossReason?:
+    ('price' | 'budget' | 'timing' | 'no_response' | 'product_fit' | 'competitor' | 'changed_mind' | 'other') | null;
   relatedTo: (
     | {
         relationTo: 'leads';
@@ -584,6 +821,10 @@ export interface Activity {
     | {
         relationTo: 'customers';
         value: number | Customer;
+      }
+    | {
+        relationTo: 'opportunities';
+        value: number | Opportunity;
       }
     | {
         relationTo: 'sales';
@@ -597,10 +838,55 @@ export interface Activity {
         relationTo: 'tasks';
         value: number | Task;
       }
+    | {
+        relationTo: 'shipments';
+        value: number | Shipment;
+      }
+    | {
+        relationTo: 'occurrences';
+        value: number | Occurrence;
+      }
+    | {
+        relationTo: 'client-interests';
+        value: number | ClientInterest;
+      }
   )[];
   updatedAt: string;
   createdAt: string;
   deletedAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "report-exports".
+ */
+export interface ReportExport {
+  id: number;
+  status: 'queued' | 'processing' | 'ready' | 'failed';
+  delivery: 'sync' | 'job';
+  requestedAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  requestedBy: number | User;
+  requestedByName: string;
+  requestedByEmail?: string | null;
+  filename: string;
+  semanticVersion: string;
+  snapshotGeneratedAt?: string | null;
+  filters:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  estimatedRows?: number | null;
+  fileSizeBytes?: number | null;
+  file?: (number | null) | ReportExportFile;
+  error?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -621,6 +907,102 @@ export interface PayloadKv {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs".
+ */
+export interface PayloadJob {
+  id: number;
+  /**
+   * Input data provided to the job
+   */
+  input?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  taskStatus?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  completedAt?: string | null;
+  totalTried?: number | null;
+  /**
+   * If hasError is true this job will not be retried
+   */
+  hasError?: boolean | null;
+  /**
+   * If hasError is true, this is the error that caused it
+   */
+  error?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Task execution log
+   */
+  log?:
+    | {
+        executedAt: string;
+        completedAt: string;
+        taskSlug: 'inline' | 'createAfterSalesTask' | 'syncActiveShipments' | 'generateReportExport';
+        taskID: string;
+        input?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        output?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        state: 'failed' | 'succeeded';
+        error?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  taskSlug?: ('inline' | 'createAfterSalesTask' | 'syncActiveShipments' | 'generateReportExport') | null;
+  queue?: string | null;
+  waitUntil?: string | null;
+  processing?: boolean | null;
+  /**
+   * Used for concurrency control. Jobs with the same key are subject to exclusive/supersedes rules.
+   */
+  concurrencyKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
@@ -633,6 +1015,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'report-export-files';
+        value: number | ReportExportFile;
       } | null)
     | ({
         relationTo: 'categories';
@@ -651,6 +1037,14 @@ export interface PayloadLockedDocument {
         value: number | Customer;
       } | null)
     | ({
+        relationTo: 'client-interests';
+        value: number | ClientInterest;
+      } | null)
+    | ({
+        relationTo: 'opportunities';
+        value: number | Opportunity;
+      } | null)
+    | ({
         relationTo: 'sales';
         value: number | Sale;
       } | null)
@@ -663,8 +1057,20 @@ export interface PayloadLockedDocument {
         value: number | Task;
       } | null)
     | ({
+        relationTo: 'shipments';
+        value: number | Shipment;
+      } | null)
+    | ({
+        relationTo: 'occurrences';
+        value: number | Occurrence;
+      } | null)
+    | ({
         relationTo: 'activities';
         value: number | Activity;
+      } | null)
+    | ({
+        relationTo: 'report-exports';
+        value: number | ReportExport;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -785,6 +1191,25 @@ export interface MediaSelect<T extends boolean = true> {
               filename?: T;
             };
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "report-export-files_select".
+ */
+export interface ReportExportFilesSelect<T extends boolean = true> {
+  semanticVersion?: T;
+  generatedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -928,18 +1353,20 @@ export interface LeadsSelect<T extends boolean = true> {
   phone?: T;
   email?: T;
   source?: T;
-  stage?: T;
   owner?: T;
+  interestCategories?: T;
+  interestedProducts?: T;
+  notes?: T;
+  customer?: T;
+  opportunity?: T;
+  opportunityMigratedAt?: T;
+  marketingConsent?: T;
+  consentRecordedAt?: T;
+  stage?: T;
   nextAction?: T;
   nextActionAt?: T;
   closedAt?: T;
   lossReason?: T;
-  customer?: T;
-  interestCategories?: T;
-  interestedProducts?: T;
-  notes?: T;
-  marketingConsent?: T;
-  consentRecordedAt?: T;
   updatedAt?: T;
   createdAt?: T;
   deletedAt?: T;
@@ -950,11 +1377,30 @@ export interface LeadsSelect<T extends boolean = true> {
  */
 export interface CustomersSelect<T extends boolean = true> {
   name?: T;
+  company?: T;
   phone?: T;
   email?: T;
   city?: T;
   state?: T;
+  normalizedPhone?: T;
+  normalizedEmail?: T;
+  status?: T;
+  origin?: T;
+  owner?: T;
   sourceLead?: T;
+  interestProfile?:
+    | T
+    | {
+        categories?: T;
+        materials?:
+          | T
+          | {
+              value?: T;
+              id?: T;
+            };
+        investmentMinCents?: T;
+        investmentMaxCents?: T;
+      };
   preferences?:
     | T
     | {
@@ -968,12 +1414,64 @@ export interface CustomersSelect<T extends boolean = true> {
         id?: T;
       };
   relationshipNotes?: T;
+  mergedInto?: T;
+  mergedAt?: T;
   marketingConsent?: T;
   consentRecordedAt?: T;
+  consentWithdrawnAt?: T;
+  privacyRequestStatus?: T;
+  privacyRequestAt?: T;
+  privacyRequestCompletedAt?: T;
+  retentionReviewAt?: T;
+  processingRestricted?: T;
   dataHandlingNotes?: T;
   updatedAt?: T;
   createdAt?: T;
   deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "client-interests_select".
+ */
+export interface ClientInterestsSelect<T extends boolean = true> {
+  customer?: T;
+  product?: T;
+  status?: T;
+  source?: T;
+  owner?: T;
+  notes?: T;
+  addedAt?: T;
+  closedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "opportunities_select".
+ */
+export interface OpportunitiesSelect<T extends boolean = true> {
+  code?: T;
+  customer?: T;
+  source?: T;
+  stage?: T;
+  rank?: T;
+  owner?: T;
+  priority?: T;
+  interestedProducts?: T;
+  estimatedValueCents?: T;
+  nextAction?: T;
+  nextActionAt?: T;
+  expectedCloseAt?: T;
+  closedAt?: T;
+  lossReason?: T;
+  lossNotes?: T;
+  wonSale?: T;
+  sourceLead?: T;
+  migrationVersion?: T;
+  migratedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -982,6 +1480,7 @@ export interface CustomersSelect<T extends boolean = true> {
 export interface SalesSelect<T extends boolean = true> {
   number?: T;
   customer?: T;
+  opportunity?: T;
   channel?: T;
   status?: T;
   owner?: T;
@@ -1019,11 +1518,15 @@ export interface SalesSelect<T extends boolean = true> {
  * via the `definition` "after-sales_select".
  */
 export interface AfterSalesSelect<T extends boolean = true> {
+  caseNumber?: T;
   sale?: T;
   customer?: T;
+  summary?: T;
   status?: T;
   priority?: T;
   owner?: T;
+  openedAt?: T;
+  closedAt?: T;
   expectedDeliveryAt?: T;
   deliveredAt?: T;
   deliveryNotes?: T;
@@ -1051,6 +1554,7 @@ export interface AfterSalesSelect<T extends boolean = true> {
  */
 export interface TasksSelect<T extends boolean = true> {
   title?: T;
+  type?: T;
   status?: T;
   priority?: T;
   dueAt?: T;
@@ -1058,6 +1562,47 @@ export interface TasksSelect<T extends boolean = true> {
   relatedTo?: T;
   notes?: T;
   completedAt?: T;
+  automationKey?: T;
+  legacySourceKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "shipments_select".
+ */
+export interface ShipmentsSelect<T extends boolean = true> {
+  afterSalesCase?: T;
+  sale?: T;
+  customer?: T;
+  carrier?: T;
+  trackingCode?: T;
+  status?: T;
+  estimatedDelivery?: T;
+  deliveredAt?: T;
+  lastEvent?: T;
+  notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "occurrences_select".
+ */
+export interface OccurrencesSelect<T extends boolean = true> {
+  afterSalesCase?: T;
+  sale?: T;
+  customer?: T;
+  type?: T;
+  severity?: T;
+  status?: T;
+  owner?: T;
+  description?: T;
+  resolution?: T;
+  openedAt?: T;
+  closedAt?: T;
   updatedAt?: T;
   createdAt?: T;
   deletedAt?: T;
@@ -1067,15 +1612,44 @@ export interface TasksSelect<T extends boolean = true> {
  * via the `definition` "activities_select".
  */
 export interface ActivitiesSelect<T extends boolean = true> {
+  eventType?: T;
   kind?: T;
   occurredAt?: T;
   summary?: T;
   details?: T;
   owner?: T;
+  opportunity?: T;
+  fromStage?: T;
+  toStage?: T;
+  lossReason?: T;
   relatedTo?: T;
   updatedAt?: T;
   createdAt?: T;
   deletedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "report-exports_select".
+ */
+export interface ReportExportsSelect<T extends boolean = true> {
+  status?: T;
+  delivery?: T;
+  requestedAt?: T;
+  startedAt?: T;
+  completedAt?: T;
+  requestedBy?: T;
+  requestedByName?: T;
+  requestedByEmail?: T;
+  filename?: T;
+  semanticVersion?: T;
+  snapshotGeneratedAt?: T;
+  filters?: T;
+  estimatedRows?: T;
+  fileSizeBytes?: T;
+  file?: T;
+  error?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1084,6 +1658,38 @@ export interface ActivitiesSelect<T extends boolean = true> {
 export interface PayloadKvSelect<T extends boolean = true> {
   key?: T;
   data?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs_select".
+ */
+export interface PayloadJobsSelect<T extends boolean = true> {
+  input?: T;
+  taskStatus?: T;
+  completedAt?: T;
+  totalTried?: T;
+  hasError?: T;
+  error?: T;
+  log?:
+    | T
+    | {
+        executedAt?: T;
+        completedAt?: T;
+        taskSlug?: T;
+        taskID?: T;
+        input?: T;
+        output?: T;
+        state?: T;
+        error?: T;
+        id?: T;
+      };
+  taskSlug?: T;
+  queue?: T;
+  waitUntil?: T;
+  processing?: T;
+  concurrencyKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1562,6 +2168,40 @@ export interface SiteSetting {
   createdAt?: string | null;
 }
 /**
+ * Regras reais que alimentam a Payload Jobs Queue. Alterações afetam apenas novos agendamentos.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "after-sales-automation".
+ */
+export interface AfterSalesAutomation {
+  id: number;
+  preparationEnabled?: boolean | null;
+  /**
+   * Usado quando a venda não possui entrega prevista. Zero agenda a tarefa imediatamente.
+   */
+  preparationDelayHours?: number | null;
+  satisfactionEnabled?: boolean | null;
+  /**
+   * Regra padrão D+3.
+   */
+  satisfactionDelayDays?: number | null;
+  testimonialEnabled?: boolean | null;
+  /**
+   * Regra padrão D+15.
+   */
+  testimonialDelayDays?: number | null;
+  maintenanceEnabled?: boolean | null;
+  /**
+   * Regra padrão D+90.
+   */
+  maintenanceDelayDays?: number | null;
+  maintenanceScope: 'selected' | 'all';
+  maintenanceProducts?: (number | Product)[] | null;
+  maintenanceCategories?: (number | Category)[] | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "home_select".
  */
@@ -1881,6 +2521,26 @@ export interface SiteSettingsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "after-sales-automation_select".
+ */
+export interface AfterSalesAutomationSelect<T extends boolean = true> {
+  preparationEnabled?: T;
+  preparationDelayHours?: T;
+  satisfactionEnabled?: T;
+  satisfactionDelayDays?: T;
+  testimonialEnabled?: T;
+  testimonialDelayDays?: T;
+  maintenanceEnabled?: T;
+  maintenanceDelayDays?: T;
+  maintenanceScope?: T;
+  maintenanceProducts?: T;
+  maintenanceCategories?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections_widget".
  */
 export interface CollectionsWidget {
@@ -1888,6 +2548,55 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskCreateAfterSalesTask".
+ */
+export interface TaskCreateAfterSalesTask {
+  input: {
+    automationKey: string;
+    saleId: string;
+    title: string;
+    type: 'delivery_confirmation' | 'satisfaction' | 'testimonial' | 'maintenance' | 'curation' | 'custom';
+    dueAt: string;
+    priority: 'low' | 'normal' | 'high' | 'urgent';
+    assigneeId?: string | null;
+    notes?: string | null;
+  };
+  output: {
+    taskID?: string | null;
+    created: boolean;
+    reason?: string | null;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSyncActiveShipments".
+ */
+export interface TaskSyncActiveShipments {
+  input?: unknown;
+  output: {
+    configured: boolean;
+    scanned: number;
+    updated: number;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskGenerateReportExport".
+ */
+export interface TaskGenerateReportExport {
+  input: {
+    exportId: string;
+  };
+  output: {
+    exportId: string;
+    fileId: string;
+    filename: string;
+    semanticVersion: string;
+    fileSizeBytes: number;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

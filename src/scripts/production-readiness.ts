@@ -1,3 +1,7 @@
+import 'dotenv/config'
+
+import { parsePostgresConnection } from '../server/env/postgres'
+
 const issues: string[] = []
 
 function required(name: string, minimum = 1) {
@@ -10,11 +14,28 @@ const databaseURL = required('DATABASE_URL', 12)
 const payloadSecret = required('PAYLOAD_SECRET', 24)
 const cronSecret = required('CRON_SECRET', 24)
 const siteURL = required('NEXT_PUBLIC_SITE_URL', 8)
-const restoreURL = required('RESTORE_TEST_DATABASE_URL', 12)
+const restoreURL = process.env.RESTORE_TEST_DATABASE_URL?.trim() || ''
 const storageDriver = required('MEDIA_STORAGE_DRIVER')
 
 if (siteURL && !siteURL.startsWith('https://')) issues.push('NEXT_PUBLIC_SITE_URL deve usar HTTPS em produção.')
-if (databaseURL && restoreURL && databaseURL === restoreURL) issues.push('RESTORE_TEST_DATABASE_URL não pode apontar para o banco de produção.')
+let databaseTarget = ''
+if (databaseURL) {
+  try {
+    databaseTarget = parsePostgresConnection(databaseURL).targetKey
+  } catch (error) {
+    issues.push(error instanceof Error ? error.message : String(error))
+  }
+}
+if (restoreURL) {
+  try {
+    const restoreTarget = parsePostgresConnection(restoreURL, 'RESTORE_TEST_DATABASE_URL').targetKey
+    if (databaseTarget && databaseTarget === restoreTarget) {
+      issues.push('RESTORE_TEST_DATABASE_URL não pode apontar para o banco de produção.')
+    }
+  } catch (error) {
+    issues.push(error instanceof Error ? error.message : String(error))
+  }
+}
 if (payloadSecret.toLocaleLowerCase().includes('change-me')) issues.push('PAYLOAD_SECRET ainda contém um placeholder.')
 if (cronSecret.toLocaleLowerCase().includes('change-me')) issues.push('CRON_SECRET ainda contém um placeholder.')
 
@@ -36,5 +57,5 @@ if (issues.length) {
   for (const issue of issues) console.error(`- ${issue}`)
   process.exitCode = 1
 } else {
-  console.info('Gate de produção aprovado: banco, secrets, restore de teste e armazenamento remoto estão declarados.')
+  console.info('Gate de produção aprovado: banco, secrets e armazenamento remoto estão declarados.')
 }
