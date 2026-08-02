@@ -105,11 +105,9 @@ export function ReportExportControl() {
       if (response.status === 202) {
         const queued = await response.json() as ExportStatus & { error?: string }
         if (!queued.id) throw new Error(queued.error || 'A Jobs Queue não retornou a exportação.')
-        setFeedback(`Relatório pesado enfileirado · contrato ${queued.semanticVersion || 'registrado'}.`)
+        setFeedback(`Relatório enfileirado · contrato ${queued.semanticVersion || 'registrado'}.`)
         const ready = await pollExport(queued, controller.signal, (status) => {
-          setFeedback(status.status === 'processing'
-            ? 'Gerando o PDF em segundo plano…'
-            : 'Relatório pesado aguardando a Jobs Queue…')
+          setFeedback(status.status === 'processing' ? 'Gerando o PDF…' : 'Aguardando a Jobs Queue…')
         })
         if (!ready.downloadUrl) throw new Error('O Job terminou sem disponibilizar o arquivo.')
         const download = await fetch(ready.downloadUrl, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
@@ -141,17 +139,11 @@ export function ReportExportControl() {
   }
 
   return (
-    <div className="esmera-report-export" aria-live="polite">
-      <div>
-        <strong>Exportação documentada</strong>
-        <span>PDF próprio com período, filtros, usuário gerador e versão semântica.</span>
-      </div>
-      <div className="esmera-report-export__actions">
-        <span role="status">{feedback}</span>
-        <button className="esmera-button esmera-button--primary" type="button" disabled={busy} onClick={() => void exportPDF()}>
-          {busy ? 'Gerando PDF…' : 'Exportar PDF'}
-        </button>
-      </div>
+    <div className="esmera-report-export-action" aria-live="polite">
+      <span role="status">{feedback}</span>
+      <button className="esmera-button esmera-button--primary" type="button" disabled={busy} onClick={() => void exportPDF()}>
+        {busy ? 'Gerando PDF…' : 'Exportar PDF'}
+      </button>
     </div>
   )
 }
