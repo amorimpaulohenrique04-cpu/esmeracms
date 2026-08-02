@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/incompatible-library -- TanStack Table exposes stateful helpers that React Compiler intentionally does not memoize. */
 'use client'
 
 import {
@@ -9,15 +10,19 @@ import {
 } from '@tanstack/react-table'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 
 import {
   BulkActionBar,
   Button,
+  ContextInspector,
   DataTable,
-  DrawerPanel,
   EmptyState,
-  Status,
+  FilterPanel,
+  InlineFeedback,
+  SegmentedControl,
+  SegmentedControlLink,
+  SplitWorkspace,
 } from '../../design-system'
 import {
   availabilityLabels,
@@ -47,7 +52,7 @@ function date(value: string | null | undefined) {
   if (!value) return '—'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return '—'
-  return parsed.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return parsed.toLocaleDateString('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function productHref(filters: ProductWorkspaceFilters, productId: string | number, tab = 'overview') {
@@ -81,8 +86,16 @@ function listHref(filters: ProductWorkspaceFilters, patch: Partial<ProductWorksp
 }
 
 function Readiness({ product }: { product: ProductListItem }) {
-  if (product.publicationReady) return <Status tone="success">Pronto</Status>
-  return <Status tone="warning">Com pendências</Status>
+  return (
+    <span className={`esmera-product-readiness${product.publicationReady ? ' is-ready' : ' has-issues'}`}>
+      <span aria-hidden="true" />
+      {product.publicationReady ? 'Pronto' : `${product.publicationIssues?.length || 0} pendência${product.publicationIssues?.length === 1 ? '' : 's'}`}
+    </span>
+  )
+}
+
+function ProductState({ active, children }: { active?: boolean; children: React.ReactNode }) {
+  return <span className={`esmera-product-state${active ? ' is-active' : ''}`}><span aria-hidden="true" />{children}</span>
 }
 
 function InspectorContent({ product, filters }: { product: ProductListItem; filters: ProductWorkspaceFilters }) {
@@ -91,7 +104,13 @@ function InspectorContent({ product, filters }: { product: ProductListItem; filt
   const categories = (product.categories || []).filter((item): item is ProductCategory => typeof item === 'object' && item !== null)
   return (
     <div className="esmera-product-inspector">
-      {coverURL ? <img className="esmera-product-inspector__image" src={coverURL} alt={cover?.alt || product.title || ''} /> : <div className="esmera-product-inspector__placeholder">Sem imagem</div>}
+      <div className="esmera-product-inspector__media">
+        {coverURL ? <img className="esmera-product-inspector__image" src={coverURL} alt={cover?.alt || product.title || ''} /> : <div className="esmera-product-inspector__placeholder">Sem imagem</div>}
+        <div className="esmera-product-inspector__media-meta">
+          <span>{product.gallery?.length || 0} mídia{product.gallery?.length === 1 ? '' : 's'}</span>
+          <Readiness product={product} />
+        </div>
+      </div>
       <dl className="esmera-product-inspector__facts">
         <div><dt>Código</dt><dd>{product.code || '—'}</dd></div>
         <div><dt>Disponibilidade</dt><dd>{availabilityLabels[product.availability || ''] || '—'}</dd></div>
@@ -107,21 +126,38 @@ function InspectorContent({ product, filters }: { product: ProductListItem; filt
           <ul>{product.publicationIssues.map((issue, index) => <li key={`${issue.message}-${index}`}>{issue.message}</li>)}</ul>
         </div>
       ) : null}
-      <div className="esmera-actions">
-        <Link className="esmera-button esmera-button--primary" href={productHref(filters, product.id)}>Abrir produto</Link>
-        <Link className="esmera-button" href={`/admin/collections/products/${product.id}`}>Admin técnico</Link>
-      </div>
     </div>
   )
 }
 
 export function ProductsWorkspaceClient({ products, categories, filters, totalDocs, totalPages }: WorkspaceProps) {
   const router = useRouter()
+  const inspectorTrigger = useRef<HTMLButtonElement | null>(null)
   const [selection, setSelection] = useState<RowSelectionState>({})
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState('')
   const [bulkAvailability, setBulkAvailability] = useState('')
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('inspect')
+  })
+
+  const openInspector = (id: string | number, trigger: HTMLButtonElement) => {
+    inspectorTrigger.current = trigger
+    setSelectedProductId(String(id))
+    const url = new URL(window.location.href)
+    url.searchParams.set('inspect', String(id))
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}`)
+  }
+
+  const closeInspector = () => {
+    setSelectedProductId(null)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('inspect')
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}`)
+    window.requestAnimationFrame(() => inspectorTrigger.current?.focus({ preventScroll: true }))
+  }
 
   const columns = useMemo<ColumnDef<ProductListItem>[]>(() => [
     {
@@ -138,40 +174,16 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
         return <div className="esmera-product-cell"><Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link><small>{product.code || 'Sem código'} · {product.slug || 'sem-slug'}</small></div>
       },
     },
-    {
-      accessorKey: 'availability',
-      header: 'Disponibilidade',
-      cell: ({ getValue }) => availabilityLabels[String(getValue() || '')] || '—',
-    },
-    {
-      id: 'price',
-      header: 'Preço',
-      cell: ({ row }) => row.original.priceMode === 'fixed' ? money(row.original.basePriceCents) : 'Sob consulta',
-    },
-    {
-      id: 'catalog',
-      header: 'Catálogo',
-      cell: ({ row }) => <Status tone={row.original.catalogStatus === 'active' ? 'success' : 'neutral'}>{row.original.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</Status>,
-    },
-    {
-      id: 'publication',
-      header: 'Publicação',
-      cell: ({ row }) => <Status tone={row.original._status === 'published' ? 'info' : 'neutral'}>{row.original._status === 'published' ? 'Publicado' : 'Rascunho'}</Status>,
-    },
-    {
-      id: 'readiness',
-      header: 'Prontidão',
-      cell: ({ row }) => <Readiness product={row.original} />,
-    },
-    {
-      accessorKey: 'updatedAt',
-      header: 'Atualizado',
-      cell: ({ getValue }) => date(String(getValue() || '')),
-    },
+    { accessorKey: 'availability', header: 'Disponibilidade', cell: ({ getValue }) => availabilityLabels[String(getValue() || '')] || '—' },
+    { id: 'price', header: 'Preço', cell: ({ row }) => row.original.priceMode === 'fixed' ? money(row.original.basePriceCents) : 'Sob consulta' },
+    { id: 'catalog', header: 'Catálogo', cell: ({ row }) => <ProductState active={row.original.catalogStatus === 'active'}>{row.original.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</ProductState> },
+    { id: 'publication', header: 'Publicação', cell: ({ row }) => <ProductState active={row.original._status === 'published'}>{row.original._status === 'published' ? 'Publicado' : 'Rascunho'}</ProductState> },
+    { id: 'readiness', header: 'Prontidão', cell: ({ row }) => <Readiness product={row.original} /> },
+    { accessorKey: 'updatedAt', header: 'Atualizado', cell: ({ getValue }) => date(String(getValue() || '')) },
     {
       id: 'inspect',
       header: '',
-      cell: ({ row }) => <DrawerPanel trigger="Inspecionar" title={row.original.title || 'Produto'} description={row.original.code || undefined}><InspectorContent product={row.original} filters={filters} /></DrawerPanel>,
+      cell: ({ row }) => <Button type="button" onClick={(event) => openInspector(row.original.id, event.currentTarget)}>Inspecionar</Button>,
     },
   ], [filters])
 
@@ -186,6 +198,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
   })
 
   const selectedIds = table.getSelectedRowModel().rows.map((row) => row.original.id)
+  const selectedProduct = products.find((product) => String(product.id) === selectedProductId)
 
   async function mutate(action: MutationAction) {
     if (!selectedIds.length || busy) return
@@ -204,12 +217,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          action,
-          ids: selectedIds,
-          categoryId: categoryId || undefined,
-          availability: bulkAvailability || undefined,
-        }),
+        body: JSON.stringify({ action, ids: selectedIds, categoryId: categoryId || undefined, availability: bulkAvailability || undefined }),
       })
       const body = await response.json() as { updated?: number; errors?: Array<{ id: string | number; message: string }>; error?: string }
       if (!response.ok) throw new Error(body.error || 'Não foi possível atualizar os produtos.')
@@ -224,71 +232,98 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     }
   }
 
-  return (
-    <>
-      <form className="esmera-products-toolbar" method="get" action="/admin/products">
-        <label className="esmera-products-search"><span>Buscar</span><input className="esmera-input" name="q" defaultValue={filters.q} placeholder="Título, código, slug ou material" /></label>
-        <label><span>Catálogo</span><select className="esmera-input" name="status" defaultValue={filters.status}><option value="all">Todos</option><option value="active">Ativos</option><option value="archived">Arquivados</option></select></label>
-        <label><span>Disponibilidade</span><select className="esmera-input" name="availability" defaultValue={filters.availability}><option value="all">Todas</option>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label><span>Publicação</span><select className="esmera-input" name="publication" defaultValue={filters.publication}><option value="all">Todos</option><option value="published">Publicados</option><option value="draft">Rascunhos</option><option value="ready">Prontos</option><option value="issues">Com pendências</option></select></label>
-        <label><span>Categoria</span><select className="esmera-input" name="category" defaultValue={filters.category}><option value="all">Todas</option>{categories.map((category) => <option key={String(category.id)} value={String(category.id)}>{category.title || category.slug || category.id}</option>)}</select></label>
-        <input type="hidden" name="view" value={filters.view} />
-        <input type="hidden" name="limit" value={filters.limit} />
-        <Button type="submit">Aplicar</Button>
-        <Link className="esmera-button esmera-button--quiet" href="/admin/products">Limpar</Link>
-      </form>
+  const master = <>
+    <form method="get" action="/admin/products">
+      <input type="hidden" name="view" value={filters.view} />
+      <input type="hidden" name="limit" value={filters.limit} />
+      <FilterPanel
+        className="esmera-products-filter-panel"
+        primary={<>
+          <label className="esmera-products-search"><span>Buscar</span><input className="esmera-input" name="q" defaultValue={filters.q} placeholder="Título, código, slug ou material" /></label>
+          <label><span>Catálogo</span><select className="esmera-input" name="status" defaultValue={filters.status}><option value="all">Todos</option><option value="active">Ativos</option><option value="archived">Arquivados</option></select></label>
+          <label><span>Publicação</span><select className="esmera-input" name="publication" defaultValue={filters.publication}><option value="all">Todos</option><option value="published">Publicados</option><option value="draft">Rascunhos</option><option value="ready">Prontos</option><option value="issues">Com pendências</option></select></label>
+        </>}
+        advancedLabel="Disponibilidade e categoria"
+        advancedActive={filters.availability !== 'all' || filters.category !== 'all'}
+        advanced={<div className="esmera-products-advanced-filters">
+          <label><span>Disponibilidade</span><select className="esmera-input" name="availability" defaultValue={filters.availability}><option value="all">Todas</option>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label><span>Categoria</span><select className="esmera-input" name="category" defaultValue={filters.category}><option value="all">Todas</option>{categories.map((category) => <option key={String(category.id)} value={String(category.id)}>{category.title || category.slug || category.id}</option>)}</select></label>
+          <Button type="submit">Aplicar recorte</Button>
+        </div>}
+        actions={<><Button type="submit" tone="primary">Aplicar</Button><Link className="esmera-button esmera-button--quiet" href="/admin/products">Limpar</Link></>}
+      />
+    </form>
 
-      <div className="esmera-products-viewbar">
-        <div><strong>{totalDocs}</strong> produto{totalDocs === 1 ? '' : 's'}</div>
-        <div className="esmera-products-viewbar__controls">
-          <Link className={`esmera-button${filters.view === 'list' ? ' esmera-button--primary' : ''}`} aria-current={filters.view === 'list' ? 'page' : undefined} href={listHref(filters, { view: 'list', page: 1 })}>Lista</Link>
-          <Link className={`esmera-button${filters.view === 'grid' ? ' esmera-button--primary' : ''}`} aria-current={filters.view === 'grid' ? 'page' : undefined} href={listHref(filters, { view: 'grid', page: 1 })}>Grid</Link>
-          <label className="esmera-products-limit"><span>Por página</span><select className="esmera-input" value={filters.limit} onChange={(event) => router.push(listHref(filters, { limit: Number(event.target.value) as 50 | 100, page: 1 }))}><option value="50">50</option><option value="100">100</option></select></label>
-        </div>
+    <div className="esmera-products-viewbar">
+      <div><strong>{totalDocs}</strong> produto{totalDocs === 1 ? '' : 's'}</div>
+      <div className="esmera-products-viewbar__controls">
+        <SegmentedControl label="Visualização dos produtos">
+          <SegmentedControlLink selected={filters.view === 'list'} href={listHref(filters, { view: 'list', page: 1 })}>Lista</SegmentedControlLink>
+          <SegmentedControlLink selected={filters.view === 'grid'} href={listHref(filters, { view: 'grid', page: 1 })}>Grid</SegmentedControlLink>
+        </SegmentedControl>
+        <label className="esmera-products-limit"><span>Por página</span><select className="esmera-input" value={filters.limit} onChange={(event) => router.push(listHref(filters, { limit: Number(event.target.value) as 50 | 100, page: 1 }))}><option value="50">50</option><option value="100">100</option></select></label>
       </div>
+    </div>
 
-      {feedback ? <div className="esmera-products-feedback" role="status" aria-live="polite">{feedback}</div> : null}
+    {feedback ? <InlineFeedback busy={busy} tone={feedback.includes('não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
 
-      {!products.length ? (
-        <EmptyState title="Nenhum produto encontrado" copy="Ajuste os filtros ou crie um novo produto para iniciar o catálogo." action={<Link className="esmera-button esmera-button--primary" href="/admin/collections/products/create">Novo produto</Link>} />
-      ) : filters.view === 'list' ? (
-        <DataTable label="Produtos do catálogo">
-          <thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead>
-          <tbody>{table.getRowModel().rows.map((row) => <tr key={row.id}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody>
-        </DataTable>
-      ) : (
-        <div className="esmera-products-grid">
-          {products.map((product) => {
-            const cover = coverItem(product.gallery)
-            const coverURL = imageURL(cover)
-            return <article className="esmera-product-tile" key={String(product.id)}>
-              <Link className="esmera-product-tile__media" href={productHref(filters, product.id)}>{coverURL ? <img src={coverURL} alt={cover?.alt || product.title || ''} /> : <span>Sem imagem</span>}</Link>
-              <div className="esmera-product-tile__body"><div><Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link><small>{product.code || 'Sem código'}</small></div><Readiness product={product} /></div>
-              <div className="esmera-product-tile__meta"><span>{availabilityLabels[product.availability || ''] || '—'}</span><span>{product.priceMode === 'fixed' ? money(product.basePriceCents) : 'Sob consulta'}</span></div>
-              <DrawerPanel trigger="Inspecionar" title={product.title || 'Produto'} description={product.code || undefined}><InspectorContent product={product} filters={filters} /></DrawerPanel>
-            </article>
-          })}
-        </div>
-      )}
+    {!products.length ? (
+      <EmptyState title="Nenhum produto encontrado" copy="Ajuste os filtros ou crie um novo produto para iniciar o catálogo." action={<Link className="esmera-button esmera-button--primary" href="/admin/collections/products/create">Novo produto</Link>} />
+    ) : filters.view === 'list' ? (
+      <DataTable label="Produtos do catálogo">
+        <thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead>
+        <tbody>{table.getRowModel().rows.map((row) => <tr key={row.id} className={String(row.original.id) === selectedProductId ? 'is-selected' : ''}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody>
+      </DataTable>
+    ) : (
+      <div className="esmera-products-grid">
+        {products.map((product) => {
+          const cover = coverItem(product.gallery)
+          const coverURL = imageURL(cover)
+          return <article className={`esmera-product-tile${String(product.id) === selectedProductId ? ' is-selected' : ''}`} key={String(product.id)}>
+            <Link className="esmera-product-tile__media" href={productHref(filters, product.id)}>{coverURL ? <img src={coverURL} alt={cover?.alt || product.title || ''} /> : <span>Sem imagem</span>}</Link>
+            <div className="esmera-product-tile__body"><div><Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link><small>{product.code || 'Sem código'}</small></div><Readiness product={product} /></div>
+            <div className="esmera-product-tile__meta"><span>{availabilityLabels[product.availability || ''] || '—'}</span><span>{product.priceMode === 'fixed' ? money(product.basePriceCents) : 'Sob consulta'}</span></div>
+            <Button type="button" onClick={(event) => openInspector(product.id, event.currentTarget)}>Inspecionar</Button>
+          </article>
+        })}
+      </div>
+    )}
 
-      <nav className="esmera-products-pagination" aria-label="Paginação de produtos">
-        <Link className={`esmera-button${filters.page <= 1 ? ' is-disabled' : ''}`} aria-disabled={filters.page <= 1} tabIndex={filters.page <= 1 ? -1 : undefined} href={listHref(filters, { page: Math.max(1, filters.page - 1) })}>Anterior</Link>
-        <span>Página {filters.page} de {Math.max(1, totalPages)}</span>
-        <Link className={`esmera-button${filters.page >= totalPages ? ' is-disabled' : ''}`} aria-disabled={filters.page >= totalPages} tabIndex={filters.page >= totalPages ? -1 : undefined} href={listHref(filters, { page: Math.min(Math.max(1, totalPages), filters.page + 1) })}>Próxima</Link>
-      </nav>
+    <nav className="esmera-products-pagination" aria-label="Paginação de produtos">
+      <Link className={`esmera-button${filters.page <= 1 ? ' is-disabled' : ''}`} aria-disabled={filters.page <= 1} tabIndex={filters.page <= 1 ? -1 : undefined} href={listHref(filters, { page: Math.max(1, filters.page - 1) })}>Anterior</Link>
+      <span>Página {filters.page} de {Math.max(1, totalPages)}</span>
+      <Link className={`esmera-button${filters.page >= totalPages ? ' is-disabled' : ''}`} aria-disabled={filters.page >= totalPages} tabIndex={filters.page >= totalPages ? -1 : undefined} href={listHref(filters, { page: Math.min(Math.max(1, totalPages), filters.page + 1) })}>Próxima</Link>
+    </nav>
 
-      {selectedIds.length ? (
-        <BulkActionBar count={selectedIds.length}>
-          <Button disabled={busy} onClick={() => void mutate('publish')} tone="primary">Publicar</Button>
-          <Button disabled={busy} onClick={() => void mutate('unpublish')}>Despublicar</Button>
-          <Button disabled={busy} onClick={() => void mutate('archive')}>Arquivar</Button>
-          <Button disabled={busy} onClick={() => void mutate('restore')}>Restaurar</Button>
-          <label className="esmera-products-bulk-category"><span>Categoria</span><select className="esmera-input" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Escolher…</option>{categories.map((category) => <option key={String(category.id)} value={String(category.id)}>{category.title || category.slug || category.id}</option>)}</select></label>
-          <Button disabled={busy || !categoryId} onClick={() => void mutate('add-category')}>Adicionar categoria</Button>
-          <label className="esmera-products-bulk-category"><span>Disponibilidade</span><select className="esmera-input" value={bulkAvailability} onChange={(event) => setBulkAvailability(event.target.value)}><option value="">Escolher…</option>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <Button disabled={busy || !bulkAvailability} onClick={() => void mutate('set-availability')}>Aplicar disponibilidade</Button>
-        </BulkActionBar>
-      ) : null}
-    </>
+    {selectedIds.length ? (
+      <BulkActionBar count={selectedIds.length}>
+        <Button disabled={busy} onClick={() => void mutate('publish')} tone="primary">Publicar</Button>
+        <Button disabled={busy} onClick={() => void mutate('unpublish')}>Despublicar</Button>
+        <Button disabled={busy} onClick={() => void mutate('archive')}>Arquivar</Button>
+        <Button disabled={busy} onClick={() => void mutate('restore')}>Restaurar</Button>
+        <label className="esmera-products-bulk-category"><span>Categoria</span><select className="esmera-input" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Escolher…</option>{categories.map((category) => <option key={String(category.id)} value={String(category.id)}>{category.title || category.slug || category.id}</option>)}</select></label>
+        <Button disabled={busy || !categoryId} onClick={() => void mutate('add-category')}>Adicionar categoria</Button>
+        <label className="esmera-products-bulk-category"><span>Disponibilidade</span><select className="esmera-input" value={bulkAvailability} onChange={(event) => setBulkAvailability(event.target.value)}><option value="">Escolher…</option>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <Button disabled={busy || !bulkAvailability} onClick={() => void mutate('set-availability')}>Aplicar disponibilidade</Button>
+      </BulkActionBar>
+    ) : null}
+  </>
+
+  return (
+    <SplitWorkspace
+      className="esmera-products-workspace"
+      master={master}
+      hasDetail={Boolean(selectedProduct)}
+      detail={selectedProduct ? (
+        <ContextInspector
+          className="esmera-product-context-inspector"
+          label={`Preview de ${selectedProduct.title || 'produto'}`}
+          header={<div className="esmera-product-context-inspector__header"><div><span className="esmera-eyebrow">Preview</span><h2>{selectedProduct.title || 'Produto sem título'}</h2><p>{selectedProduct.code || 'Sem código'}</p></div><button className="esmera-icon-button" type="button" onClick={closeInspector} aria-label="Fechar preview">×</button></div>}
+          footer={<div className="esmera-actions"><Link className="esmera-button esmera-button--primary" href={productHref(filters, selectedProduct.id)}>Abrir produto</Link><Link className="esmera-button" href={`/admin/collections/products/${selectedProduct.id}`}>Admin técnico</Link></div>}
+        >
+          <InspectorContent product={selectedProduct} filters={filters} />
+        </ContextInspector>
+      ) : undefined}
+    />
   )
 }
