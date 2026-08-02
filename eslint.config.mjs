@@ -69,6 +69,7 @@ export default defineConfig([
     files: [
       'src/admin/modules/categories/CategoriesMasterList.tsx',
       'src/admin/modules/categories/CategoryDetailEditor.tsx',
+      'src/app/(frontend)/preview/editorial/[kind]/[id]/EditorialPreviewDocument.tsx',
     ],
     rules: {
       '@next/next/no-img-element': 'off',
