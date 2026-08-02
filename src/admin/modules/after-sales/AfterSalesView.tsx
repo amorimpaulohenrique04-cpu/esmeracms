@@ -21,6 +21,8 @@ import type {
   TaskRecord,
   UserRef,
 } from './types'
+import './after-sales.scss'
+import './after-sales.release.scss'
 
 function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
