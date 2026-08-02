@@ -1,5 +1,6 @@
 import 'dotenv/config'
 
+import { parseDecoCorsOrigins } from '../server/env/cors'
 import { parsePostgresConnection } from '../server/env/postgres'
 
 const issues: string[] = []
@@ -16,6 +17,12 @@ const cronSecret = required('CRON_SECRET', 24)
 const siteURL = required('NEXT_PUBLIC_SITE_URL', 8)
 const restoreURL = process.env.RESTORE_TEST_DATABASE_URL?.trim() || ''
 const storageDriver = required('MEDIA_STORAGE_DRIVER')
+
+try {
+  parseDecoCorsOrigins(process.env.DECO_CORS_ORIGINS)
+} catch (error) {
+  issues.push(error instanceof Error ? error.message : String(error))
+}
 
 if (siteURL && !siteURL.startsWith('https://')) issues.push('NEXT_PUBLIC_SITE_URL deve usar HTTPS em produção.')
 let databaseTarget = ''

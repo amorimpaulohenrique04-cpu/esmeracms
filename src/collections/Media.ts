@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { siteEditors } from '../access/roles'
+import { publishedMediaOrAuthenticated, siteEditors } from '../access/roles'
 
 export const Media: CollectionConfig = {
   slug: 'media',
@@ -15,10 +15,14 @@ export const Media: CollectionConfig = {
   },
   access: {
     admin: siteEditors,
-    read: () => true,
+    read: publishedMediaOrAuthenticated,
     create: siteEditors,
     update: siteEditors,
     delete: siteEditors,
+  },
+  versions: {
+    drafts: true,
+    maxPerDoc: 30,
   },
   fields: [
     {

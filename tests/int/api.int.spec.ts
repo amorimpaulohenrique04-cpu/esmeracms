@@ -192,6 +192,65 @@ describe('Esméra access and data contract', () => {
     expect(editorResult.totalDocs).toBe(3)
   })
 
+  it('exposes published media while keeping media drafts private', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+    await payload.create({
+      collection: 'media',
+      overrideAccess: true,
+      data: { alt: `Mídia publicada ${stamp}`, _status: 'published' },
+      file: { data: png, mimetype: 'image/png', name: `published-${stamp}.png`, size: png.length },
+    })
+    await payload.create({
+      collection: 'media',
+      overrideAccess: true,
+      draft: true,
+      data: { alt: `Mídia rascunho ${stamp}`, _status: 'draft' },
+      file: { data: png, mimetype: 'image/png', name: `draft-${stamp}.png`, size: png.length },
+    })
+
+    const publicResult = await payload.find({
+      collection: 'media',
+      overrideAccess: false,
+      user: undefined,
+      where: { filename: { contains: stamp } },
+    })
+
+    expect(publicResult.docs.map((doc) => doc.filename)).toEqual([`published-${stamp}.png`])
+  })
+
+  it('requires authentication for every private REST collection and internal global', async () => {
+    const privateCollections = [
+      'users',
+      'leads',
+      'customers',
+      'client-interests',
+      'opportunities',
+      'sales',
+      'after-sales',
+      'tasks',
+      'shipments',
+      'occurrences',
+      'activities',
+      'report-exports',
+      'report-export-files',
+    ] as const
+
+    for (const collection of privateCollections) {
+      await expect(payload.find({
+        collection,
+        overrideAccess: false,
+        user: undefined,
+        limit: 1,
+      })).rejects.toThrow()
+    }
+
+    await expect(payload.findGlobal({
+      slug: 'after-sales-automation',
+      overrideAccess: false,
+      user: undefined,
+    })).rejects.toThrow()
+  })
+
   it('centralizes product readiness and rejects inconsistent variants', () => {
     const ready = getProductReadiness({
       title: 'Mesa Atlas',

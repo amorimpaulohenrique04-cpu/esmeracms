@@ -34,6 +34,7 @@ import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
 import { canRunEsmeraJobs, esmeraJobTasks } from './server/jobs'
 import { GenerateReportExportJob } from './server/jobs/reportExport'
+import { parseDecoCorsOrigins } from './server/env/cors'
 import { requireDatabaseURL } from './server/env/postgres'
 
 const filename = fileURLToPath(import.meta.url)
@@ -54,6 +55,7 @@ const OperationalProducts = {
 } satisfies CollectionConfig
 
 export default buildConfig({
+  cors: parseDecoCorsOrigins(process.env.DECO_CORS_ORIGINS),
   i18n: {
     supportedLanguages: { pt },
     fallbackLanguage: 'pt',

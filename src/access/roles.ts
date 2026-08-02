@@ -84,3 +84,9 @@ export const publishedGlobalOrAuthenticated = ({ req }: RequestLikeArgs) => {
   const publishedOnly: Where = { _status: { equals: 'published' } }
   return publishedOnly
 }
+
+export const publishedMediaOrAuthenticated: Access = ({ req }) => {
+  if (canManageSite(req.user)) return true
+  const publishedOnly: Where = { _status: { equals: 'published' } }
+  return publishedOnly
+}

@@ -215,6 +215,7 @@ export interface Media {
   credit?: string | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
   url?: string | null;
   thumbnailURL?: string | null;
   filename?: string | null;
@@ -1148,6 +1149,7 @@ export interface MediaSelect<T extends boolean = true> {
   credit?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
   url?: T;
   thumbnailURL?: T;
   filename?: T;
@@ -2164,6 +2166,7 @@ export interface SiteSetting {
    * Apenas sinaliza integração real. O CMS não inventa métricas de tráfego.
    */
   analyticsConfigured?: boolean | null;
+  _status?: ('draft' | 'published') | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -2515,6 +2518,7 @@ export interface SiteSettingsSelect<T extends boolean = true> {
       };
   frontendURL?: T;
   analyticsConfigured?: T;
+  _status?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
