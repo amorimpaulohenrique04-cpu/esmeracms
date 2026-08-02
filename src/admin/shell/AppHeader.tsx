@@ -3,7 +3,7 @@
 import { useAuth } from '@payloadcms/ui'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 
 import type { EsmeraRole } from '../../access/roles'
 import { ADMIN_CREATE_EVENT, ADMIN_SELECTION_EVENT } from '../state/AdminStateProvider'
@@ -62,6 +62,7 @@ export function AppHeader() {
   const auth = useAuth()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const search = searchParams.toString()
   const user = auth.user as HeaderUser | null
   const role = user?.role || null
   const name = user?.name || user?.email?.split('@')[0] || 'Esméra'
@@ -69,6 +70,12 @@ export function AppHeader() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [shortcutsReady, setShortcutsReady] = useState(false)
   const [selection, setSelection] = useState<CommandSelection | null>(null)
+
+  const openCommand = useCallback(() => {
+    const inferred = inferSelection(pathname, new URLSearchParams(search))
+    if (inferred) setSelection(inferred)
+    setCommandOpen(true)
+  }, [pathname, search])
 
   useEffect(() => {
     const onSelection = (event: Event) => {
@@ -80,18 +87,12 @@ export function AppHeader() {
   }, [])
 
   useEffect(() => {
-    if (!commandOpen) return
-    const inferred = inferSelection(pathname, new URLSearchParams(searchParams.toString()))
-    if (inferred) setSelection(inferred)
-  }, [commandOpen, pathname, searchParams])
-
-  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
 
       if ((event.metaKey || event.ctrlKey) && key === 'k') {
         event.preventDefault()
-        setCommandOpen(true)
+        openCommand()
         return
       }
 
@@ -99,7 +100,7 @@ export function AppHeader() {
 
       if (event.key === '/') {
         event.preventDefault()
-        if (!focusLocalSearch()) setCommandOpen(true)
+        if (!focusLocalSearch()) openCommand()
         return
       }
 
@@ -116,7 +117,7 @@ export function AppHeader() {
       window.cancelAnimationFrame(readyFrame)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [])
+  }, [openCommand])
 
   if (!user) return null
 
@@ -131,7 +132,7 @@ export function AppHeader() {
           <button className="esmera-shell-mobile-trigger" type="button" onClick={() => setMobileNavOpen(true)} aria-label="Abrir navegação">
             <ShellIcon name="menu" />
           </button>
-          <button className="esmera-command-trigger" type="button" onClick={() => setCommandOpen(true)} aria-label="Buscar no CMS">
+          <button className="esmera-command-trigger" type="button" onClick={openCommand} aria-label="Buscar no CMS">
             <ShellIcon name="search" />
             <span>Buscar no CMS</span>
             <kbd>⌘K / Ctrl K</kbd>
@@ -151,7 +152,7 @@ export function AppHeader() {
         open={commandOpen}
         onOpenChange={setCommandOpen}
         selection={selection}
-        currentHref={`${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
+        currentHref={`${pathname}${search ? `?${search}` : ''}`}
       />
       <MobileNav
         open={mobileNavOpen}
