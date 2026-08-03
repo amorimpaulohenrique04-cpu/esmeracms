@@ -16,7 +16,7 @@ function validProduct() {
     catalogStatus: 'active',
     categories: [{ id: 8, title: 'Esculturas', slug: 'esculturas', status: 'active', _status: 'published' }],
     gallery: [{
-      image: { id: 91, url: 'https://cdn.example.com/nodulo.jpg', alt: 'Escultura em esmeralda sobre base mineral' },
+      image: { id: 91, url: 'https://cdn.example.com/nodulo.jpg', alt: 'Escultura em esmeralda sobre base mineral', _status: 'published' },
       mediaKey: 'principal',
       role: 'cover',
       alt: 'Escultura em esmeralda sobre base mineral',
@@ -94,6 +94,17 @@ describe('storefront and publication assessment', () => {
       expect.objectContaining({ path: 'categories', severity: 'blocker' }),
       expect.objectContaining({ path: 'gallery', severity: 'blocker' }),
     ]))
+  })
+
+  it('blocks a product whose referenced media is still a draft', () => {
+    const product = validProduct()
+    product.gallery[0].image._status = 'draft'
+
+    expect(assessProductPublication(product).issues).toContainEqual(expect.objectContaining({
+      id: 'storefront.media.unpublished',
+      path: 'gallery.0.image',
+      severity: 'blocker',
+    }))
   })
 })
 

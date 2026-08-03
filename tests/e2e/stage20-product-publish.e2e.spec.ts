@@ -14,7 +14,7 @@ test.describe('Stage 20 product publication', () => {
     await cleanupTestUser()
   })
 
-  test('creates a draft, completes readiness, publishes and finds the product', async ({ page }) => {
+  test('creates a draft, completes readiness, publishes and finds the product', async ({ page, request }) => {
     test.setTimeout(120_000)
     await login({ page, user: testUser })
     const stamp = Date.now()
@@ -41,7 +41,7 @@ test.describe('Stage 20 product publication', () => {
 
     const mediaResponse = await page.request.post('http://localhost:3000/api/media', {
       multipart: {
-        _payload: JSON.stringify({ alt: 'Objeto Esméra sobre fundo neutro' }),
+        _payload: JSON.stringify({ alt: 'Objeto Esméra sobre fundo neutro', _status: 'published' }),
         file: {
           name: `produto-publicavel-${stamp}.png`,
           mimeType: 'image/png',
@@ -50,9 +50,18 @@ test.describe('Stage 20 product publication', () => {
       },
     })
     expect(mediaResponse.ok(), `media upload failed: ${mediaResponse.status()} ${await mediaResponse.text()}`).toBeTruthy()
-    const mediaBody = await mediaResponse.json() as { id?: string | number; doc?: { id?: string | number } }
+    const mediaBody = await mediaResponse.json() as { id?: string | number; url?: string; _status?: string; doc?: { id?: string | number; url?: string; _status?: string } }
     const mediaId = mediaBody.id ?? mediaBody.doc?.id
+    const mediaURL = mediaBody.url ?? mediaBody.doc?.url
+    const mediaStatus = mediaBody._status ?? mediaBody.doc?._status
     expect(mediaId).toBeTruthy()
+    expect(mediaStatus).toBe('published')
+    expect(mediaURL).toMatch(/^http:\/\/localhost:3000\/api\/media\/file\//)
+
+    const publicMediaDocument = await request.get(`http://localhost:3000/api/media/${mediaId}`)
+    expect(publicMediaDocument.ok(), await publicMediaDocument.text()).toBeTruthy()
+    const publicMediaFile = await request.get(mediaURL as string)
+    expect(publicMediaFile.ok()).toBeTruthy()
 
     const productResponse = await page.request.post('http://localhost:3000/api/products?draft=true', {
       data: {
@@ -85,8 +94,8 @@ test.describe('Stage 20 product publication', () => {
     const publishProduct = await page.request.post('http://localhost:3000/api/admin-products', {
       data: { action: 'publish', ids: [productId] },
     })
-    expect(publishProduct.ok(), await publishProduct.text()).toBeTruthy()
     const published = await publishProduct.json() as { updated?: number; errors?: unknown[] }
+    expect(publishProduct.ok(), JSON.stringify(published)).toBeTruthy()
     expect(published.updated).toBe(1)
     expect(published.errors || []).toHaveLength(0)
 

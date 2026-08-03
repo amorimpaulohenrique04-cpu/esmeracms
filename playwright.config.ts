@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test'
 import 'dotenv/config'
 
 const isCI = Boolean(process.env.CI)
-const baseURL = 'http://127.0.0.1:3000'
+const baseURL = 'http://localhost:3000'
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -14,8 +14,8 @@ export default defineConfig({
   },
   forbidOnly: isCI,
   fullyParallel: false,
-  maxFailures: isCI ? 1 : 0,
-  retries: isCI ? 1 : 0,
+  maxFailures: 0,
+  retries: 0,
   workers: isCI ? 1 : undefined,
   reporter: isCI
     ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
@@ -23,6 +23,7 @@ export default defineConfig({
   outputDir: 'test-results',
   use: {
     baseURL,
+    extraHTTPHeaders: { Origin: baseURL },
     actionTimeout: isCI ? 15_000 : 0,
     navigationTimeout: isCI ? 30_000 : 0,
     screenshot: 'only-on-failure',

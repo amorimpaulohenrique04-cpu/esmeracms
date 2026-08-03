@@ -52,7 +52,27 @@ function validateMediaRelationship(
   alt: unknown,
 ): PublicationIssue[] {
   const media = relation(value)
-  if (!media || !validAbsoluteURL(media.url)) {
+  if (!media) {
+    return [issue({
+      id: 'storefront.media.url_missing',
+      path,
+      tab: path.startsWith('gallery') ? 'gallery' : null,
+      anchor: path.startsWith('gallery') ? 'product-gallery' : null,
+      message: 'A imagem não possui uma URL pública válida.',
+      suggestion: 'Selecione novamente a mídia e confirme que ela foi publicada.',
+    })]
+  }
+  if (media._status !== 'published') {
+    return [issue({
+      id: 'storefront.media.unpublished',
+      path,
+      tab: path.startsWith('gallery') ? 'gallery' : null,
+      anchor: path.startsWith('gallery') ? 'product-gallery' : null,
+      message: 'A imagem precisa ser publicada antes de ser usada no site.',
+      suggestion: 'Publique a mídia e tente publicar o conteúdo novamente.',
+    })]
+  }
+  if (!validAbsoluteURL(media.url)) {
     return [issue({
       id: 'storefront.media.url_missing',
       path,
