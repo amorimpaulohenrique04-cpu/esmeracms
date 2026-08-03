@@ -10,7 +10,11 @@ function replaceToken(template: string, token: string, value: string) {
 
 export function editorialPreviewURL(document: PreviewDocument) {
   const template = process.env.NEXT_PUBLIC_EDITORIAL_PREVIEW_URL?.trim()
-  if (!template) return null
+
+  if (!template) {
+    const kind = document.collection === 'products' ? 'product' : 'category'
+    return `/preview/editorial/${kind}/${encodeURIComponent(String(document.id))}`
+  }
 
   let url = template
   url = replaceToken(url, 'collection', document.collection)
