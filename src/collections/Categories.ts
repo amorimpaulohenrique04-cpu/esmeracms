@@ -1,4 +1,4 @@
-import { ValidationError, type CollectionConfig, type Where } from 'payload'
+import { APIError, ValidationError, type CollectionConfig, type Where } from 'payload'
 
 import { activeCategoriesOrAuthenticated, siteEditors } from '../access/roles'
 import { getCategoryHierarchyIssues } from '../businessRules/categories/hierarchy'
@@ -39,12 +39,7 @@ export const Categories: CollectionConfig = {
         const parent = data.parent !== undefined ? data.parent : originalDoc?.parent
         const hierarchyIssues = await getCategoryHierarchyIssues(req, id, parent)
         if (hierarchyIssues.length) {
-          throw new ValidationError({
-            collection: 'categories',
-            id,
-            req,
-            errors: hierarchyIssues.map((message) => ({ path: 'parent', message })),
-          })
+          throw new APIError(hierarchyIssues.join(' '), 400)
         }
 
         const nextStatus = data.status ?? originalDoc?.status
