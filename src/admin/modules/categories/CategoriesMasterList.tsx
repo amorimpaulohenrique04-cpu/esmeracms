@@ -68,38 +68,17 @@ function SortableCategory({
       style={{ '--category-depth': category.depth } as React.CSSProperties}
       data-esmera-context-key={`category-${category.id}`}
     >
-      <button
-        ref={sortable.handleRef}
-        type="button"
-        className="esmera-category-drag"
-        aria-label={`Reordenar ${title}`}
-        disabled={disabled}
-      >
+      <button ref={sortable.handleRef} type="button" className="esmera-category-drag" aria-label={`Reordenar ${title}`} disabled={disabled}>
         <span aria-hidden="true">⋮⋮</span>
       </button>
-      <Link
-        className="esmera-category-row__main"
-        href={categoryHref(filters, category.id)}
-        data-esmera-transition="inspector"
-        data-esmera-recent-label={title}
-        data-esmera-recent-meta={`Categoria · /${category.slug || 'sem-slug'}`}
-      >
+      <Link className="esmera-category-row__main" href={categoryHref(filters, category.id)} data-esmera-transition="inspector" data-esmera-recent-label={title} data-esmera-recent-meta={`Categoria · /${category.slug || 'sem-slug'}`}>
         <span className="esmera-category-thumb">{image ? <img src={image} alt={alt} /> : <span aria-hidden="true">◇</span>}</span>
-        <span className="esmera-category-row__copy">
-          <strong>{title}</strong>
-          <small>/{category.slug || 'sem-slug'}{category.depth > 0 ? ` · nível ${category.depth + 1}` : ''}</small>
-        </span>
+        <span className="esmera-category-row__copy"><strong>{title}</strong><small>/{category.slug || 'sem-slug'}{category.depth > 0 ? ` · nível ${category.depth + 1}` : ''}</small></span>
       </Link>
       <span className="esmera-category-count">{category.productCount} prod.</span>
       <label className="esmera-category-position">
         <span className="esmera-sr-only">Mover {title} para posição</span>
-        <select
-          className="esmera-input"
-          value={index + 1}
-          disabled={disabled}
-          aria-label={`Mover ${title} para posição`}
-          onChange={(event) => onMove(index, Number(event.target.value) - 1)}
-        >
+        <select className="esmera-input" value={index + 1} disabled={disabled} aria-label={`Mover ${title} para posição`} onChange={(event) => onMove(index, Number(event.target.value) - 1)}>
           {Array.from({ length: total }, (_, target) => <option key={target + 1} value={target + 1}>{target + 1}</option>)}
         </select>
       </label>
@@ -121,12 +100,7 @@ export function CategoriesMasterList({ categories, allOrderIds, filters, selecte
       announceAdminSelection(null)
       return
     }
-    announceAdminSelection({
-      kind: 'category',
-      id: selected.id,
-      label: selected.title || 'Categoria sem título',
-      href: categoryHref(filters, selected.id),
-    })
+    announceAdminSelection({ kind: 'category', id: selected.id, label: selected.title || 'Categoria sem título', href: categoryHref(filters, selected.id) })
   }, [filters, items, selectedId])
 
   function mergedFullOrder(nextVisible: CategoryListItem[]) {
@@ -152,7 +126,7 @@ export function CategoriesMasterList({ categories, allOrderIds, filters, selecte
       })
       const body = await response.json() as { error?: string }
       if (!response.ok) throw new Error(body.error || 'Não foi possível salvar a ordem.')
-      setFeedback(`${movedTitle} movida para a posição ${position}. Ordem salva.`)
+      setFeedback(`Ordem editorial salva. ${movedTitle} movida para a posição ${position}.`)
       announceAdmin(`${movedTitle} movida para a posição ${position}.`)
       router.refresh()
     } catch (error) {
@@ -195,9 +169,7 @@ export function CategoriesMasterList({ categories, allOrderIds, filters, selecte
         </form>
       </div>
 
-      <div className="esmera-category-list-head" aria-hidden="true">
-        <span>Categoria</span><span>Produtos</span><span>Posição</span>
-      </div>
+      <div className="esmera-category-list-head" aria-hidden="true"><span>Categoria</span><span>Produtos</span><span>Posição</span></div>
 
       {!items.length ? <EmptyState title="Nenhuma categoria encontrada" copy={filters.q ? 'Ajuste a busca ou limpe o filtro.' : 'Crie uma categoria para estruturar o catálogo.'} /> : (
         <DragDropProvider onDragEnd={(event) => {
@@ -207,18 +179,7 @@ export function CategoriesMasterList({ categories, allOrderIds, filters, selecte
           move(source.initialIndex, source.index)
         }}>
           <ol className="esmera-category-list">
-            {items.map((category, index) => (
-              <SortableCategory
-                key={String(category.id)}
-                category={category}
-                index={index}
-                total={items.length}
-                filters={filters}
-                selected={String(category.id) === String(selectedId || '')}
-                disabled={saving}
-                onMove={move}
-              />
-            ))}
+            {items.map((category, index) => <SortableCategory key={String(category.id)} category={category} index={index} total={items.length} filters={filters} selected={String(category.id) === String(selectedId || '')} disabled={saving} onMove={move} />)}
           </ol>
         </DragDropProvider>
       )}
