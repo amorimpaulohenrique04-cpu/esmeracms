@@ -1731,41 +1731,55 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
  */
 export interface Home {
   id: number;
+  disabledSections?:
+    | (
+        | 'hero'
+        | 'manifesto'
+        | 'selectedObjects'
+        | 'matter'
+        | 'signature'
+        | 'matterInterlude'
+        | 'provenance'
+        | 'privateInvitation'
+      )[]
+    | null;
   heroMode: 'single' | 'carousel';
-  heroSlides: {
-    desktopImage: {
-      image: number | Media;
-      /**
-       * Descreva a imagem para pessoas que usam leitores de tela.
-       */
-      alt: string;
-      caption?: string | null;
-    };
-    mobileImage: {
-      image: number | Media;
-      /**
-       * Descreva a imagem para pessoas que usam leitores de tela.
-       */
-      alt: string;
-      caption?: string | null;
-    };
-    statement: string;
-    callToAction?: {
-      label?: string | null;
-      destinationType?: ('internal' | 'external' | 'whatsapp') | null;
-      /**
-       * Exemplo: /colecao
-       */
-      path?: string | null;
-      url?: string | null;
-    };
-    active?: boolean | null;
-    id?: string | null;
-  }[];
+  heroSlides?:
+    | {
+        desktopImage: {
+          image: number | Media;
+          /**
+           * Descreva a imagem para pessoas que usam leitores de tela.
+           */
+          alt: string;
+          caption?: string | null;
+        };
+        mobileImage: {
+          image: number | Media;
+          /**
+           * Descreva a imagem para pessoas que usam leitores de tela.
+           */
+          alt: string;
+          caption?: string | null;
+        };
+        statement: string;
+        callToAction?: {
+          label?: string | null;
+          destinationType?: ('internal' | 'external' | 'whatsapp') | null;
+          /**
+           * Exemplo: /colecao
+           */
+          path?: string | null;
+          url?: string | null;
+        };
+        active?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
   autoplay?: boolean | null;
   autoplaySeconds?: number | null;
   manifestoEyebrow?: string | null;
-  manifestoTitle: string;
+  manifestoTitle?: string | null;
   manifestoCopy?: {
     root: {
       type: string;
@@ -1798,9 +1812,9 @@ export interface Home {
     caption?: string | null;
   };
   /**
-   * Nenhum dado do produto é copiado aqui.
+   * Selecione até 4 produtos. Nenhum dado do produto é copiado aqui.
    */
-  selectedProducts: (number | Product)[];
+  selectedProducts?: (number | Product)[] | null;
   matterPanels?:
     | {
         category: number | Category;
@@ -2162,6 +2176,12 @@ export interface SiteSetting {
    * Exemplo: https://esmera.com.br
    */
   frontendURL?: string | null;
+  footerStatement?: string | null;
+  locationLabel?: string | null;
+  privacyLabel?: string | null;
+  privacyHref?: string | null;
+  termsLabel?: string | null;
+  termsHref?: string | null;
   /**
    * Apenas sinaliza integração real. O CMS não inventa métricas de tráfego.
    */
@@ -2209,6 +2229,7 @@ export interface AfterSalesAutomation {
  * via the `definition` "home_select".
  */
 export interface HomeSelect<T extends boolean = true> {
+  disabledSections?: T;
   heroMode?: T;
   heroSlides?:
     | T
@@ -2517,6 +2538,12 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         id?: T;
       };
   frontendURL?: T;
+  footerStatement?: T;
+  locationLabel?: T;
+  privacyLabel?: T;
+  privacyHref?: T;
+  termsLabel?: T;
+  termsHref?: T;
   analyticsConfigured?: T;
   _status?: T;
   updatedAt?: T;
