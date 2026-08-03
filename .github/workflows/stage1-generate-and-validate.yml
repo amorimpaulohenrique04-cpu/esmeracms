@@ -1,0 +1,55 @@
+name: Stage 1 generate and validate
+
+on:
+  push:
+    branches:
+      - agent/payload-home-contract-stage-1
+    paths:
+      - src/globals/Home.ts
+      - src/globals/SiteSettings.ts
+      - src/migrations/**
+      - tests/unit/**
+      - .github/workflows/stage1-generate-and-validate.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/esmera
+      PAYLOAD_SECRET: stage1-ci-only-secret-with-more-than-24-characters
+      MEDIA_STORAGE_DRIVER: local
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm generate:types
+      - run: pnpm generate:importmap
+      - run: pnpm typecheck
+      - run: pnpm lint --max-warnings=0
+      - run: pnpm test:unit
+
+      - name: Commit generated Payload artifacts
+        run: |
+          git add -- src/payload-types.ts 'src/app/(payload)/admin/importMap.js'
+          if git diff --cached --quiet; then
+            echo 'Generated artifacts are already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: regenerate Payload artifacts [skip ci]'
+          git push
