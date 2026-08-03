@@ -214,7 +214,7 @@ export async function POST(request: Request) {
           overrideAccess: false,
           user,
         }),
-        assess: (document) => assessCategoryWithHierarchy(payload, user, document as Record<string, unknown>),
+        assess: (document) => assessCategoryWithHierarchy(payload, user, document as unknown as Record<string, unknown>),
         publish: () => payload.update({
           collection: 'categories',
           id: body.id as string | number,
