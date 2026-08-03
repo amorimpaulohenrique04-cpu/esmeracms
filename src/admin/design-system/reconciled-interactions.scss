@@ -43,6 +43,13 @@ body .esmera-workspace-frame.is-fluid .esmera-view {
 }
 
 @media (max-width: 900px) {
+  /* The Payload template and the workspace are separate stacking contexts. The
+     fullscreen after-sales inspector owns the viewport while it is open. */
+  body:has(.esmera-after-sales-workspace.is-mobile-inspector-open) > .esmera-app-header {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
   /* Container queries make .esmera-view a stacking context. Lift that context while
      a mobile inspector is open so fixed panels can cover the sticky app header. */
   .esmera-view:has(.esmera-context-inspector),
