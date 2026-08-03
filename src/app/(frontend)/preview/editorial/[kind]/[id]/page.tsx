@@ -5,6 +5,7 @@ import { getPayload } from 'payload'
 import React from 'react'
 
 import { canManageSite } from '@/access/roles'
+import { editorialPreviewURL } from '@/admin/editorial/previewURL'
 import { EditorialPreviewDocument } from './EditorialPreviewDocument'
 import './preview.css'
 
@@ -39,8 +40,17 @@ export default async function EditorialPreviewPage({ params }: PageProps) {
     notFound()
   }
 
+  const canonicalPreviewPath = editorialPreviewURL({
+    collection: kind === 'product' ? 'products' : 'categories',
+    id,
+  })
+
   return (
-    <div className="esmera-editorial-preview-route" data-preview-kind={kind as PreviewKind}>
+    <div
+      className="esmera-editorial-preview-route"
+      data-preview-kind={kind as PreviewKind}
+      data-preview-path={canonicalPreviewPath || undefined}
+    >
       <EditorialPreviewDocument kind={kind as PreviewKind} record={serialize(record)} />
     </div>
   )
