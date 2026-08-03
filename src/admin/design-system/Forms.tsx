@@ -14,8 +14,65 @@ export function Field({ label, hint, children, className = '' }: { label?: strin
   )
 }
 
+export function FieldV2({
+  id,
+  path,
+  label,
+  description,
+  hint,
+  error,
+  required,
+  optional,
+  children,
+  className = '',
+}: {
+  id?: string
+  path?: string
+  label: string
+  description?: string
+  hint?: string
+  error?: string | null
+  required?: boolean
+  optional?: boolean
+  children: React.ReactNode
+  className?: string
+}) {
+  const generatedID = React.useId()
+  const fieldID = id || `esmera-field-${generatedID.replace(/:/g, '')}`
+  const descriptionID = description || hint ? `${fieldID}-description` : undefined
+  const errorID = error ? `${fieldID}-error` : undefined
+
+  return (
+    <div
+      className={`esmera-field esmera-field-v2${error ? ' has-error' : ''}${className ? ` ${className}` : ''}`}
+      data-field-path={path}
+    >
+      <div className="esmera-field-v2__label-row">
+        <label className="esmera-field-label" htmlFor={fieldID}>{label}</label>
+        {required ? <span className="esmera-field-v2__required">Obrigatório</span> : null}
+        {optional ? <span className="esmera-field-v2__optional">Opcional</span> : null}
+      </div>
+      {description ? <p className="esmera-field-v2__description" id={descriptionID}>{description}</p> : null}
+      <div
+        className="esmera-field-v2__control"
+        data-control-id={fieldID}
+        data-description-id={descriptionID}
+        data-error-id={errorID}
+      >
+        {children}
+      </div>
+      {!description && hint ? <span className="esmera-field-hint" id={descriptionID}>{hint}</span> : null}
+      {error ? <span className="esmera-field-error" id={errorID} role="alert">{error}</span> : null}
+    </div>
+  )
+}
+
 export function Input({ className = '', ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`esmera-input${className ? ` ${className}` : ''}`} {...props} />
+}
+
+export function Textarea({ className = '', ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea className={`esmera-input esmera-textarea${className ? ` ${className}` : ''}`} {...props} />
 }
 
 export function SearchInput({ className = '', ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -28,6 +85,21 @@ export function SearchInput({ className = '', ...props }: React.InputHTMLAttribu
       <input className="esmera-input" type="search" {...props} />
     </span>
   )
+}
+
+export function parseBRLCurrencyInput(value: string): number | null {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return null
+  const cents = Number(digits)
+  return Number.isSafeInteger(cents) ? cents : null
+}
+
+export function formatBRLCurrencyInput(cents: number | null | undefined): string {
+  if (typeof cents !== 'number' || !Number.isSafeInteger(cents) || cents < 0) return ''
+  return (cents / 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 export { Select as SelectPrimitive, Combobox as ComboboxPrimitive }

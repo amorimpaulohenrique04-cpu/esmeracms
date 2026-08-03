@@ -3,10 +3,23 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 
 import { canManageSite } from '../../../../access/roles'
+import { adminActionResponse, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
+import { coordinatePublication } from '../../../../server/publication/coordinator'
+import { assessProductPublication } from '../../../../server/publication/productAssessment'
+import { createDocumentRevision } from '../../../../server/publication/revision'
 
 export const dynamic = 'force-dynamic'
 
-type ProductAction = 'publish' | 'unpublish' | 'archive' | 'restore' | 'add-category' | 'set-availability' | 'save-draft' | 'reorder-gallery'
+type ProductAction =
+  | 'publish'
+  | 'save-and-publish'
+  | 'unpublish'
+  | 'archive'
+  | 'restore'
+  | 'add-category'
+  | 'set-availability'
+  | 'save-draft'
+  | 'reorder-gallery'
 
 type RequestBody = {
   action?: ProductAction
@@ -16,6 +29,9 @@ type RequestBody = {
   availability?: string
   data?: Record<string, unknown>
   gallery?: Array<Record<string, unknown>>
+  expectedRevision?: string | null
+  expectedUpdatedAt?: string | null
+  confirmationToken?: string | null
 }
 
 const availabilities = new Set(['unique', 'available', 'made_to_order', 'limited'])
@@ -49,6 +65,12 @@ function draftData(input: Record<string, unknown> | undefined) {
   return data
 }
 
+function updatedAt(document: unknown): string | null {
+  return document && typeof document === 'object' && 'updatedAt' in document && typeof document.updatedAt === 'string'
+    ? document.updatedAt
+    : null
+}
+
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers: request.headers })
@@ -65,20 +87,107 @@ export async function POST(request: Request) {
   const action = body.action
   if (!action) return NextResponse.json({ error: 'Ação não informada.' }, { status: 400 })
 
-  try {
-    if (action === 'save-draft') {
-      if (body.id === undefined || body.id === null) return NextResponse.json({ error: 'Produto não informado.' }, { status: 400 })
-      await payload.update({
+  if (action === 'save-draft') {
+    if (body.id === undefined || body.id === null) return adminInputError('Produto não informado.')
+    try {
+      const document = await payload.update({
         collection: 'products',
         id: body.id,
         data: draftData(body.data) as never,
         draft: true,
+        depth: 2,
         overrideAccess: false,
         user,
       })
-      return NextResponse.json({ updated: 1 })
+      return adminActionResponse('saved', {
+        entityId: body.id,
+        revision: createDocumentRevision(document),
+        message: 'Rascunho salvo.',
+        meta: { updated: 1, updatedAt: updatedAt(document) },
+      })
+    } catch (error) {
+      return adminErrorResponse(error, {
+        entity: 'product',
+        operation: 'save-draft',
+        logger: payload.logger,
+        meta: { entityId: body.id },
+      })
     }
+  }
 
+  if (action === 'save-and-publish') {
+    if (body.id === undefined || body.id === null) return adminInputError('Produto não informado.')
+    try {
+      const result = await coordinatePublication({
+        entity: 'product',
+        entityId: body.id,
+        data: draftData(body.data),
+        expectedRevision: body.expectedRevision,
+        expectedUpdatedAt: body.expectedUpdatedAt,
+        confirmationToken: body.confirmationToken,
+        readCurrent: () => payload.findByID({
+          collection: 'products',
+          id: body.id as string | number,
+          draft: true,
+          depth: 2,
+          overrideAccess: false,
+          user,
+        }),
+        saveDraft: (data) => payload.update({
+          collection: 'products',
+          id: body.id as string | number,
+          data: data as never,
+          draft: true,
+          depth: 2,
+          overrideAccess: false,
+          user,
+        }),
+        readDraft: () => payload.findByID({
+          collection: 'products',
+          id: body.id as string | number,
+          draft: true,
+          depth: 2,
+          overrideAccess: false,
+          user,
+        }),
+        assess: assessProductPublication,
+        publish: () => payload.update({
+          collection: 'products',
+          id: body.id as string | number,
+          data: { _status: 'published' } as never,
+          draft: false,
+          depth: 2,
+          overrideAccess: false,
+          user,
+        }),
+      })
+
+      return adminActionResponse(result.status, {
+        entityId: result.entityId,
+        revision: result.revision,
+        assessment: result.assessment,
+        message: result.status === 'requires_confirmation'
+          ? 'Revise e confirme os avisos antes de publicar.'
+          : result.status === 'published_but_unverified'
+          ? 'Produto publicado, mas a confirmação visual do site está indisponível.'
+          : 'Produto publicado.',
+        meta: {
+          confirmationToken: result.confirmationToken,
+          verification: result.verification,
+          updatedAt: updatedAt(result.document),
+        },
+      })
+    } catch (error) {
+      return adminErrorResponse(error, {
+        entity: 'product',
+        operation: 'save-and-publish',
+        logger: payload.logger,
+        meta: { entityId: body.id },
+      })
+    }
+  }
+
+  try {
     if (action === 'reorder-gallery') {
       if (body.id === undefined || body.id === null || !Array.isArray(body.gallery)) return NextResponse.json({ error: 'Galeria inválida.' }, { status: 400 })
       if (body.gallery.some((item) => relationID(item.image) === null)) return NextResponse.json({ error: 'Toda imagem precisa manter uma mídia válida.' }, { status: 400 })
@@ -107,12 +216,23 @@ export async function POST(request: Request) {
           collection: 'products',
           id,
           draft: true,
-          depth: 0,
+          depth: action === 'publish' ? 2 : 0,
           overrideAccess: false,
           user,
         })
 
         if (action === 'publish') {
+          const assessment = assessProductPublication(current)
+          if (!assessment.ready) {
+            errors.push({
+              id,
+              message: assessment.issues
+                .filter((issue) => issue.severity === 'blocker')
+                .map((issue) => issue.message)
+                .join(' '),
+            })
+            continue
+          }
           await payload.update({ collection: 'products', id, data: { _status: 'published' } as never, draft: false, overrideAccess: false, user })
         } else if (action === 'unpublish') {
           await payload.update({ collection: 'products', id, data: { _status: 'draft' } as never, draft: true, overrideAccess: false, user })

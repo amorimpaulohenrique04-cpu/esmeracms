@@ -3,16 +3,24 @@ import { NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
 
 import { canManageSite } from '../../../../access/roles'
+import { adminActionResponse, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
+import { assessCategoryPublication } from '../../../../server/publication/categoryAssessment'
+import { coordinatePublication } from '../../../../server/publication/coordinator'
+import { createDocumentRevision } from '../../../../server/publication/revision'
+import type { PublicationAssessment } from '../../../../server/publication/types'
 
 export const dynamic = 'force-dynamic'
 
-type CategoryAction = 'save-draft' | 'publish' | 'unpublish' | 'reorder'
+type CategoryAction = 'save-draft' | 'save-and-publish' | 'publish' | 'unpublish' | 'reorder'
 
 type RequestBody = {
   action?: CategoryAction
   id?: string | number
   data?: Record<string, unknown>
   orderedIds?: Array<string | number>
+  expectedRevision?: string | null
+  expectedUpdatedAt?: string | null
+  confirmationToken?: string | null
 }
 
 function relationID(value: unknown): string | number | null {
@@ -66,6 +74,12 @@ function categoryDraftData(input: Record<string, unknown> | undefined) {
   return data
 }
 
+function updatedAt(document: unknown): string | null {
+  return document && typeof document === 'object' && 'updatedAt' in document && typeof document.updatedAt === 'string'
+    ? document.updatedAt
+    : null
+}
+
 async function activePublishedProductCount(payload: Awaited<ReturnType<typeof getPayload>>, user: unknown, categoryId: string | number) {
   const where: Where = {
     and: [
@@ -76,6 +90,52 @@ async function activePublishedProductCount(payload: Awaited<ReturnType<typeof ge
   }
   const result = await payload.count({ collection: 'products', where, overrideAccess: false, user: user as never })
   return result.totalDocs
+}
+
+async function assessCategoryWithHierarchy(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  user: unknown,
+  document: Record<string, unknown>,
+): Promise<PublicationAssessment> {
+  const assessment = assessCategoryPublication(document)
+  const entityID = relationID(document.id)
+  let parentID = relationID(document.parent)
+  const visited = new Set<string>()
+  let hierarchyCycle = false
+
+  for (let depth = 0; parentID !== null && depth < 100; depth += 1) {
+    const key = String(parentID)
+    if ((entityID !== null && key === String(entityID)) || visited.has(key)) {
+      hierarchyCycle = true
+      break
+    }
+    visited.add(key)
+    const parent = await payload.findByID({
+      collection: 'categories',
+      id: parentID,
+      depth: 0,
+      draft: true,
+      overrideAccess: false,
+      user: user as never,
+    })
+    parentID = relationID((parent as { parent?: unknown }).parent)
+  }
+
+  if (parentID !== null) hierarchyCycle = true
+  if (hierarchyCycle && !assessment.issues.some((issue) => issue.id === 'category.parent_cycle')) {
+    assessment.issues.push({
+      id: 'category.parent_cycle',
+      severity: 'blocker',
+      path: 'parent',
+      tab: 'content',
+      anchor: 'category-parent',
+      message: 'A categoria cria um ciclo na hierarquia.',
+      suggestion: 'Escolha uma categoria principal fora da própria cadeia de descendência.',
+      source: 'business_rule',
+    })
+    assessment.ready = false
+  }
+  return assessment
 }
 
 export async function POST(request: Request) {
@@ -91,48 +151,138 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Corpo da requisição inválido.' }, { status: 400 })
   }
 
-  try {
-    if (body.action === 'save-draft') {
-      if (body.id === undefined || body.id === null) return NextResponse.json({ error: 'Categoria não informada.' }, { status: 400 })
-      await payload.update({
+  if (body.action === 'save-draft') {
+    if (body.id === undefined || body.id === null) return adminInputError('Categoria não informada.')
+    try {
+      const document = await payload.update({
         collection: 'categories',
         id: body.id,
         data: categoryDraftData(body.data) as never,
         draft: true,
+        depth: 2,
         overrideAccess: false,
         user,
       })
-      return NextResponse.json({ updated: 1 })
-    }
-
-    if (body.action === 'publish') {
-      if (body.id === undefined || body.id === null) return NextResponse.json({ error: 'Categoria não informada.' }, { status: 400 })
-      await payload.update({
-        collection: 'categories',
-        id: body.id,
-        data: { _status: 'published' } as never,
-        draft: false,
-        overrideAccess: false,
-        user,
+      return adminActionResponse('saved', {
+        entityId: body.id,
+        revision: createDocumentRevision(document),
+        message: 'Rascunho salvo.',
+        meta: { updated: 1, updatedAt: updatedAt(document) },
       })
-      return NextResponse.json({ updated: 1 })
+    } catch (error) {
+      return adminErrorResponse(error, {
+        entity: 'category',
+        operation: 'save-draft',
+        logger: payload.logger,
+        meta: { entityId: body.id },
+      })
     }
+  }
 
+  if (body.action === 'save-and-publish' || body.action === 'publish') {
+    if (body.id === undefined || body.id === null) return adminInputError('Categoria não informada.')
+    try {
+      const result = await coordinatePublication({
+        entity: 'category',
+        entityId: body.id,
+        data: categoryDraftData(body.data),
+        expectedRevision: body.expectedRevision,
+        expectedUpdatedAt: body.expectedUpdatedAt,
+        confirmationToken: body.confirmationToken,
+        readCurrent: () => payload.findByID({
+          collection: 'categories',
+          id: body.id as string | number,
+          depth: 2,
+          draft: true,
+          overrideAccess: false,
+          user,
+        }),
+        saveDraft: (data) => payload.update({
+          collection: 'categories',
+          id: body.id as string | number,
+          data: data as never,
+          draft: true,
+          depth: 2,
+          overrideAccess: false,
+          user,
+        }),
+        readDraft: () => payload.findByID({
+          collection: 'categories',
+          id: body.id as string | number,
+          depth: 2,
+          draft: true,
+          overrideAccess: false,
+          user,
+        }),
+        assess: (document) => assessCategoryWithHierarchy(payload, user, document as unknown as Record<string, unknown>),
+        publish: () => payload.update({
+          collection: 'categories',
+          id: body.id as string | number,
+          data: { _status: 'published' } as never,
+          draft: false,
+          depth: 2,
+          overrideAccess: false,
+          user,
+        }),
+      })
+
+      return adminActionResponse(result.status, {
+        entityId: result.entityId,
+        revision: result.revision,
+        assessment: result.assessment,
+        message: result.status === 'requires_confirmation'
+          ? 'Revise e confirme os avisos antes de publicar.'
+          : 'Categoria publicada.',
+        meta: {
+          confirmationToken: result.confirmationToken,
+          updatedAt: updatedAt(result.document),
+        },
+      })
+    } catch (error) {
+      return adminErrorResponse(error, {
+        entity: 'category',
+        operation: 'save-and-publish',
+        logger: payload.logger,
+        meta: { entityId: body.id },
+      })
+    }
+  }
+
+  try {
     if (body.action === 'unpublish') {
       if (body.id === undefined || body.id === null) return NextResponse.json({ error: 'Categoria não informada.' }, { status: 400 })
       const linkedProducts = await activePublishedProductCount(payload, user, body.id)
       if (linkedProducts > 0) {
-        return NextResponse.json({ error: `Esta categoria é usada por ${linkedProducts} produto(s) ativo(s) e publicado(s). Mova ou arquive esses produtos antes de despublicar.` }, { status: 422 })
+        return adminInputError(
+          `Esta categoria é usada por ${linkedProducts} produto(s) ativo(s) e publicado(s).`,
+          {
+            code: 'publication_blocked',
+            entityErrors: [{
+              code: 'category.used_by_published_products',
+              message: `A categoria está vinculada a ${linkedProducts} produto(s) ativo(s) e publicado(s).`,
+              suggestion: 'Mova ou arquive esses produtos antes de despublicar a categoria.',
+              related: [{ collection: 'products', count: linkedProducts }],
+            }],
+            meta: { linkedProducts },
+          },
+          422,
+        )
       }
-      await payload.update({
+      const document = await payload.update({
         collection: 'categories',
         id: body.id,
         data: { _status: 'draft' } as never,
         draft: true,
+        depth: 1,
         overrideAccess: false,
         user,
       })
-      return NextResponse.json({ updated: 1 })
+      return adminActionResponse('unpublished', {
+        entityId: body.id,
+        revision: createDocumentRevision(document),
+        message: 'Categoria movida para rascunho.',
+        meta: { updated: 1, updatedAt: updatedAt(document) },
+      })
     }
 
     if (body.action === 'reorder') {
