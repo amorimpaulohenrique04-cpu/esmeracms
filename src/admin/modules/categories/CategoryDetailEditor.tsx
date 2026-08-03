@@ -2,9 +2,10 @@
 
 import { Combobox } from '@base-ui/react/combobox'
 import { useRouter } from 'next/navigation'
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 
-import { Button, Field, Status } from '../../design-system'
+import { Button, Field, InlineFeedback, Status } from '../../design-system'
+import { expectAdminResponse, normalizeAdminError } from '../../state/asyncState'
 import {
   categoryImageAlt,
   categoryImageURL,
@@ -16,6 +17,32 @@ import {
 } from './types'
 
 type TermItem = { id: string; value: string; creatable?: string }
+
+type AdminActionResult = {
+  status: 'saved' | 'published' | 'unpublished' | 'requires_confirmation'
+  revision?: string | null
+  message?: string
+  assessment?: {
+    issues?: Array<{
+      id?: string
+      severity?: 'blocker' | 'warning' | 'recommendation'
+      message: string
+      suggestion?: string | null
+      anchor?: string | null
+    }>
+  } | null
+  meta?: {
+    updatedAt?: string | null
+    confirmationToken?: string | null
+  }
+}
+
+type FeedbackState = {
+  tone: 'success' | 'warning' | 'danger'
+  message: string
+  details?: Array<{ message: string; suggestion?: string | null; anchor?: string | null }>
+  traceId?: string | null
+}
 
 type Props = {
   category: CategoryDetail
@@ -29,13 +56,26 @@ function termId(value: string) {
   return value.trim().toLocaleLowerCase('pt-BR').replace(/[^a-z0-9à-ÿ]+/gi, '-').replace(/^-+|-+$/g, '') || 'termo'
 }
 
+function slugify(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-BR')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 export function CategoryDetailEditor({ category, categories, media, termSuggestions, section }: Props) {
   const router = useRouter()
   const initialTerms = (category.searchTerms || []).map((item, index) => ({ id: `${termId(item.term || '')}-${index}`, value: item.term || '' })).filter((item) => item.value)
   const [terms, setTerms] = useState<TermItem[]>(initialTerms)
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
-  const [feedback, setFeedback] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null)
+  const [confirmationToken, setConfirmationToken] = useState<string | null>(null)
+  const revision = useRef<string | null>(null)
+  const updatedAt = useRef<string | null>(null)
+  const slugTouched = useRef(Boolean(category.slug))
 
   const [title, setTitle] = useState(category.title || '')
   const [slug, setSlug] = useState(category.slug || '')
@@ -58,44 +98,15 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
     return trimmed && !exact ? [...base, { id: `create:${trimmed.toLocaleLowerCase('pt-BR')}`, value: `Adicionar “${trimmed}”`, creatable: trimmed }] : base
   }, [query, termSuggestions, terms])
 
-  async function request(action: 'save-draft' | 'publish' | 'unpublish', data?: Record<string, unknown>) {
-    if (busy) return
-    setBusy(true)
-    setFeedback(null)
-    try {
-      const response = await fetch('/api/admin-categories', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ action, id: category.id, data }),
-      })
-      const body = await response.json() as { error?: string }
-      if (!response.ok) throw new Error(body.error || 'Não foi possível salvar a categoria.')
-      setFeedback(action === 'publish' ? 'Categoria publicada.' : action === 'unpublish' ? 'Categoria movida para rascunho.' : 'Rascunho salvo.')
-      router.refresh()
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Não foi possível salvar a categoria.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  function saveGeneral(event: React.FormEvent) {
-    event.preventDefault()
+  function visibleData() {
     const parsedOrder = Number(order)
-    void request('save-draft', {
+    return {
       title: title.trim(),
       slug: slug.trim(),
       description,
       status,
       order: Number.isInteger(parsedOrder) && parsedOrder >= 0 ? parsedOrder : 100,
       parent: parent || null,
-    })
-  }
-
-  function saveMedia(event: React.FormEvent) {
-    event.preventDefault()
-    void request('save-draft', {
       image: image || null,
       searchTerms: terms.map((item) => ({ term: item.value })),
       seo: {
@@ -104,7 +115,89 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
         socialImage: socialImage || null,
         noIndex,
       },
+    }
+  }
+
+  function applyError(error: unknown, fallback: string) {
+    const normalized = normalizeAdminError(error, fallback)
+    setFeedback({
+      tone: 'danger',
+      message: normalized.summary,
+      details: [
+        ...normalized.fieldErrors.map((issue) => ({
+          message: issue.message,
+          suggestion: issue.suggestion,
+          anchor: issue.anchor,
+        })),
+        ...normalized.entityErrors.map((issue) => ({
+          message: issue.message,
+          suggestion: issue.suggestion,
+        })),
+      ],
+      traceId: normalized.traceId,
     })
+  }
+
+  async function request(action: 'save-draft' | 'save-and-publish' | 'unpublish', token?: string | null) {
+    if (busy) return
+    setBusy(true)
+    setFeedback(null)
+    try {
+      const response = await fetch('/api/admin-categories', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          action,
+          id: category.id,
+          data: action === 'unpublish' ? undefined : visibleData(),
+          expectedRevision: revision.current,
+          expectedUpdatedAt: updatedAt.current,
+          confirmationToken: token || undefined,
+        }),
+      })
+      const result = await expectAdminResponse<AdminActionResult>(response, 'Não foi possível salvar a categoria.')
+      revision.current = result.revision || revision.current
+      updatedAt.current = result.meta?.updatedAt || updatedAt.current
+
+      if (result.status === 'requires_confirmation') {
+        const nextToken = result.meta?.confirmationToken || null
+        setConfirmationToken(nextToken)
+        setFeedback({
+          tone: 'warning',
+          message: result.message || 'Revise os avisos antes de publicar.',
+          details: result.assessment?.issues
+            ?.filter((issue) => issue.severity === 'warning')
+            .map((issue) => ({ message: issue.message, suggestion: issue.suggestion, anchor: issue.anchor })),
+        })
+        return
+      }
+
+      setConfirmationToken(null)
+      setFeedback({
+        tone: 'success',
+        message: result.message || (action === 'save-and-publish'
+          ? 'Categoria publicada.'
+          : action === 'unpublish'
+          ? 'Categoria movida para rascunho.'
+          : 'Rascunho salvo.'),
+      })
+      router.refresh()
+    } catch (error) {
+      applyError(error, 'Não foi possível salvar a categoria.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function saveGeneral(event: React.FormEvent) {
+    event.preventDefault()
+    void request('save-draft')
+  }
+
+  function saveMedia(event: React.FormEvent) {
+    event.preventDefault()
+    void request('save-draft')
   }
 
   function addTerm(item: TermItem | null) {
@@ -114,6 +207,18 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
       setTerms([...terms, { id: `${termId(value)}-${Date.now()}`, value }])
     }
     setQuery('')
+  }
+
+  function changeTitle(value: string) {
+    setTitle(value)
+    if (!slugTouched.current) setSlug(slugify(value))
+    setConfirmationToken(null)
+  }
+
+  function changeSlug(value: string) {
+    slugTouched.current = true
+    setSlug(slugify(value))
+    setConfirmationToken(null)
   }
 
   const currentImage = media.find((item) => String(item.id) === image) || (typeof category.image === 'object' && category.image ? category.image : null)
@@ -127,24 +232,31 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
           <Status tone={category._status === 'published' ? 'info' : 'neutral'}>{category._status === 'published' ? 'Publicada' : 'Rascunho'}</Status>
         </div>
         <div className="esmera-actions">
-          {category._status === 'published' ? <Button disabled={busy} onClick={() => void request('unpublish')}>Despublicar</Button> : <Button tone="primary" disabled={busy} onClick={() => void request('publish')}>Publicar</Button>}
+          {category._status === 'published'
+            ? <Button disabled={busy} onClick={() => void request('unpublish')}>Despublicar</Button>
+            : confirmationToken
+            ? <Button tone="primary" disabled={busy} onClick={() => void request('save-and-publish', confirmationToken)}>Confirmar publicação</Button>
+            : <Button tone="primary" disabled={busy} onClick={() => void request('save-and-publish')}>Publicar</Button>}
           <a className="esmera-button esmera-button--quiet" href={`/admin/collections/categories/${category.id}`}>Admin técnico</a>
         </div>
       </div>
 
       {section === 'general' ? (
         <form className="esmera-category-form" onSubmit={saveGeneral}>
-          <Field label="Nome"><input className="esmera-input" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
-          <Field label="Slug" hint="URL estável: letras minúsculas, números e hífens."><input className="esmera-input" value={slug} onChange={(event) => setSlug(event.target.value)} required pattern="[a-z0-9-]+" /></Field>
+          <Field label="Nome"><input id="category-title" className="esmera-input" value={title} onChange={(event) => changeTitle(event.target.value)} required /></Field>
+          <Field label="Slug" hint="Gerado pelo nome até ser editado manualmente."><input id="category-slug" className="esmera-input" value={slug} onChange={(event) => changeSlug(event.target.value)} required pattern="[a-z0-9-]+" /></Field>
           <Field label="Descrição" className="esmera-category-field--wide"><textarea className="esmera-input esmera-category-textarea" value={description} onChange={(event) => setDescription(event.target.value)} rows={5} /></Field>
-          <Field label="Categoria principal" hint="Ciclos são rejeitados no servidor.">
-            <select className="esmera-input" value={parent} onChange={(event) => setParent(event.target.value)}>
+          <Field label="Categoria principal" hint="Ciclos em qualquer nível são rejeitados no servidor.">
+            <select id="category-parent" className="esmera-input" value={parent} onChange={(event) => setParent(event.target.value)}>
               <option value="">Sem categoria principal</option>
               {categories.filter((item) => String(item.id) !== String(category.id)).map((item) => <option key={String(item.id)} value={String(item.id)}>{item.title || item.slug || item.id}</option>)}
             </select>
           </Field>
-          <Field label="Status"><select className="esmera-input" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Ativa</option><option value="archive">Arquivada</option></select></Field>
-          <Field label="Ordem editorial" hint="A lista normaliza a ordem automaticamente ao reordenar."><input className="esmera-input" type="number" min="0" step="1" value={order} onChange={(event) => setOrder(event.target.value)} /></Field>
+          <Field label="Status"><select id="category-status" className="esmera-input" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Ativa</option><option value="archive">Arquivada</option></select></Field>
+          <details className="esmera-category-advanced esmera-category-field--wide">
+            <summary>Ajustes avançados</summary>
+            <Field label="Ordem editorial" hint="Normalmente controlada pela reordenação da lista."><input className="esmera-input" type="number" min="0" step="1" value={order} onChange={(event) => setOrder(event.target.value)} /></Field>
+          </details>
           <div className="esmera-category-form__actions"><Button tone="primary" type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar rascunho'}</Button></div>
         </form>
       ) : (
@@ -153,7 +265,7 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
             {currentImageURL ? <img src={currentImageURL} alt={categoryImageAlt(currentImage)} /> : <div className="esmera-category-media-placeholder">Sem imagem</div>}
           </div>
           <Field label="Imagem da categoria" className="esmera-category-field--wide">
-            <select className="esmera-input" value={image} onChange={(event) => setImage(event.target.value)}>
+            <select id="category-image" className="esmera-input" value={image} onChange={(event) => setImage(event.target.value)}>
               <option value="">Sem imagem</option>
               {media.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.filename || item.alt || `Mídia ${item.id}`}</option>)}
             </select>
@@ -208,7 +320,22 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
         </form>
       )}
 
-      {feedback ? <div className="esmera-products-feedback" role="status" aria-live="polite">{feedback}</div> : null}
+      {feedback ? (
+        <div className="esmera-products-feedback" role="status" aria-live="polite">
+          <InlineFeedback tone={feedback.tone}>{feedback.message}</InlineFeedback>
+          {feedback.details?.length ? (
+            <ul className="esmera-product-issues">
+              {feedback.details.map((detail, index) => (
+                <li key={`${detail.message}-${index}`}>
+                  {detail.anchor ? <a href={`#${detail.anchor}`}>{detail.message}</a> : detail.message}
+                  {detail.suggestion ? <small>{detail.suggestion}</small> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {feedback.traceId ? <small>Referência técnica: {feedback.traceId}</small> : null}
+        </div>
+      ) : null}
     </div>
   )
 }
