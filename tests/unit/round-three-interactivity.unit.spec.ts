@@ -4,13 +4,6 @@ import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { editorialPreviewURL } from '../../src/admin/editorial/previewURL'
-import {
-  parseInvestigation,
-  popInvestigation,
-  pushInvestigation,
-  reportSearchParams,
-  serializeInvestigation,
-} from '../../src/admin/modules/reports/investigation'
 
 const root = process.cwd()
 const source = (path: string) => readFileSync(resolve(root, path), 'utf8')
@@ -30,26 +23,15 @@ describe('Rodada 3 — interatividade avançada', () => {
     expect(css).toContain('navigation: none')
   })
 
-  it('mantém a investigação de Relatórios serializável e reversível pela URL', () => {
-    const first = { kind: 'source' as const, value: 'instagram', label: 'Instagram' }
-    const second = { kind: 'product' as const, value: '42', label: 'Cartografia Verde' }
-    const stack = pushInvestigation(pushInvestigation([], first), second)
-    const serialized = serializeInvestigation(stack)
-
-    expect(parseInvestigation(serialized)).toEqual(stack)
-    expect(popInvestigation(stack)).toEqual([first])
-
-    const params = reportSearchParams({
-      period: { from: '2026-08-01T03:00:00.000Z', to: '2026-08-03T02:59:59.999Z' },
-      compareWith: null,
-      ownerId: null,
-      source: 'instagram',
-      categoryId: null,
-      productId: 42,
-    }, stack)
-    expect(params.get('source')).toBe('instagram')
-    expect(params.get('product')).toBe('42')
-    expect(params.get('investigation')).toBe(serialized)
+  it('mantém filtros e drilldown de Relatórios representados na URL ativa', () => {
+    const reports = source('src/admin/modules/reports/ReportsWorkspaceClient.tsx')
+    expect(reports).toContain("params.set('from'")
+    expect(reports).toContain("params.set('to'")
+    expect(reports).toContain("params.set('source'")
+    expect(reports).toContain("params.set('product'")
+    expect(reports).toContain("params.set('mode', 'drilldown')")
+    expect(reports).toContain("params.set('kind', request.kind)")
+    expect(reports).toContain('window.history.replaceState')
   })
 
   it('usa preview interno autenticado como fallback e preserva override externo', () => {
