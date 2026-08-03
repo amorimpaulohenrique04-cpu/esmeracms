@@ -1,4 +1,8 @@
 export const adminErrorCodes = [
+  'invalid_request',
+  'validation_failed',
+  'publication_blocked',
+  'revision_conflict',
   'query_error',
   'unauthorized',
   'forbidden',
@@ -8,42 +12,122 @@ export const adminErrorCodes = [
   'mutation_rollback',
   'job_failed',
   'integration_unconfigured',
+  'integration_unavailable',
   'unknown',
 ] as const
 
 export type AdminErrorCode = (typeof adminErrorCodes)[number]
+export type AdminIssueSeverity = 'blocker' | 'warning' | 'recommendation'
+
+export type AdminFieldError = {
+  path: string
+  tab?: string | null
+  anchor?: string | null
+  code?: string | null
+  message: string
+  suggestion?: string | null
+  severity?: AdminIssueSeverity
+}
+
+export type AdminEntityError = {
+  code: string
+  message: string
+  suggestion?: string | null
+  related?: Array<Record<string, unknown>>
+}
 
 export type AdminErrorShape = {
   code: AdminErrorCode
   message: string
+  summary: string
   status: number | null
   retryable: boolean
   detail?: string | null
+  traceId?: string | null
+  fieldErrors: AdminFieldError[]
+  entityErrors: AdminEntityError[]
+  meta?: Record<string, unknown>
 }
 
 const statusCodes: Record<number, AdminErrorCode> = {
+  400: 'invalid_request',
   401: 'unauthorized',
   403: 'forbidden',
   404: 'not_found',
-  409: 'conflict',
+  409: 'revision_conflict',
+  422: 'validation_failed',
+  503: 'integration_unavailable',
 }
 
 const knownCodes = new Set<string>(adminErrorCodes)
 
 export class AdminRequestError extends Error implements AdminErrorShape {
   code: AdminErrorCode
+  summary: string
   status: number | null
   retryable: boolean
   detail?: string | null
+  traceId?: string | null
+  fieldErrors: AdminFieldError[]
+  entityErrors: AdminEntityError[]
+  meta?: Record<string, unknown>
 
-  constructor(shape: AdminErrorShape) {
-    super(shape.message)
+  constructor(shape: Omit<AdminErrorShape, 'message'> & { message?: string }) {
+    super(shape.message || shape.summary)
     this.name = 'AdminRequestError'
     this.code = shape.code
+    this.summary = shape.summary
     this.status = shape.status
     this.retryable = shape.retryable
     this.detail = shape.detail
+    this.traceId = shape.traceId
+    this.fieldErrors = shape.fieldErrors
+    this.entityErrors = shape.entityErrors
+    this.meta = shape.meta
   }
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : null
+}
+
+function fieldErrors(value: unknown): AdminFieldError[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item): AdminFieldError[] => {
+    const entry = record(item)
+    const path = typeof entry?.path === 'string' ? entry.path : ''
+    const message = typeof entry?.message === 'string' ? entry.message : ''
+    if (!path || !message) return []
+    return [{
+      path,
+      message,
+      tab: typeof entry?.tab === 'string' ? entry.tab : null,
+      anchor: typeof entry?.anchor === 'string' ? entry.anchor : null,
+      code: typeof entry?.code === 'string' ? entry.code : null,
+      suggestion: typeof entry?.suggestion === 'string' ? entry.suggestion : null,
+      severity: entry?.severity === 'warning' || entry?.severity === 'recommendation'
+        ? entry.severity
+        : 'blocker',
+    }]
+  })
+}
+
+function entityErrors(value: unknown): AdminEntityError[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item): AdminEntityError[] => {
+    const entry = record(item)
+    const code = typeof entry?.code === 'string' ? entry.code : ''
+    const message = typeof entry?.message === 'string' ? entry.message : ''
+    if (!code || !message) return []
+    return [{
+      code,
+      message,
+      suggestion: typeof entry?.suggestion === 'string' ? entry.suggestion : null,
+      related: Array.isArray(entry?.related)
+        ? entry.related.filter((candidate): candidate is Record<string, unknown> => Boolean(record(candidate)))
+        : undefined,
+    }]
+  })
 }
 
 export function adminErrorCodeFromStatus(status: number, bodyCode?: unknown): AdminErrorCode {
@@ -57,26 +141,38 @@ export function normalizeAdminError(error: unknown, fallback = 'Não foi possív
     return {
       code: error.code,
       message: error.message,
+      summary: error.summary,
       status: error.status,
       retryable: error.retryable,
       detail: error.detail,
+      traceId: error.traceId,
+      fieldErrors: error.fieldErrors,
+      entityErrors: error.entityErrors,
+      meta: error.meta,
     }
   }
 
   if (error instanceof Error) {
+    const summary = error.message || fallback
     return {
       code: 'unknown',
-      message: error.message || fallback,
+      message: summary,
+      summary,
       status: null,
       retryable: true,
+      fieldErrors: [],
+      entityErrors: [],
     }
   }
 
   return {
     code: 'unknown',
     message: fallback,
+    summary: fallback,
     status: null,
     retryable: true,
+    fieldErrors: [],
+    entityErrors: [],
   }
 }
 
@@ -90,18 +186,42 @@ export async function expectAdminResponse<T>(response: Response, fallback: strin
     body = null
   }
 
-  if (response.ok) return body as T
+  const envelope = record(body)
+  if (response.ok) {
+    if (envelope?.ok === true && record(envelope.result)) return envelope.result as T
+    return body as T
+  }
 
-  const record = body && typeof body === 'object' ? body as Record<string, unknown> : null
-  const message = String(record?.error || record?.message || (typeof body === 'string' ? body : '') || fallback)
-  const code = adminErrorCodeFromStatus(response.status, record?.code)
+  const structuredError = envelope?.ok === false ? record(envelope.error) : null
+  const legacyRecord = envelope
+  const summary = String(
+    structuredError?.summary ||
+    legacyRecord?.error ||
+    legacyRecord?.message ||
+    (typeof body === 'string' ? body : '') ||
+    fallback,
+  )
+  const code = adminErrorCodeFromStatus(response.status, structuredError?.code || legacyRecord?.code)
 
   throw new AdminRequestError({
     code,
-    message,
+    message: summary,
+    summary,
     status: response.status,
-    retryable: response.status >= 500 || response.status === 408 || response.status === 429 || code === 'job_failed' || code === 'mutation_rollback',
-    detail: typeof record?.detail === 'string' ? record.detail : null,
+    retryable: typeof structuredError?.retryable === 'boolean'
+      ? structuredError.retryable
+      : response.status >= 500 || response.status === 408 || response.status === 429 || code === 'job_failed' || code === 'mutation_rollback',
+    detail: typeof structuredError?.detail === 'string'
+      ? structuredError.detail
+      : typeof legacyRecord?.detail === 'string'
+      ? legacyRecord.detail
+      : null,
+    traceId: typeof structuredError?.traceId === 'string'
+      ? structuredError.traceId
+      : response.headers.get('x-esmera-trace-id'),
+    fieldErrors: fieldErrors(structuredError?.fieldErrors),
+    entityErrors: entityErrors(structuredError?.entityErrors),
+    meta: record(structuredError?.meta) || undefined,
   })
 }
 
@@ -119,9 +239,11 @@ export function assertFiniteMetric(value: unknown, label: string): number {
   if (normalized === null) {
     throw new AdminRequestError({
       code: 'query_error',
-      message: `${label} não possui um valor numérico válido.`,
+      summary: `${label} não possui um valor numérico válido.`,
       status: null,
       retryable: true,
+      fieldErrors: [],
+      entityErrors: [],
     })
   }
   return normalized
