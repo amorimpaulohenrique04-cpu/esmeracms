@@ -52,8 +52,9 @@ describe('Rodada 3 — interatividade avançada', () => {
     expect(params.get('investigation')).toBe(serialized)
   })
 
-  it('só cria preview quando uma rota draft real está configurada', () => {
-    expect(editorialPreviewURL({ collection: 'products', id: 12, slug: 'nodulo-i' })).toBeNull()
+  it('usa preview interno autenticado como fallback e preserva override externo', () => {
+    expect(editorialPreviewURL({ collection: 'products', id: 12, slug: 'nodulo-i' })).toBe('/preview/editorial/product/12')
+    expect(editorialPreviewURL({ collection: 'categories', id: 'green', slug: 'esculturas' })).toBe('/preview/editorial/category/green')
 
     process.env.NEXT_PUBLIC_EDITORIAL_PREVIEW_URL = 'https://preview.esmera.test/{collection}/{slug}?document={id}'
     expect(editorialPreviewURL({ collection: 'products', id: 12, slug: 'nodulo-i' })).toBe('https://preview.esmera.test/products/nodulo-i?document=12&draft=true&source=esmera-cms')
