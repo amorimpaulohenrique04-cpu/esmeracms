@@ -1,12 +1,12 @@
 import type { GlobalConfig } from 'payload'
 
-import { canManageSite, siteEditors } from '../access/roles'
+import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
 
 export const SiteSettings: GlobalConfig = {
   slug: 'site-settings',
   label: 'Configurações do site',
   admin: { group: 'Site', hidden: ({ user }) => !canManageSite(user) },
-  access: { read: siteEditors, update: siteEditors, readVersions: siteEditors },
+  access: { read: publishedGlobalOrAuthenticated, update: siteEditors, readVersions: siteEditors },
   versions: { drafts: true, max: 30 },
   fields: [
     { name: 'siteName', type: 'text', label: 'Nome do site', defaultValue: 'Esméra' },
@@ -38,6 +38,12 @@ export const SiteSettings: GlobalConfig = {
       ],
     },
     { name: 'frontendURL', type: 'text', label: 'URL do site', admin: { description: 'Exemplo: https://esmera.com.br' } },
+    { name: 'footerStatement', type: 'textarea', label: 'Texto institucional do rodapé' },
+    { name: 'locationLabel', type: 'text', label: 'Localização exibida no rodapé' },
+    { name: 'privacyLabel', type: 'text', label: 'Rótulo de privacidade' },
+    { name: 'privacyHref', type: 'text', label: 'Link de privacidade' },
+    { name: 'termsLabel', type: 'text', label: 'Rótulo dos termos' },
+    { name: 'termsHref', type: 'text', label: 'Link dos termos' },
     { name: 'analyticsConfigured', type: 'checkbox', label: 'Analytics configurado', defaultValue: false, admin: { description: 'Apenas sinaliza integração real. O CMS não inventa métricas de tráfego.' } },
   ],
 }
