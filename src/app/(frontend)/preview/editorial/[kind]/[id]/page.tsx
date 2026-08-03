@@ -30,17 +30,18 @@ export default async function EditorialPreviewPage({ params }: PageProps) {
   const { user } = await payload.auth({ headers: requestHeaders })
   if (!user || !canManageSite(user)) notFound()
 
+  let record: unknown
   try {
-    const record = kind === 'product'
+    record = kind === 'product'
       ? await payload.findByID({ collection: 'products', id, draft: true, depth: 2, overrideAccess: false, user })
       : await payload.findByID({ collection: 'categories', id, draft: true, depth: 2, overrideAccess: false, user })
-
-    return (
-      <div className="esmera-editorial-preview-route" data-preview-kind={kind as PreviewKind}>
-        <EditorialPreviewDocument kind={kind as PreviewKind} record={serialize(record)} />
-      </div>
-    )
   } catch {
     notFound()
   }
+
+  return (
+    <div className="esmera-editorial-preview-route" data-preview-kind={kind as PreviewKind}>
+      <EditorialPreviewDocument kind={kind as PreviewKind} record={serialize(record)} />
+    </div>
+  )
 }
