@@ -69,7 +69,7 @@ describe('public content access policy', () => {
   })
 
   it('exposes only published institutional globals and keeps internal automation private', async () => {
-    const publicGlobals = [Home, About, Contact, CollectionPage, Navigation]
+    const publicGlobals = [Home, About, Contact, CollectionPage, Navigation, SiteSettings]
 
     for (const global of publicGlobals) {
       const result = await anonymousRead(global)
@@ -77,7 +77,8 @@ describe('public content access policy', () => {
       expect(global.access?.update).not.toBe(true)
     }
 
-    expect(await anonymousRead(SiteSettings)).toBe(false)
+    expect(Home.versions).toMatchObject({ drafts: true })
+    expect(Navigation.versions).toMatchObject({ drafts: true })
     expect(SiteSettings.versions).toMatchObject({ drafts: true })
     expect(await anonymousRead(AfterSalesAutomation)).toBe(false)
   })
