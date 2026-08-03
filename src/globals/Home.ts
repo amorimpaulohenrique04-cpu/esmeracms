@@ -3,6 +3,17 @@ import type { GlobalConfig } from 'payload'
 import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
 import { callToActionFields, imageWithAltFields, seoField } from '../fields/common'
 
+export const HOME_DISABLED_SECTIONS = [
+  'hero',
+  'manifesto',
+  'selectedObjects',
+  'matter',
+  'signature',
+  'matterInterlude',
+  'provenance',
+  'privateInvitation',
+] as const
+
 export const Home: GlobalConfig = {
   slug: 'home',
   label: 'Home',
@@ -14,6 +25,22 @@ export const Home: GlobalConfig = {
   },
   versions: { drafts: true, max: 50 },
   fields: [
+    {
+      name: 'disabledSections',
+      type: 'select',
+      hasMany: true,
+      label: 'Seções desativadas',
+      options: [
+        { label: 'Hero', value: 'hero' },
+        { label: 'Manifesto', value: 'manifesto' },
+        { label: 'Seleção de objetos', value: 'selectedObjects' },
+        { label: 'Matter', value: 'matter' },
+        { label: 'Signature', value: 'signature' },
+        { label: 'Matter Interlude', value: 'matterInterlude' },
+        { label: 'Proveniência', value: 'provenance' },
+        { label: 'Convite privado', value: 'privateInvitation' },
+      ],
+    },
     {
       type: 'tabs',
       tabs: [
@@ -35,9 +62,9 @@ export const Home: GlobalConfig = {
               name: 'heroSlides',
               type: 'array',
               label: 'Galeria da Hero',
-              minRows: 1,
+              minRows: 0,
               maxRows: 5,
-              required: true,
+              required: false,
               fields: [
                 imageWithAltFields('desktopImage', 'Imagem desktop', true),
                 imageWithAltFields('mobileImage', 'Imagem mobile', true),
@@ -47,6 +74,8 @@ export const Home: GlobalConfig = {
               ],
               validate: (value: unknown, { siblingData }: { siblingData?: { heroMode?: string } }) => {
                 const slides = Array.isArray(value) ? value : []
+                if (slides.length === 0) return true
+
                 const activeCount = slides.filter((slide) => (slide as { active?: boolean }).active !== false).length
                 if (siblingData?.heroMode === 'single' && activeCount !== 1) return 'No modo de uma imagem, deixe exatamente um slide ativo.'
                 if (siblingData?.heroMode === 'carousel' && (activeCount < 2 || activeCount > 5)) return 'No carrossel, deixe entre 2 e 5 slides ativos.'
@@ -74,7 +103,7 @@ export const Home: GlobalConfig = {
           label: 'Manifesto',
           fields: [
             { name: 'manifestoEyebrow', type: 'text', label: 'Sobretítulo' },
-            { name: 'manifestoTitle', type: 'text', label: 'Título', required: true },
+            { name: 'manifestoTitle', type: 'text', label: 'Título' },
             { name: 'manifestoCopy', type: 'richText', label: 'Texto' },
             imageWithAltFields('manifestoPrimaryImage', 'Imagem principal'),
             imageWithAltFields('manifestoSecondaryImage', 'Imagem secundária'),
@@ -89,10 +118,10 @@ export const Home: GlobalConfig = {
               relationTo: 'products',
               hasMany: true,
               label: 'Seleção de produtos',
-              required: true,
-              validate: (value: unknown) =>
-                (Array.isArray(value) && value.length === 4) || 'Escolha exatamente 4 produtos.',
-              admin: { description: 'Nenhum dado do produto é copiado aqui.' },
+              required: false,
+              minRows: 0,
+              maxRows: 4,
+              admin: { description: 'Selecione até 4 produtos. Nenhum dado do produto é copiado aqui.' },
             },
           ],
         },
@@ -103,7 +132,7 @@ export const Home: GlobalConfig = {
               name: 'matterPanels',
               type: 'array',
               label: 'Painéis Matter',
-              minRows: 3,
+              minRows: 0,
               maxRows: 3,
               fields: [
                 { name: 'category', type: 'relationship', relationTo: 'categories', label: 'Categoria', required: true },
@@ -123,7 +152,7 @@ export const Home: GlobalConfig = {
               name: 'signatureSlides',
               type: 'array',
               label: 'Slides Signature',
-              minRows: 1,
+              minRows: 0,
               maxRows: 6,
               fields: [
                 { name: 'product', type: 'relationship', relationTo: 'products', label: 'Produto', required: true },
