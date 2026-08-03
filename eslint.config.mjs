@@ -76,6 +76,12 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/app/(frontend)/preview/editorial/**/EditorialPreviewDocument.tsx'],
+    rules: {
+      '@next/next/no-img-element': 'off',
+    },
+  },
+  {
     files: ['src/admin/modules/sales/SalesWorkspaceClient.tsx'],
     linterOptions: { reportUnusedDisableDirectives: false },
     rules: {
