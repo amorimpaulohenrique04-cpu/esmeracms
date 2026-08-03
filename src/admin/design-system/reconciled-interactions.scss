@@ -43,6 +43,14 @@ body .esmera-workspace-frame.is-fluid .esmera-view {
 }
 
 @media (max-width: 900px) {
+  /* Container queries make .esmera-view a stacking context. Lift that context while
+     a mobile inspector is open so fixed panels can cover the sticky app header. */
+  .esmera-view:has(.esmera-context-inspector),
+  .esmera-view:has(.esmera-after-sales-workspace.is-mobile-inspector-open) {
+    position: relative;
+    z-index: var(--esmera-z-modal);
+  }
+
   .esmera-context-inspector {
     position: fixed !important;
     z-index: var(--esmera-z-overlay);
