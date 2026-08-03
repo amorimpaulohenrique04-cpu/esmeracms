@@ -1,0 +1,116 @@
+name: Investigate production media
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-media:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect Payload media URLs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          BASE = "https://esmeracms-green.vercel.app"
+
+          def get_json(path):
+              req = urllib.request.Request(
+                  urllib.parse.urljoin(BASE, path),
+                  headers={"Accept": "application/json", "User-Agent": "EsmeraMediaDiagnostic/1.0"},
+              )
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  return response.status, response.headers.get("content-type"), json.load(response)
+
+          def sanitize(url):
+              parsed = urllib.parse.urlsplit(url)
+              return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
+
+          def probe(raw_url):
+              absolute = urllib.parse.urljoin(BASE + "/", raw_url)
+              request = urllib.request.Request(
+                  absolute,
+                  headers={"User-Agent": "EsmeraMediaDiagnostic/1.0", "Range": "bytes=0-0"},
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      return {
+                          "url": sanitize(absolute),
+                          "status": response.status,
+                          "contentType": response.headers.get("content-type"),
+                          "contentLength": response.headers.get("content-length"),
+                          "finalURL": sanitize(response.geturl()),
+                      }
+              except urllib.error.HTTPError as error:
+                  return {
+                      "url": sanitize(absolute),
+                      "status": error.code,
+                      "contentType": error.headers.get("content-type"),
+                      "contentLength": error.headers.get("content-length"),
+                      "finalURL": sanitize(error.geturl()),
+                  }
+              except Exception as error:
+                  return {"url": sanitize(absolute), "error": repr(error)}
+
+          endpoints = [
+              "/api/media?limit=20&depth=0",
+              "/api/products?limit=20&depth=2",
+              "/api/globals/home?depth=2",
+          ]
+          payloads = {}
+          for endpoint in endpoints:
+              status, content_type, body = get_json(endpoint)
+              print(f"ENDPOINT {endpoint}: status={status} content-type={content_type}")
+              payloads[endpoint] = body
+
+          media_docs = payloads[endpoints[0]].get("docs", [])
+          print(f"MEDIA_DOCS={len(media_docs)}")
+          candidates = []
+          for media in media_docs:
+              summary = {
+                  "id": media.get("id"),
+                  "filename": media.get("filename"),
+                  "mimeType": media.get("mimeType"),
+                  "url": media.get("url"),
+                  "sizes": {
+                      key: (value or {}).get("url")
+                      for key, value in (media.get("sizes") or {}).items()
+                  },
+                  "status": media.get("_status"),
+              }
+              print("MEDIA", json.dumps(summary, ensure_ascii=False))
+              if media.get("url"):
+                  candidates.append((f"media:{media.get('id')}:original", media["url"]))
+              for key, value in (media.get("sizes") or {}).items():
+                  if isinstance(value, dict) and value.get("url"):
+                      candidates.append((f"media:{media.get('id')}:{key}", value["url"]))
+
+          products = payloads[endpoints[1]].get("docs", [])
+          print(f"PRODUCT_DOCS={len(products)}")
+          for product in products:
+              print("PRODUCT", json.dumps({
+                  "id": product.get("id"),
+                  "title": product.get("title"),
+                  "slug": product.get("slug"),
+                  "gallery": product.get("gallery"),
+              }, ensure_ascii=False))
+
+          seen = set()
+          print("PROBES")
+          for label, url in candidates:
+              absolute = urllib.parse.urljoin(BASE + "/", url)
+              if absolute in seen:
+                  continue
+              seen.add(absolute)
+              print(label, json.dumps(probe(url), ensure_ascii=False))
+          PY
