@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button, InlineFeedback, SavingState } from '../../design-system'
+import { expectAdminResponse, normalizeAdminError } from '../../state/asyncState'
 import { availabilityLabels } from './types'
 
 type DraftState = {
@@ -16,6 +17,44 @@ type DraftState = {
   basePriceCents: string
 }
 
+type PublicationIssue = {
+  id?: string
+  severity?: 'blocker' | 'warning' | 'recommendation'
+  path?: string | null
+  tab?: string | null
+  anchor?: string | null
+  message: string
+  suggestion?: string | null
+}
+
+type AdminActionResult = {
+  status: 'saved' | 'published' | 'unpublished' | 'archived' | 'restored' | 'published_but_unverified' | 'requires_confirmation'
+  entityId?: string | number
+  revision?: string | null
+  assessment?: {
+    ready?: boolean
+    issues?: PublicationIssue[]
+  } | null
+  message?: string
+  meta?: {
+    updated?: number
+    updatedAt?: string | null
+    confirmationToken?: string | null
+  }
+}
+
+type LegacyMutationResult = {
+  updated?: number
+  errors?: Array<{ message: string }>
+}
+
+type FeedbackState = {
+  tone: 'success' | 'warning' | 'danger'
+  message: string
+  issues?: PublicationIssue[]
+  traceId?: string | null
+}
+
 type Props = {
   productId: string | number
   initial: DraftState
@@ -23,51 +62,125 @@ type Props = {
   archived: boolean
 }
 
+function formatCurrencyInputFromCents(value: string) {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return ''
+  const cents = Number(digits)
+  if (!Number.isSafeInteger(cents)) return ''
+  return (cents / 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function normalizeCurrencyInput(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 15)
+  if (!digits) return ''
+  return (Number(digits) / 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function currencyInputToCents(value: string): number | null {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return null
+  const cents = Number(digits)
+  return Number.isSafeInteger(cents) ? cents : null
+}
+
+function requestData(value: DraftState) {
+  return {
+    title: value.title,
+    subtitle: value.subtitle || null,
+    material: value.material || null,
+    edition: value.edition || null,
+    availability: value.availability,
+    priceMode: value.priceMode,
+    basePriceCents: value.priceMode === 'fixed' ? currencyInputToCents(value.basePriceCents) : null,
+  }
+}
+
 export function ProductDraftForm({ productId, initial, published, archived }: Props) {
   const router = useRouter()
-  const [draft, setDraft] = useState(initial)
+  const [draft, setDraft] = useState<DraftState>(() => ({
+    ...initial,
+    basePriceCents: formatCurrencyInputFromCents(initial.basePriceCents),
+  }))
   const [dirty, setDirty] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [feedback, setFeedback] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null)
+  const [confirmationToken, setConfirmationToken] = useState<string | null>(null)
   const latestRequest = useRef(0)
+  const activeSave = useRef<AbortController | null>(null)
+  const revision = useRef<string | null>(null)
+  const updatedAt = useRef<string | null>(null)
+
+  const applyError = useCallback((error: unknown, fallback: string) => {
+    const normalized = normalizeAdminError(error, fallback)
+    setFeedback({
+      tone: 'danger',
+      message: normalized.summary,
+      issues: [
+        ...normalized.fieldErrors.map((issue) => ({
+          id: issue.code || undefined,
+          severity: issue.severity,
+          path: issue.path,
+          tab: issue.tab,
+          anchor: issue.anchor,
+          message: issue.message,
+          suggestion: issue.suggestion,
+        })),
+        ...normalized.entityErrors.map((issue) => ({
+          id: issue.code,
+          severity: 'blocker' as const,
+          message: issue.message,
+          suggestion: issue.suggestion,
+        })),
+      ],
+      traceId: normalized.traceId,
+    })
+  }, [])
 
   const saveDraft = useCallback(async (value: DraftState) => {
     const requestId = latestRequest.current + 1
     latestRequest.current = requestId
+    activeSave.current?.abort()
+    const controller = new AbortController()
+    activeSave.current = controller
     setSaveState('saving')
     setFeedback(null)
+
     try {
       const response = await fetch('/api/admin-products', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           action: 'save-draft',
           id: productId,
-          data: {
-            title: value.title,
-            subtitle: value.subtitle || null,
-            material: value.material || null,
-            edition: value.edition || null,
-            availability: value.availability,
-            priceMode: value.priceMode,
-            basePriceCents: value.priceMode === 'fixed' && value.basePriceCents !== '' ? Number(value.basePriceCents) : null,
-          },
+          data: requestData(value),
+          expectedRevision: revision.current,
+          expectedUpdatedAt: updatedAt.current,
         }),
       })
-      const body = await response.json() as { error?: string }
-      if (!response.ok) throw new Error(body.error || 'Não foi possível salvar o rascunho.')
-      if (latestRequest.current === requestId) {
-        setSaveState('saved')
-        setDirty(false)
-      }
+      const result = await expectAdminResponse<AdminActionResult>(response, 'Não foi possível salvar o rascunho.')
+      if (latestRequest.current !== requestId) return false
+      revision.current = result.revision || revision.current
+      updatedAt.current = result.meta?.updatedAt || updatedAt.current
+      setSaveState('saved')
+      setDirty(false)
+      return true
     } catch (error) {
-      if (latestRequest.current === requestId) {
-        setSaveState('error')
-        setFeedback(error instanceof Error ? error.message : 'Não foi possível salvar o rascunho.')
-      }
+      if (controller.signal.aborted || latestRequest.current !== requestId) return false
+      setSaveState('error')
+      applyError(error, 'Não foi possível salvar o rascunho.')
+      return false
+    } finally {
+      if (activeSave.current === controller) activeSave.current = null
     }
-  }, [productId])
+  }, [applyError, productId])
 
   useEffect(() => {
     if (!dirty) return
@@ -75,15 +188,71 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
     return () => window.clearTimeout(timer)
   }, [dirty, draft, saveDraft])
 
+  useEffect(() => () => activeSave.current?.abort(), [])
+
   function field<K extends keyof DraftState>(key: K, value: DraftState[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
     setDirty(true)
     setSaveState('idle')
+    setConfirmationToken(null)
   }
 
-  async function action(name: 'publish' | 'unpublish' | 'archive' | 'restore') {
+  async function publish(token?: string | null) {
     setFeedback(null)
-    if (dirty) await saveDraft(draft)
+    activeSave.current?.abort()
+    setSaveState('saving')
+    try {
+      const response = await fetch('/api/admin-products', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          action: 'save-and-publish',
+          id: productId,
+          data: requestData(draft),
+          expectedRevision: revision.current,
+          expectedUpdatedAt: updatedAt.current,
+          confirmationToken: token || undefined,
+        }),
+      })
+      const result = await expectAdminResponse<AdminActionResult>(response, 'Não foi possível publicar o produto.')
+      revision.current = result.revision || revision.current
+      updatedAt.current = result.meta?.updatedAt || updatedAt.current
+
+      if (result.status === 'requires_confirmation') {
+        const nextToken = result.meta?.confirmationToken || null
+        setConfirmationToken(nextToken)
+        setSaveState('saved')
+        setFeedback({
+          tone: 'warning',
+          message: result.message || 'Revise os avisos antes de confirmar a publicação.',
+          issues: result.assessment?.issues?.filter((issue) => issue.severity === 'warning'),
+        })
+        return
+      }
+
+      setConfirmationToken(null)
+      setDirty(false)
+      setSaveState('saved')
+      setFeedback({
+        tone: result.status === 'published_but_unverified' ? 'warning' : 'success',
+        message: result.message || (result.status === 'published_but_unverified'
+          ? 'Produto publicado, mas o site não pôde ser verificado agora.'
+          : 'Produto publicado.'),
+      })
+      router.refresh()
+    } catch (error) {
+      setSaveState('error')
+      applyError(error, 'Não foi possível publicar o produto.')
+    }
+  }
+
+  async function legacyAction(name: 'unpublish' | 'archive' | 'restore') {
+    setFeedback(null)
+    if (dirty) {
+      const saved = await saveDraft(draft)
+      if (!saved) return
+    }
     try {
       const response = await fetch('/api/admin-products', {
         method: 'POST',
@@ -91,13 +260,21 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ action: name, ids: [productId] }),
       })
-      const body = await response.json() as { updated?: number; errors?: Array<{ message: string }>; error?: string }
-      if (!response.ok) throw new Error(body.error || 'Não foi possível concluir a ação.')
-      if (!body.updated && body.errors?.length) throw new Error(body.errors.map((item) => item.message).join(' '))
-      setFeedback(name === 'publish' ? 'Produto publicado.' : name === 'unpublish' ? 'Produto despublicado.' : name === 'archive' ? 'Produto arquivado.' : 'Produto restaurado.')
+      const result = await expectAdminResponse<LegacyMutationResult>(response, 'Não foi possível concluir a ação.')
+      if (!result.updated && result.errors?.length) {
+        throw new Error(result.errors.map((item) => item.message).join(' '))
+      }
+      setFeedback({
+        tone: 'success',
+        message: name === 'unpublish'
+          ? 'Produto despublicado.'
+          : name === 'archive'
+          ? 'Produto arquivado.'
+          : 'Produto restaurado.',
+      })
       router.refresh()
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Não foi possível concluir a ação.')
+      applyError(error, 'Não foi possível concluir a ação.')
     }
   }
 
@@ -118,15 +295,36 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
         <label><span>Edição</span><input className="esmera-input" value={draft.edition} onChange={(event) => field('edition', event.target.value)} /></label>
         <label><span>Disponibilidade</span><select className="esmera-input" value={draft.availability} onChange={(event) => field('availability', event.target.value)}>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label><span>Modo de preço</span><select className="esmera-input" value={draft.priceMode} onChange={(event) => field('priceMode', event.target.value)}><option value="inquiry">Sob consulta</option><option value="fixed">Preço fixo</option></select></label>
-        {draft.priceMode === 'fixed' ? <label><span>Preço base em centavos</span><input className="esmera-input" inputMode="numeric" value={draft.basePriceCents} onChange={(event) => field('basePriceCents', event.target.value.replace(/\D/g, ''))} /></label> : null}
+        {draft.priceMode === 'fixed' ? <label><span>Preço base (R$)</span><input className="esmera-input" inputMode="decimal" value={draft.basePriceCents} onChange={(event) => field('basePriceCents', normalizeCurrencyInput(event.target.value))} placeholder="0,00" /></label> : null}
       </div>
-      <p className="esmera-product-draft-form__hint">Alterações nestes campos são salvas como rascunho após 700 ms. Publicar continua sendo uma ação separada. Descrição rica, opções e variantes completas permanecem no editor técnico.</p>
+      <p className="esmera-product-draft-form__hint">Alterações nestes campos são salvas como rascunho após 700 ms. Publicar salva novamente o estado visível, avalia as regras do catálogo e só então promove a mesma revisão.</p>
       <div className="esmera-product-draft-form__actions">
         <div className="esmera-actions">
-          <Button tone="primary" onClick={() => void action(published ? 'unpublish' : 'publish')}>{published ? 'Despublicar' : 'Publicar'}</Button>
-          <Button onClick={() => void action(archived ? 'restore' : 'archive')}>{archived ? 'Restaurar no catálogo' : 'Arquivar'}</Button>
+          {published
+            ? <Button tone="primary" onClick={() => void legacyAction('unpublish')}>Despublicar</Button>
+            : confirmationToken
+            ? <Button tone="primary" onClick={() => void publish(confirmationToken)}>Confirmar publicação</Button>
+            : <Button tone="primary" onClick={() => void publish()}>Publicar</Button>}
+          <Button onClick={() => void legacyAction(archived ? 'restore' : 'archive')}>{archived ? 'Restaurar no catálogo' : 'Arquivar'}</Button>
         </div>
-        {feedback ? <InlineFeedback tone={feedback.includes('Não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
+        {feedback ? (
+          <div className="esmera-product-publication-feedback" role="status" aria-live="polite">
+            <InlineFeedback tone={feedback.tone}>{feedback.message}</InlineFeedback>
+            {feedback.issues?.length ? (
+              <ul className="esmera-product-issues">
+                {feedback.issues.map((issue, index) => (
+                  <li key={`${issue.id || issue.path || 'issue'}-${index}`}>
+                    {issue.anchor
+                      ? <a href={`#${issue.anchor}`}>{issue.message}</a>
+                      : <span>{issue.message}</span>}
+                    {issue.suggestion ? <small>{issue.suggestion}</small> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {feedback.traceId ? <small>Referência técnica: {feedback.traceId}</small> : null}
+          </div>
+        ) : null}
       </div>
     </section>
   )
