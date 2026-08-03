@@ -140,11 +140,16 @@ test.describe('Stages 16–20 hardening', () => {
     await commercialPage.goto(`http://localhost:3000/admin/privacy?q=${encodeURIComponent('Cliente Privacidade E2E')}`)
     await expect(commercialPage.getByRole('heading', { name: 'Privacidade' }).first()).toBeVisible()
     const row = commercialPage.getByRole('row').filter({ hasText: 'Cliente Privacidade E2E' })
-    await row.locator('summary').filter({ hasText: 'Operar' }).click()
+    const actions = row.locator('details.esmera-privacy-actions')
+    const openActions = async () => {
+      if (await actions.getAttribute('open') === null) await actions.locator('summary').click()
+      await expect(actions).toHaveAttribute('open', '')
+    }
+    await openActions()
     await row.getByRole('button', { name: 'Registrar consentimento' }).click()
     await expect(row.getByText('Concedido', { exact: true })).toBeVisible({ timeout: 10_000 })
 
-    await row.locator('summary').filter({ hasText: 'Operar' }).click()
+    await openActions()
     await row.getByRole('button', { name: 'Registrar solicitação de exclusão' }).click()
     await expect(row.getByText('Solicitada', { exact: true })).toBeVisible({ timeout: 10_000 })
 
