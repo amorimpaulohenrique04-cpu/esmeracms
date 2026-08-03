@@ -49,6 +49,19 @@ export type AdminErrorShape = {
   meta?: Record<string, unknown>
 }
 
+export type AdminRequestErrorInput = {
+  code: AdminErrorCode
+  message?: string
+  summary?: string
+  status?: number | null
+  retryable?: boolean
+  detail?: string | null
+  traceId?: string | null
+  fieldErrors?: AdminFieldError[]
+  entityErrors?: AdminEntityError[]
+  meta?: Record<string, unknown>
+}
+
 const statusCodes: Record<number, AdminErrorCode> = {
   400: 'invalid_request',
   401: 'unauthorized',
@@ -72,17 +85,18 @@ export class AdminRequestError extends Error implements AdminErrorShape {
   entityErrors: AdminEntityError[]
   meta?: Record<string, unknown>
 
-  constructor(shape: Omit<AdminErrorShape, 'message'> & { message?: string }) {
-    super(shape.message || shape.summary)
+  constructor(shape: AdminRequestErrorInput) {
+    const summary = shape.summary || shape.message || 'Não foi possível concluir esta operação.'
+    super(shape.message || summary)
     this.name = 'AdminRequestError'
     this.code = shape.code
-    this.summary = shape.summary
-    this.status = shape.status
-    this.retryable = shape.retryable
+    this.summary = summary
+    this.status = shape.status ?? null
+    this.retryable = shape.retryable ?? false
     this.detail = shape.detail
     this.traceId = shape.traceId
-    this.fieldErrors = shape.fieldErrors
-    this.entityErrors = shape.entityErrors
+    this.fieldErrors = shape.fieldErrors || []
+    this.entityErrors = shape.entityErrors || []
     this.meta = shape.meta
   }
 }
