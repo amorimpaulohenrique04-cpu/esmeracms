@@ -294,6 +294,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
           >
             <div className="esmera-dashboard-panel-body">
               <IntegrationState
+                title="Não configurado"
                 copy={snapshot.traffic.reason}
                 action={<small>Nenhum percentual, visitante, sessão ou gráfico é estimado ou preenchido com placeholder.</small>}
               />
