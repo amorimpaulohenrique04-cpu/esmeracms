@@ -11,6 +11,7 @@
 }
 
 /* Operational workspaces must use the complete available width. */
+body .esmera-workspace-frame.is-fluid,
 body .esmera-workspace-frame.is-fluid .esmera-view {
   max-width: none;
 }
