@@ -55,6 +55,7 @@ const OperationalProducts = {
 } satisfies CollectionConfig
 
 export default buildConfig({
+  serverURL: process.env.NEXT_PUBLIC_SITE_URL,
   cors: parseDecoCorsOrigins(process.env.DECO_CORS_ORIGINS),
   i18n: {
     supportedLanguages: { pt },

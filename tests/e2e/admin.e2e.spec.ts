@@ -288,7 +288,7 @@ test.describe('Admin Panel', () => {
 
   test('can navigate to the technical users list', async () => {
     await page.goto('http://localhost:3000/admin/collections/users')
-    await expect(page).toHaveURL('http://localhost:3000/admin/collections/users')
+    await expect(page).toHaveURL(/\/admin\/collections\/users(?:\?.*)?$/)
     await expect(page.getByRole('heading', { name: /Usuários/i }).first()).toBeVisible()
     await expect(page.getByTestId('esmera-app-header')).toBeVisible()
   })
