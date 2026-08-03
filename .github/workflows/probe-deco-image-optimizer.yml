@@ -1,0 +1,55 @@
+name: Probe Deco image optimizer
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe original and optimized media
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, urllib.error, urllib.parse, urllib.request
+
+          payload = "https://esmeracms-green.vercel.app"
+          api = payload + "/api/media?limit=20&depth=0"
+          with urllib.request.urlopen(api, timeout=20) as response:
+              docs = json.load(response)["docs"]
+
+          def probe(url):
+              req = urllib.request.Request(url, headers={
+                  "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                  "Referer": "https://envs-testeesmera--vdcji85.decocdn.com/",
+                  "User-Agent": "Mozilla/5.0",
+              })
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      body = response.read()
+                      return response.status, response.headers.get("content-type"), len(body), body[:16].hex(), ""
+              except urllib.error.HTTPError as error:
+                  body = error.read()
+                  return error.code, error.headers.get("content-type"), len(body), body[:16].hex(), body[:400].decode("utf-8", errors="replace")
+              except Exception as error:
+                  return 0, None, 0, "", repr(error)
+
+          for doc in docs:
+              raw = ((doc.get("sizes") or {}).get("card") or {}).get("url") or doc.get("url")
+              original = urllib.parse.urljoin(payload + "/", raw)
+              print("ORIGINAL", doc.get("id"), original, probe(original))
+              for factor in (1, 2):
+                  query = urllib.parse.urlencode({
+                      "fit": "cover",
+                      "width": 960 * factor,
+                      "height": 1200 * factor,
+                      "src": original,
+                  })
+                  optimized = "https://decoims.com/image?" + query
+                  print("OPTIMIZED", doc.get("id"), factor, optimized, probe(optimized))
+          PY
