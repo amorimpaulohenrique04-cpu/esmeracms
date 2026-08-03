@@ -10,6 +10,15 @@ on:
       - src/migrations/**
       - tests/unit/**
       - .github/workflows/stage1-generate-and-validate.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/globals/Home.ts
+      - src/globals/SiteSettings.ts
+      - src/migrations/**
+      - tests/unit/**
+      - .github/workflows/stage1-generate-and-validate.yml
 
 permissions:
   contents: write
@@ -25,6 +34,8 @@ jobs:
       NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -43,6 +54,7 @@ jobs:
       - run: pnpm test:unit
 
       - name: Commit generated Payload artifacts
+        if: github.event_name == 'push'
         run: |
           git add -- src/payload-types.ts 'src/app/(payload)/admin/importMap.js'
           if git diff --cached --quiet; then
