@@ -1,0 +1,89 @@
+name: Stage 2 post-merge API validation
+
+on:
+  push:
+    branches:
+      - agent/payload-home-contract-stage-1
+    paths:
+      - .github/workflows/stage2-post-merge-validation.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate-production-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate public and private API contracts
+        run: |
+          node <<'NODE'
+          ;(async () => {
+            const baseURL = 'https://esmeracms-green.vercel.app'
+            const publicEndpoints = [
+              '/api/products?limit=1&depth=2',
+              '/api/categories?limit=1&depth=2',
+              '/api/media?limit=1',
+              '/api/globals/home?depth=2',
+              '/api/globals/navigation?depth=2',
+              '/api/globals/site-settings?depth=2',
+              '/api/globals/about?depth=2',
+              '/api/globals/contact?depth=2',
+              '/api/globals/collection-page?depth=2',
+            ]
+            const privateEndpoints = [
+              '/api/customers?limit=1',
+              '/api/users?limit=1',
+              '/api/sales?limit=1',
+              '/api/after-sales?limit=1',
+            ]
+
+            async function inspect(path, visibility) {
+              const response = await fetch(`${baseURL}${path}`, {
+                headers: { accept: 'application/json', 'user-agent': 'esmera-stage2-post-merge/1.0' },
+                signal: AbortSignal.timeout(20000),
+              })
+              const contentType = response.headers.get('content-type') || ''
+              const text = await response.text()
+              let validJSON = false
+              let parsed = null
+              try { parsed = JSON.parse(text); validJSON = true } catch {}
+              return {
+                path,
+                visibility,
+                status: response.status,
+                contentType,
+                validJSON,
+                totalDocs: parsed && typeof parsed === 'object' ? parsed.totalDocs ?? null : null,
+                documentStatus: parsed && typeof parsed === 'object' ? parsed._status ?? null : null,
+              }
+            }
+
+            const results = []
+            for (const endpoint of publicEndpoints) results.push(await inspect(endpoint, 'public'))
+            for (const endpoint of privateEndpoints) results.push(await inspect(endpoint, 'private'))
+
+            const publicFailures = results.filter((item) =>
+              item.visibility === 'public' &&
+              (item.status !== 200 || item.validJSON !== true || !item.contentType.includes('application/json'))
+            )
+            const privateFailures = results.filter((item) => item.visibility === 'private' && item.status === 200)
+
+            console.log(JSON.stringify({
+              checkedAt: new Date().toISOString(),
+              baseURL,
+              passed: publicFailures.length === 0 && privateFailures.length === 0,
+              summary: {
+                publicChecked: publicEndpoints.length,
+                publicFailures: publicFailures.length,
+                privateChecked: privateEndpoints.length,
+                privateFailures: privateFailures.length,
+              },
+              results,
+            }, null, 2))
+
+            if (publicFailures.length || privateFailures.length) process.exitCode = 1
+          })().catch((error) => {
+            console.error(error)
+            process.exitCode = 1
+          })
+          NODE
