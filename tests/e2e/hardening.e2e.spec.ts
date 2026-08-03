@@ -140,10 +140,12 @@ test.describe('Stages 16–20 hardening', () => {
     await commercialPage.goto(`http://localhost:3000/admin/privacy?q=${encodeURIComponent('Cliente Privacidade E2E')}`)
     await expect(commercialPage.getByRole('heading', { name: 'Privacidade' }).first()).toBeVisible()
     const row = commercialPage.getByRole('row').filter({ hasText: 'Cliente Privacidade E2E' })
+    await row.getByRole('button', { name: 'Operar' }).click()
     await row.getByRole('button', { name: 'Registrar consentimento' }).click()
     await expect(row.getByText('Concedido', { exact: true })).toBeVisible({ timeout: 10_000 })
 
-    await row.getByRole('button', { name: 'Solicitar exclusão' }).click()
+    await row.getByRole('button', { name: 'Operar' }).click()
+    await row.getByRole('button', { name: 'Registrar solicitação de exclusão' }).click()
     await expect(row.getByText('Solicitada', { exact: true })).toBeVisible({ timeout: 10_000 })
 
     const exportResponse = await commercialPage.request.get(`http://localhost:3000/api/admin-privacy?customer=${customerId}`)
