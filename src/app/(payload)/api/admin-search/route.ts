@@ -162,7 +162,7 @@ export async function GET(request: Request) {
         collection: 'opportunities', overrideAccess: false, user, depth: 1, limit: 6,
         where: { or: [{ code: { like: query } }, { nextAction: { like: query } }, { 'customer.name': { like: query } }] } as Where,
         select: { id: true, code: true, stage: true, nextAction: true, customer: true },
-      }).then((result) => result.docs.map((doc) => ({ id: `opportunity-${doc.id}`, group: 'Oportunidades recentes', label: text(doc.code) || 'Oportunidade sem código', meta: [relationLabel(doc.customer), opportunityStageLabels[doc.stage as keyof typeof opportunityStageLabels] || text(doc.stage), text(doc.nextAction)].filter(Boolean).join(' · ') || undefined, href: `/admin/collections/opportunities/${doc.id}`, icon: 'receipt' }))),
+      }).then((result) => result.docs.map((doc) => ({ id: `opportunity-${doc.id}`, group: 'Oportunidades', label: text(doc.code) || 'Oportunidade sem código', meta: [relationLabel(doc.customer), opportunityStageLabels[doc.stage as keyof typeof opportunityStageLabels] || text(doc.stage), text(doc.nextAction)].filter(Boolean).join(' · ') || undefined, href: `/admin/collections/opportunities/${doc.id}`, icon: 'receipt' }))),
       payload.find({
         collection: 'leads', overrideAccess: false, user, depth: 0, limit: 6,
         where: { or: [{ name: { like: query } }, { phone: { like: query } }, { email: { like: query } }] } as Where,
