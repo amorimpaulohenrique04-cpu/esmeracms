@@ -10,6 +10,11 @@
   animation: esmera-rollback var(--esmera-transition-panel, 220ms) var(--esmera-ease);
 }
 
+/* Operational workspaces must use the complete available width. */
+body .esmera-workspace-frame.is-fluid .esmera-view {
+  max-width: none;
+}
+
 .esmera-spatial-selection {
   position: relative;
 }
