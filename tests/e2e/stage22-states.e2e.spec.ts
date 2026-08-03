@@ -61,7 +61,7 @@ test.describe('Stage 22 state contract', () => {
     await page.getByRole('button', { name: 'Buscar no CMS' }).click()
     const palette = page.getByTestId('esmera-command-palette')
     await expect(palette).toBeVisible()
-    await palette.getByPlaceholder('Produto, cliente, venda ou ação…').fill('produto')
+    await palette.getByRole('textbox', { name: 'Buscar no CMS' }).fill('produto')
     await expect(palette.getByRole('alert')).toHaveText('Busca temporariamente indisponível.')
     await expect(palette.getByRole('option')).toHaveCount(0)
     await page.unroute('**/api/admin-search**')
