@@ -50,7 +50,9 @@ describe('Home global schema', () => {
     expect(heroSlides.maxRows).toBe(5)
     expect(heroSlides.validate?.([], { siblingData: { heroMode: 'single' } })).toBe(true)
     expect(heroSlides.validate?.([{ active: true }], { siblingData: { heroMode: 'single' } })).toBe(true)
-    expect(heroSlides.validate?.([{ active: true }, { active: true }], { siblingData: { heroMode: 'single' } })).toBeTypeOf('string')
+    expect(
+      heroSlides.validate?.([{ active: true }, { active: true }], { siblingData: { heroMode: 'single' } }),
+    ).toBeTypeOf('string')
   })
 
   it('allows zero to four selected products without an all-or-nothing validator', () => {
@@ -92,7 +94,9 @@ describe('Home global schema', () => {
 
   it('accepts only the supported disabled section identifiers', () => {
     const disabledSections = getField(homeFields, 'disabledSections')
-    const optionValues = disabledSections.options?.map((option) => typeof option === 'string' ? option : option.value)
+    const optionValues = disabledSections.options?.map((option) =>
+      typeof option === 'string' ? option : option.value,
+    )
 
     expect(disabledSections.type).toBe('select')
     expect(disabledSections.hasMany).toBe(true)
@@ -101,16 +105,18 @@ describe('Home global schema', () => {
 })
 
 describe('public Site Settings schema', () => {
-  it('contains only explicit storefront footer fields added by this contract', () => {
-    const names = new Set(siteSettingsFields.map((field) => field.name))
+  it('contains the explicit storefront footer fields required by the contract', () => {
+    const names = siteSettingsFields.map((field) => field.name)
 
-    expect(names).toEqual(expect.objectContaining(new Set([
-      'footerStatement',
-      'locationLabel',
-      'privacyLabel',
-      'privacyHref',
-      'termsLabel',
-      'termsHref',
-    ])))
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'footerStatement',
+        'locationLabel',
+        'privacyLabel',
+        'privacyHref',
+        'termsLabel',
+        'termsHref',
+      ]),
+    )
   })
 })
