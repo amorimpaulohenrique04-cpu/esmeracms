@@ -4,9 +4,15 @@ import { Combobox } from '@base-ui/react/combobox'
 import { Select } from '@base-ui/react/select'
 import React from 'react'
 
-export function Field({ label, hint, children, className = '' }: { label?: string; hint?: string; children: React.ReactNode; className?: string }) {
+type FieldProps = React.LabelHTMLAttributes<HTMLLabelElement> & {
+  label?: string
+  hint?: string
+  children: React.ReactNode
+}
+
+export function Field({ label, hint, children, className = '', ...props }: FieldProps) {
   return (
-    <label className={`esmera-field${className ? ` ${className}` : ''}`}>
+    <label {...props} className={`esmera-field${className ? ` ${className}` : ''}`}>
       {label ? <span className="esmera-field-label">{label}</span> : null}
       {children}
       {hint ? <span className="esmera-field-hint">{hint}</span> : null}
