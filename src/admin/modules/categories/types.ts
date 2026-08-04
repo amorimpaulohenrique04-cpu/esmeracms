@@ -16,11 +16,7 @@ export type CategoryParent = {
   parent?: RelationshipLike<CategoryParent>
 }
 
-export type CategorySearchTerm = {
-  id?: string | null
-  term?: string | null
-}
-
+export type CategorySearchTerm = { id?: string | null; term?: string | null }
 export type CategorySeo = {
   title?: string | null
   description?: string | null
@@ -41,6 +37,12 @@ export type CategoryListItem = {
   updatedAt?: string | null
   productCount: number
   depth: number
+  publicationRevision?: string | null
+  publicationContractVersion?: string | null
+  publicationOperationalStatus?: string | null
+  publicationVerificationStatus?: string | null
+  publicationVerifiedAt?: string | null
+  publicationTraceId?: string | null
 }
 
 export type CategoryDetail = CategoryListItem & {
@@ -59,16 +61,8 @@ export type RelatedProduct = {
 }
 
 export type CategoryTab = 'general' | 'media' | 'products'
-
-export type CategoryWorkspaceFilters = {
-  q: string
-  status: 'active' | 'archive'
-}
-
-export const categoryStatusLabels: Record<string, string> = {
-  active: 'Ativa',
-  archive: 'Arquivada',
-}
+export type CategoryWorkspaceFilters = { q: string; status: 'active' | 'archive' }
+export const categoryStatusLabels: Record<string, string> = { active: 'Ativa', archive: 'Arquivada' }
 
 export function relationId(value: RelationshipLike<{ id?: string | number | null }>) {
   if (typeof value === 'string' || typeof value === 'number') return value
@@ -77,11 +71,9 @@ export function relationId(value: RelationshipLike<{ id?: string | number | null
 }
 
 export function categoryImageURL(value: RelationshipLike<CategoryMedia>) {
-  if (!value || typeof value !== 'object') return null
-  return value.url || null
+  return value && typeof value === 'object' ? value.url || null : null
 }
 
 export function categoryImageAlt(value: RelationshipLike<CategoryMedia>) {
-  if (!value || typeof value !== 'object') return ''
-  return value.alt || value.filename || ''
+  return value && typeof value === 'object' ? value.alt || value.filename || '' : ''
 }
