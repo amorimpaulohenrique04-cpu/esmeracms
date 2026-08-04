@@ -97,6 +97,12 @@
 .esmera-product-readiness-list strong { font-size: var(--esmera-font-body); }
 .esmera-product-readiness-list ul,
 .esmera-product-issues { margin: 8px 0 0; padding-left: 18px; color: var(--esmera-text-secondary); font-size: var(--esmera-font-meta); line-height: var(--esmera-line-body); }
+.esmera-products-bulk-result { margin: var(--esmera-space-4) 0; padding: var(--esmera-space-4); border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-radius-8); background: var(--esmera-surface); }
+.esmera-products-bulk-result__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--esmera-space-3); }
+.esmera-products-bulk-result__list { margin: var(--esmera-space-3) 0 0; padding: 0; list-style: none; display: grid; gap: var(--esmera-space-3); }
+.esmera-products-bulk-result__list > li { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--esmera-space-3); padding: var(--esmera-space-3); border-left: 2px solid var(--esmera-warning); background: var(--esmera-surface-hover); }
+.esmera-products-bulk-result__list p { margin: 4px 0 0; color: var(--esmera-text-secondary); font-size: var(--esmera-font-meta); line-height: var(--esmera-line-body); }
+.esmera-products-bulk-result__status { display: block; margin-top: 2px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 .esmera-products-bulk-category { min-width: 190px; display: grid; grid-template-columns: auto minmax(120px, 1fr); align-items: center; gap: 7px; }
 .esmera-products-bulk-category span { color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 .esmera-products-bulk-category .esmera-input { min-height: var(--esmera-control-compact); }

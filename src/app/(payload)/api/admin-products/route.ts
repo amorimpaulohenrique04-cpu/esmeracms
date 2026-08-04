@@ -4,6 +4,11 @@ import { getPayload } from 'payload'
 
 import { canManageSite } from '../../../../access/roles'
 import { adminActionResponse, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
+import {
+  BULK_PUBLICATION_LIMIT,
+  publishProductsInBulk,
+  type BulkPublicationItemInput,
+} from '../../../../server/publication/bulkPublication'
 import { coordinatePublication } from '../../../../server/publication/coordinator'
 import { assessProductPublication } from '../../../../server/publication/productAssessment'
 import { withSerializableTransaction } from '../../../../server/publication/concurrency'
@@ -26,6 +31,7 @@ type ProductAction =
 type RequestBody = {
   action?: ProductAction
   ids?: Array<string | number>
+  items?: BulkPublicationItemInput[]
   id?: string | number
   categoryId?: string | number
   availability?: string
@@ -223,6 +229,36 @@ export async function POST(request: Request) {
     }
   }
 
+  if (action === 'publish') {
+    if (Array.isArray(body.ids) && body.ids.length) {
+      return adminInputError('A publicação em lote agora exige items[] com o token de concorrência de cada produto.')
+    }
+    if (!Array.isArray(body.items) || !body.items.length) {
+      return adminInputError('Selecione ao menos um produto para publicar.')
+    }
+    if (body.items.length > BULK_PUBLICATION_LIMIT) {
+      return adminInputError(`Publique no máximo ${BULK_PUBLICATION_LIMIT} produtos por vez.`)
+    }
+    const itemIds = body.items.map((item) => String(item?.id))
+    if (new Set(itemIds).size !== itemIds.length) {
+      return adminInputError('O lote possui produtos repetidos.')
+    }
+
+    try {
+      const result = await publishProductsInBulk(payload, user, body.items)
+      return adminActionResponse('bulk_completed', {
+        message: `${result.published} de ${result.requested} produto(s) publicados.`,
+        meta: result as unknown as Record<string, unknown>,
+      })
+    } catch (error) {
+      return adminErrorResponse(error, {
+        entity: 'product',
+        operation: 'bulk-publish',
+        logger: payload.logger,
+      })
+    }
+  }
+
   try {
     if (action === 'reorder-gallery') {
       if (body.id === undefined || body.id === null || !Array.isArray(body.gallery)) return NextResponse.json({ error: 'Galeria inválida.' }, { status: 400 })
@@ -252,25 +288,12 @@ export async function POST(request: Request) {
           collection: 'products',
           id,
           draft: true,
-          depth: action === 'publish' ? 2 : 0,
+          depth: 0,
           overrideAccess: false,
           user,
         })
 
-        if (action === 'publish') {
-          const assessment = assessProductPublication(current)
-          if (!assessment.ready) {
-            errors.push({
-              id,
-              message: assessment.issues
-                .filter((issue) => issue.severity === 'blocker')
-                .map((issue) => issue.message)
-                .join(' '),
-            })
-            continue
-          }
-          await payload.update({ collection: 'products', id, data: { _status: 'published' } as never, draft: false, overrideAccess: false, user })
-        } else if (action === 'unpublish') {
+        if (action === 'unpublish') {
           await payload.update({ collection: 'products', id, data: { _status: 'draft' } as never, draft: true, overrideAccess: false, user })
         } else if (action === 'archive' || action === 'restore') {
           const currentStatus = (current as { _status?: string })._status

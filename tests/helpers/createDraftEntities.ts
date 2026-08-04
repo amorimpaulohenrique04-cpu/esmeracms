@@ -3,6 +3,18 @@ import { expect } from '@playwright/test'
 
 const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2p9sAAAAASUVORK5CYII=', 'base64')
 
+/**
+ * Token de concorrência do lote: o mesmo `updatedAt` que a lista do admin
+ * entrega ao cliente. Escalar, portanto idêntico em qualquer `depth`.
+ */
+export async function fetchProductUpdatedAt(page: Page, id: string | number): Promise<string> {
+  const response = await page.request.get(`http://localhost:3000/api/products/${id}?draft=true&depth=0`)
+  expect(response.ok(), await response.text()).toBeTruthy()
+  const document = await response.json() as { updatedAt?: string }
+  expect(document.updatedAt, 'produto sem updatedAt').toBeTruthy()
+  return document.updatedAt as string
+}
+
 export async function createDraftCategory(page: Page, stamp: number | string): Promise<string | number> {
   const categoryResponse = await page.request.post('http://localhost:3000/api/categories?draft=true', {
     data: {

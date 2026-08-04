@@ -41,7 +41,50 @@ type WorkspaceProps = {
   totalPages: number
 }
 
-type MutationAction = 'publish' | 'unpublish' | 'archive' | 'restore' | 'add-category' | 'set-availability'
+// 'publish' saiu daqui: a publicação em lote passa pelo coordenador e usa
+// items[] com token de concorrência por produto, não ids[].
+type MutationAction = 'unpublish' | 'archive' | 'restore' | 'add-category' | 'set-availability'
+
+type BulkItemStatus =
+  | 'published'
+  | 'blocked'
+  | 'warning_requires_confirmation'
+  | 'revision_conflict'
+  | 'failed'
+
+type BulkItemResult = {
+  id: string | number
+  title?: string
+  status: BulkItemStatus
+  message: string
+  revision?: string
+  updatedAt?: string
+  issues?: Array<{ message: string; suggestion?: string | null }>
+  confirmationToken?: string
+}
+
+type BulkResult = {
+  requested: number
+  published: number
+  blocked: number
+  conflicts: number
+  failed: number
+  results: BulkItemResult[]
+}
+
+type PublishItemRequest = {
+  id: string | number
+  expectedUpdatedAt: string
+  confirmationToken?: string
+}
+
+const bulkStatusLabels: Record<BulkItemStatus, string> = {
+  published: 'Publicado',
+  blocked: 'Pendências impedem publicar',
+  warning_requires_confirmation: 'Avisos aguardando confirmação',
+  revision_conflict: 'Alterado em outra sessão',
+  failed: 'Não foi possível publicar',
+}
 
 function money(cents: number | null | undefined) {
   if (typeof cents !== 'number') return 'Sob consulta'
@@ -136,6 +179,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
   const [selection, setSelection] = useState<RowSelectionState>({})
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null)
   const [categoryId, setCategoryId] = useState('')
   const [bulkAvailability, setBulkAvailability] = useState('')
   const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
@@ -199,6 +243,58 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
   const selectedIds = table.getSelectedRowModel().rows.map((row) => row.original.id)
   const selectedProduct = products.find((product) => String(product.id) === selectedProductId)
+
+  async function publishSelected(override?: PublishItemRequest[]) {
+    if (busy) return
+    const items: PublishItemRequest[] = override || table.getSelectedRowModel().rows.map((row) => ({
+      id: row.original.id,
+      expectedUpdatedAt: row.original.updatedAt || '',
+    }))
+    if (!items.length) return
+
+    setBusy(true)
+    setFeedback(null)
+    try {
+      const response = await fetch('/api/admin-products', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'publish', items }),
+      })
+      const body = await response.json() as {
+        ok?: boolean
+        result?: { meta?: BulkResult }
+        error?: { summary?: string }
+      }
+      if (!response.ok || !body.result?.meta) {
+        throw new Error(body.error?.summary || 'Não foi possível publicar os produtos.')
+      }
+
+      const result = body.result.meta
+      setBulkResult(result)
+
+      // Só os publicados saem da seleção. Bloqueados, conflitos, falhas e
+      // itens aguardando confirmação permanecem selecionados para retry.
+      const publishedIds = new Set(
+        result.results.filter((item) => item.status === 'published').map((item) => String(item.id)),
+      )
+      setSelection((current) => Object.fromEntries(
+        Object.entries(current).filter(([id, selected]) => selected && !publishedIds.has(id)),
+      ))
+      router.refresh()
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Não foi possível publicar os produtos.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Reenvia apenas os itens em aviso, usando o updatedAt devolvido pelo
+  // servidor — o updatedAt original da linha já está vencido, porque o
+  // coordenador gravou o rascunho antes de pedir a confirmação.
+  const pendingConfirmation = (bulkResult?.results || []).filter(
+    (item) => item.status === 'warning_requires_confirmation' && item.confirmationToken && item.updatedAt,
+  )
 
   async function mutate(action: MutationAction) {
     if (!selectedIds.length || busy) return
@@ -267,6 +363,59 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
     {feedback ? <InlineFeedback busy={busy} tone={feedback.includes('não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
 
+    {bulkResult ? (
+      <section className="esmera-products-bulk-result" aria-label="Resultado da publicação em lote">
+        <div className="esmera-products-bulk-result__header">
+          <InlineFeedback tone={bulkResult.published === bulkResult.requested ? 'success' : 'warning'}>
+            {bulkResult.published} de {bulkResult.requested} produto(s) publicados.
+          </InlineFeedback>
+          <button className="esmera-icon-button" type="button" onClick={() => setBulkResult(null)} aria-label="Fechar resultado da publicação">×</button>
+        </div>
+
+        <ul className="esmera-products-bulk-result__list">
+          {bulkResult.results.filter((item) => item.status !== 'published').map((item) => (
+            <li key={String(item.id)}>
+              <div>
+                <strong>{item.title || `Produto ${item.id}`}</strong>
+                <span className="esmera-products-bulk-result__status">{bulkStatusLabels[item.status]}</span>
+                <p>{item.message}</p>
+                {item.issues?.length ? (
+                  <ul className="esmera-product-issues">
+                    {item.issues.map((issue, index) => (
+                      <li key={`${item.id}-issue-${index}`}>
+                        {issue.message}
+                        {issue.suggestion ? <small>{issue.suggestion}</small> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+              <div className="esmera-actions">
+                <Link className="esmera-button" href={productHref(filters, item.id)}>Abrir produto</Link>
+                {item.status === 'revision_conflict' ? <Button onClick={() => router.refresh()}>Recarregar lista</Button> : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        {pendingConfirmation.length ? (
+          <div className="esmera-actions">
+            <Button
+              tone="primary"
+              disabled={busy}
+              onClick={() => void publishSelected(pendingConfirmation.map((item) => ({
+                id: item.id,
+                expectedUpdatedAt: item.updatedAt as string,
+                confirmationToken: item.confirmationToken,
+              })))}
+            >
+              Confirmar avisos e publicar ({pendingConfirmation.length})
+            </Button>
+          </div>
+        ) : null}
+      </section>
+    ) : null}
+
     {!products.length ? (
       <EmptyState title="Nenhum produto encontrado" copy="Ajuste os filtros ou crie um novo produto para iniciar o catálogo." action={<Link className="esmera-button esmera-button--primary" href="/admin/collections/products/create">Novo produto</Link>} />
     ) : filters.view === 'list' ? (
@@ -297,7 +446,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
     {selectedIds.length ? (
       <BulkActionBar count={selectedIds.length}>
-        <Button disabled={busy} onClick={() => void mutate('publish')} tone="primary">Publicar</Button>
+        <Button disabled={busy} onClick={() => void publishSelected()} tone="primary">Publicar</Button>
         <Button disabled={busy} onClick={() => void mutate('unpublish')}>Despublicar</Button>
         <Button disabled={busy} onClick={() => void mutate('archive')}>Arquivar</Button>
         <Button disabled={busy} onClick={() => void mutate('restore')}>Restaurar</Button>

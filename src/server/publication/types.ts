@@ -111,26 +111,37 @@ export type PublicationReceipt = {
   issues?: PublicationIssue[]
 }
 
+// Vocabulário próprio do lote: não reusa OperationalPublicationStatus, que tem
+// `conflict` (não `revision_conflict`) e não tem `warning_requires_confirmation`.
+export type BulkPublicationItemStatus =
+  | 'published'
+  | 'blocked'
+  | 'warning_requires_confirmation'
+  | 'revision_conflict'
+  | 'failed'
+
+export type BulkPublicationItemResult = {
+  id: string | number
+  title?: string
+  status: BulkPublicationItemStatus
+  message: string
+  revision?: string
+  // Token temporal devolvido pelo servidor. Obrigatório no handshake de
+  // confirmação de warnings: coordinatePublication() valida expectedUpdatedAt
+  // ANTES de saveDraft(), então o updatedAt original da lista já está vencido
+  // quando `requires_confirmation` retorna. Ver docs/cms-implementation-plan.md.
+  updatedAt?: string
+  issues?: PublicationIssue[]
+  confirmationToken?: string
+}
+
 export type BulkPublicationResult = {
   requested: number
   published: number
-  unverified: number
-  incompatible: number
-  reverted: number
   blocked: number
-  conflicted: number
+  conflicts: number
   failed: number
-  results: Array<{
-    id: string | number
-    title?: string
-    expectedRevision?: string
-    publishedRevision?: string
-    status: OperationalPublicationStatus
-    message: string
-    fieldErrors?: PublicationIssue[]
-    verification?: StorefrontVerification
-    retryable: boolean
-  }>
+  results: BulkPublicationItemResult[]
 }
 
 export class PublicationBlockedError extends Error {
