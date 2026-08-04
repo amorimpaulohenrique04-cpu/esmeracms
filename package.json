@@ -37,7 +37,8 @@
     "test:e2e": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.config.ts",
     "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts",
     "baseline:prepare": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/prepare-visual-baseline.ts",
-    "baseline:capture": "pnpm baseline:prepare && cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.baseline.config.ts",
+    "baseline:finalize": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/finalize-visual-baseline.ts",
+    "baseline:capture": "pnpm baseline:prepare && cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.baseline.config.ts && pnpm baseline:finalize",
     "baseline:compare": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/compare-visual-baseline.ts"
   },
   "dependencies": {
