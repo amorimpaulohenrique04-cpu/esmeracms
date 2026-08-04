@@ -2,6 +2,8 @@ import type { GlobalConfig } from 'payload'
 
 import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
 import { callToActionFields, imageWithAltFields, seoField } from '../fields/common'
+import { publicationMetadataFields } from '../server/publication/publicationMetadataFields'
+import { stampPublishedHomeMetadata } from '../server/publication/stampPublicationMetadata'
 
 export const HOME_DISABLED_SECTIONS = [
   'hero',
@@ -24,6 +26,9 @@ export const Home: GlobalConfig = {
     readVersions: siteEditors,
   },
   versions: { drafts: true, max: 50 },
+  hooks: {
+    afterChange: [stampPublishedHomeMetadata],
+  },
   fields: [
     {
       name: 'disabledSections',
@@ -188,5 +193,6 @@ export const Home: GlobalConfig = {
         },
       ],
     },
+    ...publicationMetadataFields(),
   ],
 }

@@ -2,6 +2,7 @@ import type { Payload, PayloadRequest } from 'payload'
 
 import { coordinatePublication, type PublicationCoordinatorResult } from './coordinator'
 import { assessProductPublication } from './productAssessment'
+import { createPublicPublicationMetadata } from './publicRevision'
 import {
   PublicationBlockedError,
   RevisionConflictError,
@@ -48,18 +49,6 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
-/**
- * Converte o retorno (ou a exceção) de coordinatePublication() no resultado de
- * um item do lote. Função pura de propósito: permite testar o handshake de
- * confirmação de warnings sem banco.
- *
- * Regra do `updatedAt`: só é devolvido quando o cliente pode legitimamente
- * reutilizá-lo numa próxima chamada.
- * - `revision_conflict` nunca devolve: entregar um token fresco permitiria um
- *   retry cego publicando conteúdo que ninguém revisou. O operador precisa
- *   recarregar e reavaliar.
- * - `failed` nunca devolve: o estado do documento é indeterminado.
- */
 export function mapCoordinatorOutcome(
   outcome: CoordinatorOutcome,
   context: OutcomeContext,
@@ -81,8 +70,6 @@ export function mapCoordinatorOutcome(
       }
     }
 
-    // `published_but_unverified` só ocorre com verify conectado (fora de escopo
-    // do PR-03); hoje é inalcançável e cai aqui como publicado.
     return {
       ...base,
       status: 'published',
@@ -108,9 +95,6 @@ export function mapCoordinatorOutcome(
       status: 'blocked',
       message: 'Existem pendências que impedem a publicação.',
       revision: error.assessment?.revision,
-      // O bloqueio é lançado DEPOIS do saveDraft do coordenador, então o
-      // documento já foi tocado: sem devolver o updatedAt novo, o operador
-      // corrigiria o produto e levaria revision_conflict ao tentar de novo.
       updatedAt: context.updatedAt,
       issues: issuesOfSeverity(error.assessment?.issues, 'blocker'),
     }
@@ -145,8 +129,6 @@ async function publishSingleProduct(
     const result = await coordinatePublication({
       entity: 'product',
       entityId: item.id,
-      // O lote nunca altera campos editoriais: apenas promove o que já está
-      // salvo. O coordenador exige um saveDraft, então gravamos só o _status.
       data: { _status: 'draft' },
       expectedRevision: item.expectedRevision,
       expectedUpdatedAt: item.expectedUpdatedAt,
@@ -164,23 +146,31 @@ async function publishSingleProduct(
         overrideAccess: false,
         user,
       }),
-      // Captura o snapshot mais recente sem custo extra: o coordenador já
-      // chama readDraft, e é este updatedAt que o handshake de confirmação
-      // de warnings precisa devolver ao cliente.
       readDraft: async () => {
         lastDraft = await read()
         return lastDraft
       },
       assess: (document) => assessProductPublication(document as never),
-      publish: () => payload.update({
-        collection: 'products',
-        id: item.id,
-        data: { _status: 'published' } as never,
-        draft: false,
-        depth: 2,
-        overrideAccess: false,
-        user,
-      }),
+      publish: (snapshot) => {
+        const publicSnapshot = {
+          ...(snapshot as Record<string, unknown>),
+          _status: 'published',
+        }
+        const metadata = createPublicPublicationMetadata('product', publicSnapshot)
+        return payload.update({
+          collection: 'products',
+          id: item.id,
+          data: {
+            _status: publicSnapshot._status,
+            publicationRevision: metadata.revision,
+            publicationContractVersion: metadata.contractVersion,
+          } as never,
+          draft: false,
+          depth: 2,
+          overrideAccess: true,
+          user,
+        })
+      },
     })
 
     return mapCoordinatorOutcome({ ok: true, result }, {
@@ -197,10 +187,6 @@ async function publishSingleProduct(
   }
 }
 
-/**
- * Publica produtos em lote passando cada item por coordinatePublication().
- * Sequencial e tolerante a falhas: um item que falha nunca interrompe os demais.
- */
 export async function publishProductsInBulk(
   payload: Payload,
   user: PayloadRequest['user'],

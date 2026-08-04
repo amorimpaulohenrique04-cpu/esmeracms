@@ -7,7 +7,9 @@ import { adminActionResponse, adminErrorResponse, adminInputError } from '../../
 import { assessCategoryPublication } from '../../../../server/publication/categoryAssessment'
 import { coordinatePublication } from '../../../../server/publication/coordinator'
 import { withSerializableTransaction } from '../../../../server/publication/concurrency'
+import { createPublicPublicationMetadata } from '../../../../server/publication/publicRevision'
 import { assertExpectedDocumentRevision, createDocumentRevision } from '../../../../server/publication/revision'
+import { stampPublishedDocumentMetadata } from '../../../../server/publication/stampPublicationMetadata'
 import { RevisionConflictError, type PublicationAssessment } from '../../../../server/publication/types'
 
 export const dynamic = 'force-dynamic'
@@ -182,10 +184,6 @@ export async function POST(request: Request) {
         })
       })
 
-      // withSerializableTransaction()'s commit can silently swallow a
-      // Postgres serialization failure — re-read outside the transaction to
-      // confirm the write actually persisted before reporting success. A
-      // mismatch means another request won the race.
       const persisted = await payload.findByID({
         collection: 'categories',
         id: body.id,
@@ -250,15 +248,26 @@ export async function POST(request: Request) {
           user,
         }),
         assess: (document) => assessCategoryWithHierarchy(payload, user, document as unknown as Record<string, unknown>),
-        publish: () => payload.update({
-          collection: 'categories',
-          id: body.id as string | number,
-          data: { _status: 'published' } as never,
-          draft: false,
-          depth: 2,
-          overrideAccess: false,
-          user,
-        }),
+        publish: (snapshot) => {
+          const publicSnapshot = {
+            ...(snapshot as Record<string, unknown>),
+            _status: 'published',
+          }
+          const metadata = createPublicPublicationMetadata('category', publicSnapshot)
+          return payload.update({
+            collection: 'categories',
+            id: body.id as string | number,
+            data: {
+              _status: publicSnapshot._status,
+              publicationRevision: metadata.revision,
+              publicationContractVersion: metadata.contractVersion,
+            } as never,
+            draft: false,
+            depth: 2,
+            overrideAccess: true,
+            user,
+          })
+        },
       })
 
       return adminActionResponse(result.status, {
@@ -345,14 +354,16 @@ export async function POST(request: Request) {
         const doc = byId.get(String(id))
         const nextOrder = (index + 1) * 100
         if (!doc || doc.order === nextOrder) continue
-        await payload.update({
+        const mutated = await payload.update({
           collection: 'categories',
           id,
           data: { order: nextOrder } as never,
           draft: doc._status !== 'published',
+          depth: 2,
           overrideAccess: false,
           user,
         })
+        await stampPublishedDocumentMetadata({ payload, entity: 'category', collection: 'categories', id, user, document: mutated })
       }
       return NextResponse.json({ updated: orderedIds.length })
     }

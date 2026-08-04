@@ -1,0 +1,382 @@
+[
+  {
+    "name": "published_product_with_populated_public_relations",
+    "entity": "product",
+    "document": {
+      "id": 101,
+      "slug": "nodulo-i",
+      "code": "OBJ-101",
+      "title": "Nódulo I",
+      "subtitle": "Escultura em esmeralda bruta",
+      "_status": "published",
+      "catalogStatus": "active",
+      "availability": "unique",
+      "material": "Esmeralda bruta",
+      "edition": "Peça única",
+      "description": {
+        "root": {
+          "type": "root",
+          "children": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Forma mineral singular."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "attributes": [
+        {
+          "label": "Origem",
+          "value": "Bahia"
+        }
+      ],
+      "searchTerms": [
+        {
+          "term": "esmeralda"
+        }
+      ],
+      "categories": [
+        {
+          "id": 7,
+          "title": "Esculturas",
+          "slug": "esculturas",
+          "status": "active",
+          "_status": "published",
+          "updatedAt": "ignored"
+        }
+      ],
+      "gallery": [
+        {
+          "role": "cover",
+          "mediaKey": "frente",
+          "alt": "Nódulo I de frente",
+          "image": {
+            "id": 55,
+            "url": "https://cdn.example.com/nodulo-frente.jpg",
+            "alt": "Mídia de frente"
+          }
+        },
+        {
+          "role": "detail",
+          "mediaKey": "detalhe",
+          "alt": "Detalhe mineral",
+          "image": {
+            "id": 56,
+            "url": "https://cdn.example.com/nodulo-detalhe.jpg",
+            "alt": "Mídia de detalhe"
+          }
+        }
+      ],
+      "priceMode": "fixed",
+      "basePriceCents": 1490000,
+      "optionDefinitions": [
+        {
+          "code": "tamanho",
+          "label": "Tamanho",
+          "values": [
+            {
+              "value": "unico",
+              "label": "Único",
+              "swatch": null
+            }
+          ]
+        }
+      ],
+      "variants": [
+        {
+          "sku": "OBJ-101-UN",
+          "selection": [
+            {
+              "option": "tamanho",
+              "value": "unico"
+            }
+          ],
+          "priceMode": "inherit",
+          "priceCents": null,
+          "status": "enabled",
+          "mediaKeys": [
+            {
+              "key": "frente"
+            }
+          ]
+        }
+      ],
+      "seo": {
+        "title": "Nódulo I",
+        "description": "Escultura em esmeralda bruta.",
+        "noIndex": false,
+        "socialImage": {
+          "id": 57,
+          "url": "https://cdn.example.com/nodulo-social.jpg",
+          "alt": "Nódulo I"
+        }
+      },
+      "createdAt": "2026-08-01T00:00:00.000Z",
+      "updatedAt": "2026-08-04T00:00:00.000Z",
+      "publicationReady": true,
+      "publicationIssues": [],
+      "internalNotes": "não público",
+      "publicationRevision": "4e12432d29325ce5765567eed5349e024760c954798478b77c86e049cc9eae50",
+      "publicationContractVersion": "1"
+    },
+    "expectedProjection": {
+      "_status": "published",
+      "attributes": [
+        {
+          "label": "Origem",
+          "value": "Bahia"
+        }
+      ],
+      "availability": "unique",
+      "basePriceCents": 1490000,
+      "catalogStatus": "active",
+      "categories": [
+        {
+          "_status": "published",
+          "id": 7,
+          "slug": "esculturas",
+          "status": "active",
+          "title": "Esculturas"
+        }
+      ],
+      "code": "OBJ-101",
+      "description": {
+        "root": {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "Forma mineral singular.",
+                  "type": "text"
+                }
+              ],
+              "type": "paragraph"
+            }
+          ],
+          "type": "root"
+        }
+      },
+      "edition": "Peça única",
+      "gallery": [
+        {
+          "alt": "Nódulo I de frente",
+          "image": {
+            "alt": "Mídia de frente",
+            "url": "https://cdn.example.com/nodulo-frente.jpg"
+          },
+          "mediaKey": "frente",
+          "role": "cover"
+        },
+        {
+          "alt": "Detalhe mineral",
+          "image": {
+            "alt": "Mídia de detalhe",
+            "url": "https://cdn.example.com/nodulo-detalhe.jpg"
+          },
+          "mediaKey": "detalhe",
+          "role": "detail"
+        }
+      ],
+      "id": 101,
+      "material": "Esmeralda bruta",
+      "optionDefinitions": [
+        {
+          "code": "tamanho",
+          "label": "Tamanho",
+          "values": [
+            {
+              "label": "Único",
+              "swatch": null,
+              "value": "unico"
+            }
+          ]
+        }
+      ],
+      "priceMode": "fixed",
+      "searchTerms": [
+        {
+          "term": "esmeralda"
+        }
+      ],
+      "seo": {
+        "description": "Escultura em esmeralda bruta.",
+        "noIndex": false,
+        "socialImage": {
+          "alt": "Nódulo I",
+          "url": "https://cdn.example.com/nodulo-social.jpg"
+        },
+        "title": "Nódulo I"
+      },
+      "slug": "nodulo-i",
+      "subtitle": "Escultura em esmeralda bruta",
+      "title": "Nódulo I",
+      "variants": [
+        {
+          "mediaKeys": [
+            {
+              "key": "frente"
+            }
+          ],
+          "priceCents": null,
+          "priceMode": "inherit",
+          "selection": [
+            {
+              "option": "tamanho",
+              "value": "unico"
+            }
+          ],
+          "sku": "OBJ-101-UN",
+          "status": "enabled"
+        }
+      ]
+    },
+    "expectedRevision": "4e12432d29325ce5765567eed5349e024760c954798478b77c86e049cc9eae50"
+  },
+  {
+    "name": "published_category_with_id_only_parent",
+    "entity": "category",
+    "document": {
+      "id": 7,
+      "title": "Esculturas",
+      "slug": "esculturas",
+      "status": "active",
+      "_status": "published",
+      "description": "Objetos escultóricos minerais.",
+      "order": 200,
+      "parent": {
+        "id": 2,
+        "title": "Objetos"
+      },
+      "image": {
+        "id": 88,
+        "url": "https://cdn.example.com/esculturas.jpg",
+        "alt": "Esculturas em esmeralda"
+      },
+      "seo": {
+        "title": "Esculturas",
+        "description": "Coleção de esculturas.",
+        "socialImage": null,
+        "noIndex": false
+      },
+      "updatedAt": "2026-08-04T00:00:00.000Z",
+      "searchTerms": [
+        {
+          "term": "arte mineral"
+        }
+      ],
+      "publicationRevision": "0b04653a142b9702b7b4610ddf2bcd56c66ad0b58d339152bc1e179732efafde",
+      "publicationContractVersion": "1"
+    },
+    "expectedProjection": {
+      "_status": "published",
+      "description": "Objetos escultóricos minerais.",
+      "id": 7,
+      "image": {
+        "alt": "Esculturas em esmeralda",
+        "url": "https://cdn.example.com/esculturas.jpg"
+      },
+      "order": 200,
+      "parent": 2,
+      "seo": {
+        "description": "Coleção de esculturas.",
+        "noIndex": false,
+        "socialImage": null,
+        "title": "Esculturas"
+      },
+      "slug": "esculturas",
+      "status": "active",
+      "title": "Esculturas"
+    },
+    "expectedRevision": "0b04653a142b9702b7b4610ddf2bcd56c66ad0b58d339152bc1e179732efafde"
+  },
+  {
+    "name": "published_home_with_set_and_ordered_ids",
+    "entity": "home",
+    "document": {
+      "_status": "published",
+      "disabledSections": [
+        "signature",
+        "manifesto"
+      ],
+      "heroMode": "single",
+      "heroSlides": [],
+      "autoplay": false,
+      "autoplaySeconds": 6,
+      "manifestoEyebrow": "Matéria rara",
+      "manifestoTitle": "Objetos de presença",
+      "manifestoCopy": null,
+      "manifestoPrimaryImage": null,
+      "manifestoSecondaryImage": null,
+      "selectedProducts": [
+        101,
+        {
+          "id": 102,
+          "title": "Ignorado na identidade"
+        }
+      ],
+      "matterPanels": [],
+      "signatureSlides": [],
+      "provenanceTitle": "Da matéria à forma",
+      "provenanceCopy": null,
+      "provenanceImage": null,
+      "provenanceSteps": [],
+      "provenanceCallToAction": {
+        "label": "Conheça a história",
+        "destinationType": "internal",
+        "path": "/sobre"
+      },
+      "seo": {
+        "title": "Esméra",
+        "description": "Objetos em esmeralda.",
+        "socialImage": null,
+        "noIndex": false
+      },
+      "updatedAt": "2026-08-04T00:00:00.000Z",
+      "publicationRevision": "525d664bae00fda56e522e1528207d4959134bcf07f1f2e017b8ac11ca6edfcc",
+      "publicationContractVersion": "1"
+    },
+    "expectedProjection": {
+      "_status": "published",
+      "autoplay": false,
+      "autoplaySeconds": 6,
+      "disabledSections": [
+        "manifesto",
+        "signature"
+      ],
+      "heroMode": "single",
+      "heroSlides": [],
+      "manifestoCopy": null,
+      "manifestoEyebrow": "Matéria rara",
+      "manifestoPrimaryImage": null,
+      "manifestoSecondaryImage": null,
+      "manifestoTitle": "Objetos de presença",
+      "matterPanels": [],
+      "provenanceCallToAction": {
+        "destinationType": "internal",
+        "label": "Conheça a história",
+        "path": "/sobre"
+      },
+      "provenanceCopy": null,
+      "provenanceImage": null,
+      "provenanceSteps": [],
+      "provenanceTitle": "Da matéria à forma",
+      "selectedProducts": [
+        101,
+        102
+      ],
+      "seo": {
+        "description": "Objetos em esmeralda.",
+        "noIndex": false,
+        "socialImage": null,
+        "title": "Esméra"
+      },
+      "signatureSlides": []
+    },
+    "expectedRevision": "525d664bae00fda56e522e1528207d4959134bcf07f1f2e017b8ac11ca6edfcc"
+  }
+]

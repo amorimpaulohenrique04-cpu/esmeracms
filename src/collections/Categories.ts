@@ -3,6 +3,7 @@ import { APIError, ValidationError, type CollectionConfig, type Where } from 'pa
 import { activeCategoriesOrAuthenticated, siteEditors } from '../access/roles'
 import { getCategoryHierarchyIssues } from '../businessRules/categories/hierarchy'
 import { seoField, slugify } from '../fields/common'
+import { publicationMetadataFields } from '../server/publication/publicationMetadataFields'
 
 export const Categories: CollectionConfig = {
   slug: 'categories',
@@ -159,5 +160,6 @@ export const Categories: CollectionConfig = {
         },
       ],
     },
+    ...publicationMetadataFields(),
   ],
 }

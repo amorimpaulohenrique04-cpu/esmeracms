@@ -12,7 +12,9 @@ import {
 import { coordinatePublication } from '../../../../server/publication/coordinator'
 import { assessProductPublication } from '../../../../server/publication/productAssessment'
 import { withSerializableTransaction } from '../../../../server/publication/concurrency'
+import { createPublicPublicationMetadata } from '../../../../server/publication/publicRevision'
 import { assertExpectedDocumentRevision, createDocumentRevision } from '../../../../server/publication/revision'
+import { stampPublishedDocumentMetadata } from '../../../../server/publication/stampPublicationMetadata'
 import { RevisionConflictError } from '../../../../server/publication/types'
 
 export const dynamic = 'force-dynamic'
@@ -125,10 +127,6 @@ export async function POST(request: Request) {
         })
       })
 
-      // withSerializableTransaction()'s commit can silently swallow a
-      // Postgres serialization failure — re-read outside the transaction to
-      // confirm the write actually persisted before reporting success. A
-      // mismatch means another request won the race.
       const persisted = await payload.findByID({
         collection: 'products',
         id: body.id,
@@ -193,15 +191,23 @@ export async function POST(request: Request) {
           user,
         }),
         assess: assessProductPublication,
-        publish: () => payload.update({
-          collection: 'products',
-          id: body.id as string | number,
-          data: { _status: 'published' } as never,
-          draft: false,
-          depth: 2,
-          overrideAccess: false,
-          user,
-        }),
+        publish: (snapshot) => {
+          const publicSnapshot = { ...snapshot, _status: 'published' as const }
+          const metadata = createPublicPublicationMetadata('product', publicSnapshot)
+          return payload.update({
+            collection: 'products',
+            id: body.id as string | number,
+            data: {
+              _status: publicSnapshot._status,
+              publicationRevision: metadata.revision,
+              publicationContractVersion: metadata.contractVersion,
+            } as never,
+            draft: false,
+            depth: 2,
+            overrideAccess: true,
+            user,
+          })
+        },
       })
 
       return adminActionResponse(result.status, {
@@ -297,35 +303,41 @@ export async function POST(request: Request) {
           await payload.update({ collection: 'products', id, data: { _status: 'draft' } as never, draft: true, overrideAccess: false, user })
         } else if (action === 'archive' || action === 'restore') {
           const currentStatus = (current as { _status?: string })._status
-          await payload.update({
+          const mutated = await payload.update({
             collection: 'products',
             id,
             data: { catalogStatus: action === 'archive' ? 'archived' : 'active' } as never,
             draft: currentStatus !== 'published',
+            depth: 2,
             overrideAccess: false,
             user,
           })
+          await stampPublishedDocumentMetadata({ payload, entity: 'product', collection: 'products', id, user, document: mutated })
         } else if (action === 'add-category') {
           const existing = ((current as { categories?: unknown[] }).categories || []).map(relationID).filter((value): value is string | number => value !== null)
           const categoryId = body.categoryId as string | number
           const categories = existing.some((value) => String(value) === String(categoryId)) ? existing : [...existing, categoryId]
-          await payload.update({
+          const mutated = await payload.update({
             collection: 'products',
             id,
             data: { categories } as never,
             draft: (current as { _status?: string })._status !== 'published',
+            depth: 2,
             overrideAccess: false,
             user,
           })
+          await stampPublishedDocumentMetadata({ payload, entity: 'product', collection: 'products', id, user, document: mutated })
         } else if (action === 'set-availability') {
-          await payload.update({
+          const mutated = await payload.update({
             collection: 'products',
             id,
             data: { availability: body.availability } as never,
             draft: (current as { _status?: string })._status !== 'published',
+            depth: 2,
             overrideAccess: false,
             user,
           })
+          await stampPublishedDocumentMetadata({ payload, entity: 'product', collection: 'products', id, user, document: mutated })
         }
         updated += 1
       } catch (error) {
