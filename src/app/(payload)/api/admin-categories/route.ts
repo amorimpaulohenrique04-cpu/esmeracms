@@ -6,8 +6,9 @@ import { canManageSite } from '../../../../access/roles'
 import { adminActionResponse, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
 import { assessCategoryPublication } from '../../../../server/publication/categoryAssessment'
 import { coordinatePublication } from '../../../../server/publication/coordinator'
+import { withSerializableTransaction } from '../../../../server/publication/concurrency'
 import { assertExpectedDocumentRevision, createDocumentRevision } from '../../../../server/publication/revision'
-import type { PublicationAssessment } from '../../../../server/publication/types'
+import { RevisionConflictError, type PublicationAssessment } from '../../../../server/publication/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -154,28 +155,49 @@ export async function POST(request: Request) {
   if (body.action === 'save-draft') {
     if (body.id === undefined || body.id === null) return adminInputError('Categoria não informada.')
     try {
-      const current = await payload.findByID({
-        collection: 'categories',
-        id: body.id,
-        draft: true,
-        depth: 2,
-        overrideAccess: false,
-        user,
-      })
-      assertExpectedDocumentRevision(current, {
-        expectedRevision: body.expectedRevision,
-        expectedUpdatedAt: body.expectedUpdatedAt,
+      const document = await withSerializableTransaction(payload, user, async (req) => {
+        const current = await payload.findByID({
+          collection: 'categories',
+          id: body.id as string | number,
+          draft: true,
+          depth: 2,
+          overrideAccess: false,
+          user,
+          req,
+        })
+        assertExpectedDocumentRevision(current, {
+          expectedRevision: body.expectedRevision,
+          expectedUpdatedAt: body.expectedUpdatedAt,
+        })
+
+        return await payload.update({
+          collection: 'categories',
+          id: body.id as string | number,
+          data: categoryDraftData(body.data) as never,
+          draft: true,
+          depth: 2,
+          overrideAccess: false,
+          user,
+          req,
+        })
       })
 
-      const document = await payload.update({
+      // withSerializableTransaction()'s commit can silently swallow a
+      // Postgres serialization failure — re-read outside the transaction to
+      // confirm the write actually persisted before reporting success. A
+      // mismatch means another request won the race.
+      const persisted = await payload.findByID({
         collection: 'categories',
         id: body.id,
-        data: categoryDraftData(body.data) as never,
         draft: true,
         depth: 2,
         overrideAccess: false,
         user,
       })
+      if (createDocumentRevision(persisted) !== createDocumentRevision(document)) {
+        throw new RevisionConflictError('O conteúdo foi alterado por outra sessão durante a gravação. Tente novamente.')
+      }
+
       return adminActionResponse('saved', {
         entityId: body.id,
         revision: createDocumentRevision(document),
