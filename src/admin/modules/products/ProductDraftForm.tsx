@@ -27,8 +27,20 @@ type PublicationIssue = {
   suggestion?: string | null
 }
 
+type PublicationResultStatus =
+  | 'saved'
+  | 'published'
+  | 'unpublished'
+  | 'archived'
+  | 'restored'
+  | 'published_but_unverified'
+  | 'published_but_incompatible'
+  | 'publish_reverted'
+  | 'failed'
+  | 'requires_confirmation'
+
 type AdminActionResult = {
-  status: 'saved' | 'published' | 'unpublished' | 'archived' | 'restored' | 'published_but_unverified' | 'requires_confirmation'
+  status: PublicationResultStatus
   entityId?: string | number
   revision?: string | null
   assessment?: {
@@ -40,6 +52,10 @@ type AdminActionResult = {
     updated?: number
     updatedAt?: string | null
     confirmationToken?: string | null
+    publicationRevision?: string | null
+    contractVersion?: string | null
+    traceId?: string | null
+    retryable?: boolean
   }
 }
 
@@ -54,6 +70,9 @@ type FeedbackState = {
   code?: string | null
   issues?: PublicationIssue[]
   traceId?: string | null
+  publicationRevision?: string | null
+  contractVersion?: string | null
+  retryable?: boolean
 }
 
 type Props = {
@@ -104,6 +123,12 @@ function requestData(value: DraftState) {
   }
 }
 
+function feedbackTone(status: PublicationResultStatus): FeedbackState['tone'] {
+  if (status === 'published' || status === 'publish_reverted') return 'success'
+  if (status === 'published_but_incompatible' || status === 'failed') return 'danger'
+  return 'warning'
+}
+
 export function ProductDraftForm({ productId, initial, published, archived, initialRevision, initialUpdatedAt }: Props) {
   const router = useRouter()
   const [draft, setDraft] = useState<DraftState>(() => ({
@@ -115,10 +140,6 @@ export function ProductDraftForm({ productId, initial, published, archived, init
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
   const [confirmationToken, setConfirmationToken] = useState<string | null>(null)
   const activeAbort = useRef<AbortController | null>(null)
-  // Fila serial: nunca há mais de um save-draft em voo. Uma resposta antiga não
-  // pode sobrescrever revision.current depois de uma mais nova porque a próxima
-  // gravação só começa depois que a anterior confirma no servidor (abortar o
-  // fetch no browser não garante que a escrita já foi cancelada no servidor).
   const saveQueue = useRef<Promise<boolean>>(Promise.resolve(true))
   const revision = useRef<string | null>(initialRevision ?? null)
   const updatedAt = useRef<string | null>(initialUpdatedAt ?? null)
@@ -209,9 +230,6 @@ export function ProductDraftForm({ productId, initial, published, archived, init
 
   async function publish(token?: string | null) {
     setFeedback(null)
-    // Publish nunca aborta um autosave em voo — ele aguarda a fila confirmar o
-    // último estado salvo (e enfileira o draft atual se ainda houver alterações
-    // pendentes) antes de publicar exatamente essa revisão.
     const flushed = dirty ? await enqueueSave(draft) : await saveQueue.current
     if (!flushed) return
 
@@ -248,17 +266,52 @@ export function ProductDraftForm({ productId, initial, published, archived, init
 
       setConfirmationToken(null)
       setDirty(false)
-      setSaveState('saved')
+      setSaveState(result.status === 'failed' ? 'error' : 'saved')
       setFeedback({
-        tone: result.status === 'published_but_unverified' ? 'warning' : 'success',
-        message: result.message || (result.status === 'published_but_unverified'
-          ? 'Produto publicado, mas o site não pôde ser verificado agora.'
-          : 'Produto publicado.'),
+        tone: feedbackTone(result.status),
+        message: result.message || 'A publicação foi processada.',
+        traceId: result.meta?.traceId,
+        publicationRevision: result.meta?.publicationRevision,
+        contractVersion: result.meta?.contractVersion || '1',
+        retryable: result.meta?.retryable,
       })
       router.refresh()
     } catch (error) {
       setSaveState('error')
       applyError(error, 'Não foi possível publicar o produto.')
+    }
+  }
+
+  async function recheck() {
+    if (!feedback?.publicationRevision) return
+    setSaveState('saving')
+    try {
+      const response = await fetch('/api/admin-publication-recheck', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          entity: 'product',
+          id: productId,
+          expectedPublicationRevision: feedback.publicationRevision,
+          contractVersion: feedback.contractVersion || '1',
+          parentTraceId: feedback.traceId,
+        }),
+      })
+      const result = await expectAdminResponse<AdminActionResult>(response, 'Não foi possível verificar a publicação.')
+      setFeedback({
+        tone: feedbackTone(result.status),
+        message: result.message || 'A verificação foi processada.',
+        traceId: result.meta?.traceId,
+        publicationRevision: feedback.publicationRevision,
+        contractVersion: feedback.contractVersion,
+        retryable: result.meta?.retryable,
+      })
+      setSaveState('saved')
+      router.refresh()
+    } catch (error) {
+      setSaveState('error')
+      applyError(error, 'Não foi possível verificar a publicação.')
     }
   }
 
@@ -284,8 +337,8 @@ export function ProductDraftForm({ productId, initial, published, archived, init
         message: name === 'unpublish'
           ? 'Produto despublicado.'
           : name === 'archive'
-          ? 'Produto arquivado.'
-          : 'Produto restaurado.',
+          ? 'Produto arquivado. A confirmação da vitrine será atualizada em segundo plano.'
+          : 'Produto restaurado. A confirmação da vitrine será atualizada em segundo plano.',
       })
       router.refresh()
     } catch (error) {
@@ -297,9 +350,9 @@ export function ProductDraftForm({ productId, initial, published, archived, init
     <section className="esmera-product-draft-form" aria-label="Edição rápida do rascunho">
       <div className="esmera-product-draft-form__status">
         <div><strong>Edição rápida</strong><span>Draft oficial do Payload</span></div>
-        {saveState === 'saving' ? <SavingState state="saving" message="Salvando rascunho…" /> : null}
+        {saveState === 'saving' ? <SavingState state="saving" message="Processando…" /> : null}
         {saveState === 'saved' ? <SavingState state="saved" message="Rascunho salvo" /> : null}
-        {saveState === 'error' ? <SavingState state="rollback" message="Falha ao salvar o rascunho." /> : null}
+        {saveState === 'error' ? <SavingState state="rollback" message="Falha na operação." /> : null}
         {saveState === 'idle' && dirty ? <InlineFeedback tone="warning">Alterações aguardando salvamento automático.</InlineFeedback> : null}
         {saveState === 'idle' && !dirty ? <InlineFeedback>Rascunho sincronizado.</InlineFeedback> : null}
       </div>
@@ -312,7 +365,7 @@ export function ProductDraftForm({ productId, initial, published, archived, init
         <label><span>Modo de preço</span><select className="esmera-input" value={draft.priceMode} onChange={(event) => field('priceMode', event.target.value)}><option value="inquiry">Sob consulta</option><option value="fixed">Preço fixo</option></select></label>
         {draft.priceMode === 'fixed' ? <label><span>Preço base (R$)</span><input className="esmera-input" inputMode="decimal" value={draft.basePriceCents} onChange={(event) => field('basePriceCents', normalizeCurrencyInput(event.target.value))} placeholder="0,00" /></label> : null}
       </div>
-      <p className="esmera-product-draft-form__hint">Alterações nestes campos são salvas como rascunho após 700 ms. Publicar salva novamente o estado visível, avalia as regras do catálogo e só então promove a mesma revisão.</p>
+      <p className="esmera-product-draft-form__hint">Publicar salva o estado visível, aplica as regras do catálogo e só mostra “Visível no site” após a Deco confirmar a revisão pública exata.</p>
       <div className="esmera-product-draft-form__actions">
         <div className="esmera-actions">
           {published
@@ -327,6 +380,9 @@ export function ProductDraftForm({ productId, initial, published, archived, init
             <InlineFeedback tone={feedback.tone}>{feedback.message}</InlineFeedback>
             {feedback.code === 'revision_conflict' ? (
               <Button onClick={() => window.location.reload()}>Recarregar versão atual</Button>
+            ) : null}
+            {feedback.retryable && feedback.publicationRevision ? (
+              <Button onClick={() => void recheck()}>Tentar verificar novamente</Button>
             ) : null}
             {feedback.issues?.length ? (
               <ul className="esmera-product-issues">
