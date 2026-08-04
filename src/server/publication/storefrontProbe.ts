@@ -1,4 +1,5 @@
 import type { StorefrontVerification } from './types'
+import type { PublicationVerificationConfig } from './verificationConfig'
 
 export type StorefrontProbeInput = {
   entity: 'product' | 'category' | 'home'
@@ -6,6 +7,8 @@ export type StorefrontProbeInput = {
   slug?: string
   expectedRevision: string
   contractVersion: string
+  traceId: string
+  config?: PublicationVerificationConfig
 }
 
 type ProbeResponse = {
@@ -21,13 +24,20 @@ type ProbeResponse = {
 
 const DEFAULT_TIMEOUT_MS = 5_000
 
-function unavailable(input: StorefrontProbeInput, message: string): StorefrontVerification {
+function result(
+  input: StorefrontProbeInput,
+  status: StorefrontVerification['status'],
+  code: string,
+  message: string,
+  responseReceived = false,
+): StorefrontVerification {
   return {
-    status: 'unavailable',
+    status,
     expectedRevision: input.expectedRevision,
     contractVersion: input.contractVersion,
     checkedAt: new Date().toISOString(),
-    issues: [{ code: 'probe.unavailable', message }],
+    issues: [{ code, message }],
+    responseReceived,
   }
 }
 
@@ -57,10 +67,10 @@ function isProbeResponse(value: unknown): value is ProbeResponse {
 export async function probeStorefrontRevision(
   input: StorefrontProbeInput,
 ): Promise<StorefrontVerification> {
-  const endpoint = process.env.STOREFRONT_PROBE_URL?.trim()
-  const token = process.env.STOREFRONT_PROBE_TOKEN?.trim()
+  const endpoint = input.config?.probeURL || process.env.STOREFRONT_PROBE_URL?.trim()
+  const token = input.config?.probeToken || process.env.STOREFRONT_PROBE_TOKEN?.trim() || process.env.ESMERA_RENDERABILITY_TOKEN?.trim()
   if (!endpoint || !token) {
-    return unavailable(input, 'O probe da vitrine não está configurado.')
+    return result(input, 'not_run', 'probe.not_configured', 'O probe da vitrine não está configurado.')
   }
 
   const configuredTimeout = Number(process.env.STOREFRONT_PROBE_TIMEOUT_MS || DEFAULT_TIMEOUT_MS)
@@ -75,6 +85,7 @@ export async function probeStorefrontRevision(
         accept: 'application/json',
         'content-type': 'application/json',
         authorization: `Bearer ${token}`,
+        'x-esmera-trace-id': input.traceId,
       },
       body: JSON.stringify({
         kind: input.entity,
@@ -86,13 +97,17 @@ export async function probeStorefrontRevision(
       signal: AbortSignal.timeout(timeoutMs),
     })
 
+    if (response.status === 401 || response.status === 403) {
+      return result(input, 'unavailable', 'probe.auth_failed', 'A credencial do probe foi recusada pela vitrine.', true)
+    }
+
     const body = await response.json().catch(() => null)
     if (
       !isProbeResponse(body) ||
       body.expectedRevision !== input.expectedRevision ||
       body.contractVersion !== input.contractVersion
     ) {
-      return unavailable(input, 'A vitrine respondeu com um contrato de verificação inválido.')
+      return result(input, 'unavailable', 'probe.invalid_response', 'A vitrine respondeu com um contrato de verificação inválido.', true)
     }
 
     return {
@@ -104,8 +119,9 @@ export async function probeStorefrontRevision(
       publicUrl: body.publicUrl,
       issues: body.issues,
       retryAfterMs: body.retryAfterMs,
+      responseReceived: true,
     }
   } catch {
-    return unavailable(input, 'A vitrine não pôde ser consultada agora.')
+    return result(input, 'unavailable', 'probe.transport_error', 'A vitrine não pôde ser consultada agora.')
   }
 }
