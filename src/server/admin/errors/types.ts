@@ -62,6 +62,7 @@ export const adminActionStatuses = [
   'restored',
   'published_but_unverified',
   'requires_confirmation',
+  'bulk_completed',
 ] as const
 
 export type AdminActionStatus = (typeof adminActionStatuses)[number]

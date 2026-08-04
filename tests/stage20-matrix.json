@@ -3,7 +3,7 @@
   { "id": "role-aware-sidebar", "file": "tests/e2e/hardening.e2e.spec.ts", "evidence": "enforces the role-aware navigation matrix" },
   { "id": "create-product-draft", "file": "tests/e2e/stage20-product-publish.e2e.spec.ts", "evidence": "creates a draft, completes readiness, publishes and finds the product" },
   { "id": "complete-product", "file": "tests/e2e/stage20-product-publish.e2e.spec.ts", "evidence": "Pronto para publicar" },
-  { "id": "publish-product", "file": "tests/e2e/stage20-product-publish.e2e.spec.ts", "evidence": "action: 'publish', ids: [productId]" },
+  { "id": "publish-product", "file": "tests/e2e/stage20-product-publish.e2e.spec.ts", "evidence": "action: 'publish', items: [{ id: productId, expectedUpdatedAt }]" },
   { "id": "find-published-product", "file": "tests/e2e/stage20-product-publish.e2e.spec.ts", "evidence": "getByRole('link', { name: title })" },
   { "id": "category-reorder-drag", "file": "tests/e2e/stage20-category-reorder.e2e.spec.ts", "evidence": "await page.mouse.down()" },
   { "id": "category-reorder-accessible", "file": "tests/e2e/stage20-category-reorder.e2e.spec.ts", "evidence": "selectOption('1')" },

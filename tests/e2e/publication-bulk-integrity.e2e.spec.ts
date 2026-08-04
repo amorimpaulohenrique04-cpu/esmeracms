@@ -19,30 +19,33 @@ test.describe('Publication integrity — bulk bypass and unwired verify (FLOW-01
     await cleanupTestUser()
   })
 
-  test.fail(
-    'bulk publish rejects a per-item expectedRevision mismatch instead of ignoring it (FLOW-01, fixed in Fase 2)',
-    async ({ page }) => {
-      test.setTimeout(60_000)
-      await login({ page, user: testUser })
-      const stamp = Date.now()
-      const productId = await createDraftProduct(page, stamp)
+  // FLOW-01 corrigido no PR-03: o lote passou a exigir token de concorrência
+  // por item e a delegar cada publicação a coordinatePublication().
+  test('bulk publish rejects a per-item concurrency token mismatch instead of ignoring it (FLOW-01)', async ({ page }) => {
+    test.setTimeout(60_000)
+    await login({ page, user: testUser })
+    const stamp = Date.now()
+    const productId = await createDraftProduct(page, stamp)
 
-      // O contrato de bulk publish hoje nem aceita revisão esperada por item — o
-      // loop em admin-products/route.ts nunca chama coordinatePublication/
-      // assertExpectedDocumentRevision. Mandar uma revisão deliberadamente errada
-      // deveria ser rejeitada (409/conflict) assim que a Fase 2 unificar bulk no
-      // coordinator; hoje é silenciosamente ignorada e a publicação sucede.
-      const publishResponse = await page.request.post('http://localhost:3000/api/admin-products', {
-        data: {
-          action: 'publish',
-          ids: [productId],
-          expectedRevisions: { [String(productId)]: 'deliberately-wrong-revision-hash' },
-        },
-      })
-      const published = await publishResponse.json() as { updated?: number; errors?: unknown[] }
-      expect(published.updated, JSON.stringify(published)).toBe(0)
-    },
-  )
+    const publishResponse = await page.request.post('http://localhost:3000/api/admin-products', {
+      data: {
+        action: 'publish',
+        items: [{ id: productId, expectedUpdatedAt: '2020-01-01T00:00:00.000Z' }],
+      },
+    })
+    const published = await publishResponse.json() as {
+      result?: { meta?: { published?: number; conflicts?: number; results?: Array<{ status?: string }> } }
+    }
+    expect(publishResponse.ok(), JSON.stringify(published)).toBeTruthy()
+    expect(published.result?.meta?.published, JSON.stringify(published)).toBe(0)
+    expect(published.result?.meta?.conflicts).toBe(1)
+    expect(published.result?.meta?.results?.[0].status).toBe('revision_conflict')
+
+    // O documento continua rascunho: o conflito não publicou nada.
+    const stored = await page.request.get(`http://localhost:3000/api/products/${productId}?draft=true&depth=0`)
+    const storedBody = await stored.json() as { _status?: string }
+    expect(storedBody._status).toBe('draft')
+  })
 
   test.fail(
     'save-and-publish returns a verification with expected/observed revision instead of not_run (FLOW-05, fixed in Fase 3)',
