@@ -1,3 +1,6 @@
+import { decorateIssues, dedupeRawIssues } from '../../issues/build'
+import { ISSUE_CODES } from '../../issues/codes'
+import type { PublicationIssue, RawIssue } from '../../issues/types'
 import { relationshipID, type RelationshipValue } from '../relationships'
 
 export const catalogStatuses = ['active', 'archived'] as const
@@ -42,47 +45,70 @@ export type ProductReadinessInput = {
 
 export type ProductReadiness = {
   ready: boolean
-  issues: string[]
+  issues: PublicationIssue[]
 }
 
 const normalized = (value: string | null | undefined) => String(value || '').trim().toLowerCase()
 const isNonNegativeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0
 
-export function getOptionDefinitionIssues(definitionsValue: unknown) {
+const blocker = (code: string, path: string, params?: Record<string, string | number>): RawIssue => ({
+  code,
+  severity: 'blocker',
+  path,
+  source: 'readiness',
+  ...(params ? { params } : {}),
+})
+
+/**
+ * Decisão pura sobre as definições de opção.
+ *
+ * Retorna `RawIssue[]`: sem mensagem, sem sugestão, sem rótulo. Os dados do editor
+ * que a copy precisa (código da opção, valor) viajam em `params`, nunca
+ * interpolados numa string — é isso que impede a copy de virar chave de decisão.
+ */
+export function collectOptionDefinitionIssues(definitionsValue: unknown): RawIssue[] {
   const definitions = (Array.isArray(definitionsValue) ? definitionsValue : []) as OptionDefinition[]
-  const issues: string[] = []
+  const raws: RawIssue[] = []
   const codes = new Set<string>()
 
-  for (const definition of definitions) {
+  definitions.forEach((definition, index) => {
     const code = normalized(definition.code)
     if (!code) {
-      issues.push('Existe uma opção sem código.')
-      continue
+      raws.push(blocker(ISSUE_CODES.productOptionCodeMissing, `optionDefinitions.${index}.code`))
+      return
     }
-    if (codes.has(code)) issues.push(`O código de opção “${code}” está repetido.`)
+    if (codes.has(code)) {
+      raws.push(blocker(ISSUE_CODES.productOptionCodeDuplicated, `optionDefinitions.${index}.code`, { code }))
+    }
     codes.add(code)
 
     const values = new Set<string>()
-    if (!definition.values?.length) issues.push(`A opção “${code}” não possui valores.`)
-    for (const item of definition.values || []) {
-      const value = normalized(item.value)
-      if (!value) {
-        issues.push(`A opção “${code}” possui um valor sem código.`)
-        continue
-      }
-      if (values.has(value)) issues.push(`O valor “${value}” está repetido na opção “${code}”.`)
-      values.add(value)
+    if (!definition.values?.length) {
+      raws.push(blocker(ISSUE_CODES.productOptionValuesMissing, `optionDefinitions.${index}.values`, { code }))
     }
-  }
+    ;(definition.values || []).forEach((item, valueIndex) => {
+      const value = normalized(item.value)
+      const path = `optionDefinitions.${index}.values.${valueIndex}.value`
+      if (!value) {
+        raws.push(blocker(ISSUE_CODES.productOptionValueCodeMissing, path, { code }))
+        return
+      }
+      if (values.has(value)) {
+        raws.push(blocker(ISSUE_CODES.productOptionValueDuplicated, path, { code, value }))
+      }
+      values.add(value)
+    })
+  })
 
-  return issues
+  return raws
 }
 
-export function getVariantIssues(product: ProductReadinessInput) {
+/** Decisão pura sobre as variantes. Ver a nota em `collectOptionDefinitionIssues`. */
+export function collectVariantIssues(product: ProductReadinessInput): RawIssue[] {
   const definitions = product.optionDefinitions || []
   const variants = product.variants || []
-  const issues: string[] = []
+  const raws: RawIssue[] = []
   const definitionMap = new Map(
     definitions.map((definition) => [
       normalized(definition.code),
@@ -93,85 +119,143 @@ export function getVariantIssues(product: ProductReadinessInput) {
   const skus = new Set<string>()
   const combinations = new Set<string>()
 
-  if (definitions.length && !variants.length) issues.push('As opções cadastradas ainda não possuem variantes.')
-  if (variants.length && !definitions.length) issues.push('Existem variantes sem definições de opções.')
+  if (definitions.length && !variants.length) {
+    raws.push(blocker(ISSUE_CODES.productVariantsMissing, 'variants'))
+  }
+  if (variants.length && !definitions.length) {
+    raws.push(blocker(ISSUE_CODES.productVariantsOptionsMissing, 'optionDefinitions'))
+  }
 
-  for (const variant of variants) {
+  variants.forEach((variant, index) => {
     const sku = String(variant.sku || '').trim().toUpperCase()
-    if (!sku) issues.push('Existe uma variante sem SKU.')
-    else if (skus.has(sku)) issues.push(`O SKU “${sku}” está repetido neste produto.`)
+    if (!sku) raws.push(blocker(ISSUE_CODES.productVariantSkuMissing, `variants.${index}.sku`))
+    else if (skus.has(sku)) raws.push(blocker(ISSUE_CODES.productVariantSkuDuplicated, `variants.${index}.sku`, { sku }))
     skus.add(sku)
 
     const selection = variant.selection || []
     const selectedOptions = new Set(selection.map((item) => normalized(item.option)).filter(Boolean))
-    if (selection.length !== selectedOptions.size) issues.push(`A variante “${sku || 'sem SKU'}” repete uma opção.`)
+    if (selection.length !== selectedOptions.size) {
+      raws.push(blocker(ISSUE_CODES.productVariantSelectionDuplicated, `variants.${index}.selection`, { sku }))
+    }
     if (selectedOptions.size !== definitionMap.size) {
-      issues.push(`A variante “${sku || 'sem SKU'}” deve selecionar exatamente um valor de cada opção.`)
+      raws.push(blocker(ISSUE_CODES.productVariantSelectionIncomplete, `variants.${index}.selection`, { sku }))
     }
 
-    for (const item of selection) {
+    selection.forEach((item, selectionIndex) => {
       const option = normalized(item.option)
       const value = normalized(item.value)
       const allowedValues = definitionMap.get(option)
-      if (!allowedValues) issues.push(`A variante “${sku || 'sem SKU'}” usa a opção inexistente “${option}”.`)
-      else if (!allowedValues.has(value)) issues.push(`A variante “${sku || 'sem SKU'}” usa o valor inexistente “${value}”.`)
-    }
+      if (!allowedValues) {
+        raws.push(blocker(
+          ISSUE_CODES.productVariantOptionUnknown,
+          `variants.${index}.selection.${selectionIndex}.option`,
+          { sku, option },
+        ))
+      } else if (!allowedValues.has(value)) {
+        raws.push(blocker(
+          ISSUE_CODES.productVariantValueUnknown,
+          `variants.${index}.selection.${selectionIndex}.value`,
+          { sku, value },
+        ))
+      }
+    })
 
     const combination = selection
       .map((item) => `${normalized(item.option)}:${normalized(item.value)}`)
       .sort()
       .join('|')
-    if (combination && combinations.has(combination)) issues.push(`A combinação “${combination}” está duplicada.`)
+    if (combination && combinations.has(combination)) {
+      raws.push(blocker(ISSUE_CODES.productVariantCombinationDuplicated, `variants.${index}.selection`, { combination }))
+    }
     if (combination) combinations.add(combination)
 
-    for (const media of variant.mediaKeys || []) {
+    ;(variant.mediaKeys || []).forEach((media, mediaIndex) => {
       const key = normalized(media.key)
-      if (key && !galleryKeys.has(key)) issues.push(`A variante “${sku || 'sem SKU'}” usa a mídia inexistente “${key}”.`)
-    }
+      if (key && !galleryKeys.has(key)) {
+        raws.push(blocker(
+          ISSUE_CODES.productVariantMediaUnknown,
+          `variants.${index}.mediaKeys.${mediaIndex}.key`,
+          { sku, key },
+        ))
+      }
+    })
 
     if (variant.priceMode === 'fixed' && !isNonNegativeInteger(variant.priceCents)) {
-      issues.push(`A variante “${sku || 'sem SKU'}” está com preço fixo, mas não possui preço válido.`)
+      raws.push(blocker(ISSUE_CODES.productVariantPriceMissing, `variants.${index}.priceCents`, { sku }))
     }
     if (variant.priceMode === 'inherit' && product.priceMode === 'fixed' && !isNonNegativeInteger(product.basePriceCents)) {
-      issues.push(`A variante “${sku || 'sem SKU'}” herda um preço base inexistente.`)
+      raws.push(blocker(ISSUE_CODES.productVariantInheritedPriceMissing, `variants.${index}.priceMode`, { sku }))
     }
-  }
+  })
 
-  return [...new Set(issues)]
+  return dedupeRawIssues(raws)
 }
 
-export function getProductReadiness(product: ProductReadinessInput): ProductReadiness {
-  const issues: string[] = []
+/**
+ * Fonte única de decisão de readiness do produto.
+ *
+ * Retorna `RawIssue[]` deliberadamente: nenhuma mensagem legível existe neste
+ * ponto do fluxo, então é estruturalmente impossível que a copy editorial
+ * influencie código, path, severidade ou a decisão de estar pronto (ERR-U02).
+ */
+export function collectProductReadinessIssues(product: ProductReadinessInput): RawIssue[] {
+  const raws: RawIssue[] = []
   const gallery = product.gallery || []
   const categories = (product.categories || []).filter((item) => relationshipID(item) !== null)
 
-  if (!product.title?.trim()) issues.push('Título não definido.')
-  if (!product.slug?.trim()) issues.push('Slug não definido.')
-  if (!product.code?.trim()) issues.push('Código não definido.')
-  if (!categories.length) issues.push('Categoria não definida.')
-  issues.push(...(product.categoryIssues || []))
-  if (!catalogStatuses.includes(product.catalogStatus as (typeof catalogStatuses)[number])) issues.push('Status de catálogo inválido.')
-  if (!productAvailabilities.includes(product.availability as (typeof productAvailabilities)[number])) issues.push('Disponibilidade não definida.')
+  if (!product.title?.trim()) raws.push(blocker(ISSUE_CODES.productTitleMissing, 'title'))
+  if (!product.slug?.trim()) raws.push(blocker(ISSUE_CODES.productSlugMissing, 'slug'))
+  if (!product.code?.trim()) raws.push(blocker(ISSUE_CODES.productCodeMissing, 'code'))
+  if (!categories.length) raws.push(blocker(ISSUE_CODES.productCategoriesMissing, 'categories'))
+  if (product.categoryIssues?.length) raws.push(blocker(ISSUE_CODES.productCategoriesInactive, 'categories'))
+  if (!catalogStatuses.includes(product.catalogStatus as (typeof catalogStatuses)[number])) {
+    raws.push(blocker(ISSUE_CODES.productCatalogStatusInvalid, 'catalogStatus'))
+  }
+  if (!productAvailabilities.includes(product.availability as (typeof productAvailabilities)[number])) {
+    raws.push(blocker(ISSUE_CODES.productAvailabilityMissing, 'availability'))
+  }
 
-  if (!gallery.length) issues.push('Produto sem imagem.')
-  if (gallery.length && !gallery.some((item) => relationshipID(item.image) !== null)) issues.push('Galeria sem mídia válida.')
-  if (gallery.some((item) => !item.alt?.trim())) issues.push('Existe imagem sem texto alternativo.')
-  if (gallery.length && gallery.filter((item) => item.role === 'cover').length !== 1) issues.push('Defina exatamente uma imagem de capa.')
+  if (!gallery.length) raws.push(blocker(ISSUE_CODES.productGalleryEmpty, 'gallery'))
+  if (gallery.length && !gallery.some((item) => relationshipID(item.image) !== null)) {
+    raws.push(blocker(ISSUE_CODES.productGalleryMediaInvalid, 'gallery'))
+  }
+  gallery.forEach((item, index) => {
+    if (!item.alt?.trim()) {
+      raws.push(blocker(ISSUE_CODES.productGalleryAltRequired, `gallery.${index}.alt`, { position: index + 1 }))
+    }
+  })
+  if (gallery.length && gallery.filter((item) => item.role === 'cover').length !== 1) {
+    raws.push(blocker(ISSUE_CODES.productGalleryCoverCount, 'gallery'))
+  }
 
-  issues.push(...getOptionDefinitionIssues(product.optionDefinitions))
-  issues.push(...getVariantIssues(product))
+  raws.push(...collectOptionDefinitionIssues(product.optionDefinitions))
+  raws.push(...collectVariantIssues(product))
 
   if (!productPriceModes.includes(product.priceMode as (typeof productPriceModes)[number])) {
-    issues.push('Modo de preço não definido.')
+    raws.push(blocker(ISSUE_CODES.productPriceModeMissing, 'priceMode'))
   } else if (product.priceMode === 'fixed') {
     const enabledVariants = (product.variants || []).filter((variant) => variant.status !== 'disabled')
     const hasBasePrice = isNonNegativeInteger(product.basePriceCents)
     const hasUsableVariantPrice = enabledVariants.some(
       (variant) => variant.priceMode === 'fixed' && isNonNegativeInteger(variant.priceCents),
     )
-    if (!hasBasePrice && !hasUsableVariantPrice) issues.push('Produto com preço fixo sem preço utilizável.')
+    if (!hasBasePrice && !hasUsableVariantPrice) {
+      raws.push(blocker(ISSUE_CODES.productBasePriceMissing, 'basePriceCents'))
+    }
   }
 
-  const uniqueIssues = [...new Set(issues)]
-  return { ready: uniqueIssues.length === 0, issues: uniqueIssues }
+  return dedupeRawIssues(raws)
+}
+
+export function getOptionDefinitionIssues(definitionsValue: unknown): PublicationIssue[] {
+  return decorateIssues(collectOptionDefinitionIssues(definitionsValue), 'product')
+}
+
+export function getVariantIssues(product: ProductReadinessInput): PublicationIssue[] {
+  return decorateIssues(collectVariantIssues(product), 'product')
+}
+
+export function getProductReadiness(product: ProductReadinessInput): ProductReadiness {
+  const issues = decorateIssues(collectProductReadinessIssues(product), 'product')
+  return { ready: issues.every((issue) => issue.severity !== 'blocker'), issues }
 }

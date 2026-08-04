@@ -103,7 +103,7 @@ function buildConfirmationToken(
 ): string {
   const warningIDs = assessment.issues
     .filter((issue) => issue.severity === 'warning')
-    .map((issue) => issue.id)
+    .map((issue) => issue.code)
     .sort()
     .join('|')
   return createHash('sha256')

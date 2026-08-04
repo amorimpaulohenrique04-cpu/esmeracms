@@ -1,4 +1,13 @@
-import type { FieldError, EntityError, IssueSeverity } from '../admin/errors/types'
+import { decorateIssue } from '../../issues/build'
+import { ISSUE_CODES } from '../../issues/codes'
+import { issueCopy } from '../../issues/copy'
+import { ENTITY_PATH_REVISION, isEntityScoped, type IssueSeverity, type IssueSource, type PublicationIssue } from '../../issues/types'
+import type { EntityError } from '../admin/errors/types'
+
+export type { IssueSeverity, PublicationIssue }
+
+/** @deprecated Use `IssueSource` de `src/issues/types`. Mantido só como alias de leitura. */
+export type PublicationIssueSource = IssueSource
 
 export const PUBLICATION_ASSESSMENT_VERSION = '1' as const
 export const STOREFRONT_CONTRACT_VERSION = '1' as const
@@ -15,18 +24,6 @@ export const publicationEntities = [
 ] as const
 
 export type PublicationEntity = (typeof publicationEntities)[number]
-export type PublicationIssueSource = 'payload' | 'business_rule' | 'storefront_contract' | 'integration'
-
-export type PublicationIssue = {
-  id: string
-  severity: IssueSeverity
-  path?: string | null
-  tab?: string | null
-  anchor?: string | null
-  message: string
-  suggestion?: string | null
-  source: PublicationIssueSource
-}
 
 export type StorefrontCompatibilityAssessment = {
   contractVersion: typeof STOREFRONT_CONTRACT_VERSION
@@ -46,20 +43,54 @@ export type PublicationAssessment = {
   assessedAt: string
 }
 
+const revisionConflictCopy = issueCopy[ISSUE_CODES.revisionConflict]
+
 export class RevisionConflictError extends Error {
   status = 409
-  code = 'revision_conflict'
+  code = 'revision_conflict' as const
   retryable = false
+  issues: PublicationIssue[]
   entityErrors: EntityError[]
 
-  constructor(message = 'Este conteúdo foi alterado em outra sessão.') {
+  constructor(message = revisionConflictCopy.message({})) {
     super(message)
     this.name = 'RevisionConflictError'
-    this.entityErrors = [{
-      code: 'revision_conflict',
+    // A entidade não é conhecida aqui: o conflito é detectado antes de sabermos
+    // qual coleção está sendo gravada. O path `$revision` resolve pelo registry
+    // compartilhado, e a mensagem recebida vence a do catálogo para preservar as
+    // chamadas que passam uma copy própria.
+    this.issues = [{
+      ...decorateIssue({
+        code: ISSUE_CODES.revisionConflict,
+        severity: 'blocker',
+        path: ENTITY_PATH_REVISION,
+        source: 'concurrency',
+      }, undefined),
       message,
-      suggestion: 'Recarregue a versão mais recente, revise as diferenças e tente novamente.',
     }]
+    this.entityErrors = [{
+      code: ISSUE_CODES.revisionConflict,
+      message,
+      suggestion: revisionConflictCopy.suggestion ?? null,
+    }]
+  }
+}
+
+/**
+ * Integração obrigatória de verificação indisponível → HTTP 503.
+ *
+ * Não há produtor em `main`: quem vai lançá-la é o probe do storefront da PR-05.
+ * Declarada aqui para que o serializer já tenha o ramo de classificação fechado
+ * e testado — sem isso, o 503 exigido pelo §4.3 não teria como ser produzido.
+ */
+export class PublicationVerificationFailedError extends Error {
+  status = 503
+  code = 'verification_failed' as const
+  retryable = true
+
+  constructor(message = 'Não foi possível confirmar a publicação no site.') {
+    super(message)
+    this.name = 'PublicationVerificationFailedError'
   }
 }
 
@@ -146,32 +177,25 @@ export type BulkPublicationResult = {
 
 export class PublicationBlockedError extends Error {
   status = 422
-  code = 'publication_blocked'
+  code = 'publication_blocked' as const
   retryable = false
-  fieldErrors: FieldError[]
+  fieldErrors: PublicationIssue[]
   entityErrors: EntityError[]
   meta: Record<string, unknown>
 
   constructor(public assessment: PublicationAssessment, draftSaved = true) {
     super('O rascunho foi salvo, mas ainda existem pendências para publicar.')
     this.name = 'PublicationBlockedError'
-    this.fieldErrors = assessment.issues
-      .filter((issue) => issue.severity === 'blocker' && issue.path)
+    const blockers = assessment.issues.filter((issue) => issue.severity === 'blocker')
+    // `path` agora é sempre preenchido, então a divisão passa a ser pelo escopo:
+    // paths sentinela (`$document`, `$revision`) valem para o documento inteiro.
+    this.fieldErrors = blockers.filter((issue) => !isEntityScoped(issue.path))
+    this.entityErrors = blockers
+      .filter((issue) => isEntityScoped(issue.path))
       .map((issue) => ({
-        path: issue.path as string,
-        tab: issue.tab || null,
-        anchor: issue.anchor || null,
-        code: issue.id,
+        code: issue.code,
         message: issue.message,
-        suggestion: issue.suggestion || null,
-        severity: issue.severity,
-      }))
-    this.entityErrors = assessment.issues
-      .filter((issue) => issue.severity === 'blocker' && !issue.path)
-      .map((issue) => ({
-        code: issue.id,
-        message: issue.message,
-        suggestion: issue.suggestion || null,
+        suggestion: issue.suggestion ?? null,
       }))
     this.meta = { assessment, draftSaved }
   }

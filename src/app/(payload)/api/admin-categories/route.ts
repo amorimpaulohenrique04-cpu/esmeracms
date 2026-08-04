@@ -3,7 +3,10 @@ import { NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
 
 import { canManageSite } from '../../../../access/roles'
-import { adminActionResponse, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
+import { decorateIssue } from '../../../../issues/build'
+import { ISSUE_CODES } from '../../../../issues/codes'
+import { issueCopy } from '../../../../issues/copy'
+import { adminActionResponse, adminCodedError, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
 import { assessCategoryPublication } from '../../../../server/publication/categoryAssessment'
 import { coordinatePublication } from '../../../../server/publication/coordinator'
 import { withSerializableTransaction } from '../../../../server/publication/concurrency'
@@ -126,17 +129,16 @@ async function assessCategoryWithHierarchy(
   }
 
   if (parentID !== null) hierarchyCycle = true
-  if (hierarchyCycle && !assessment.issues.some((issue) => issue.id === 'category.parent_cycle')) {
-    assessment.issues.push({
-      id: 'category.parent_cycle',
+  // A caminhada acima detecta um ciclo na cadeia de ancestrais — condição
+  // distinta da auto-referência que `assessCategoryPublication` já cobre, por
+  // isso um código próprio. Copy, aba, rótulo e âncora vêm do catálogo/registry.
+  if (hierarchyCycle && !assessment.issues.some((issue) => issue.code === ISSUE_CODES.categoryParentCycle)) {
+    assessment.issues.push(decorateIssue({
+      code: ISSUE_CODES.categoryParentCycle,
       severity: 'blocker',
       path: 'parent',
-      tab: 'content',
-      anchor: 'category-parent',
-      message: 'A categoria cria um ciclo na hierarquia.',
-      suggestion: 'Escolha uma categoria principal fora da própria cadeia de descendência.',
-      source: 'business_rule',
-    })
+      source: 'readiness',
+    }, 'category'))
     assessment.ready = false
   }
   return assessment
@@ -145,14 +147,14 @@ async function assessCategoryWithHierarchy(
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers: request.headers })
-  if (!user) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-  if (!canManageSite(user)) return NextResponse.json({ error: 'Sem permissão para operar categorias.' }, { status: 403 })
+  if (!user) return adminCodedError('unauthenticated')
+  if (!canManageSite(user)) return adminCodedError('forbidden', { summary: 'Sem permissão para operar categorias.' })
 
   let body: RequestBody
   try {
     body = await request.json() as RequestBody
   } catch {
-    return NextResponse.json({ error: 'Corpo da requisição inválido.' }, { status: 400 })
+    return adminCodedError('invalid_request', { summary: 'Corpo da requisição inválido.' })
   }
 
   if (body.action === 'save-draft') {
@@ -317,23 +319,20 @@ export async function POST(request: Request) {
 
   try {
     if (body.action === 'unpublish') {
-      if (body.id === undefined || body.id === null) return NextResponse.json({ error: 'Categoria não informada.' }, { status: 400 })
+      if (body.id === undefined || body.id === null) return adminCodedError('invalid_request', { summary: 'Categoria não informada.' })
       const linkedProducts = await activePublishedProductCount(payload, user, body.id)
       if (linkedProducts > 0) {
-        return adminInputError(
-          `Esta categoria é usada por ${linkedProducts} produto(s) ativo(s) e publicado(s).`,
-          {
-            code: 'publication_blocked',
-            entityErrors: [{
-              code: 'category.used_by_published_products',
-              message: `A categoria está vinculada a ${linkedProducts} produto(s) ativo(s) e publicado(s).`,
-              suggestion: 'Mova ou arquive esses produtos antes de despublicar a categoria.',
-              related: [{ collection: 'products', count: linkedProducts }],
-            }],
-            meta: { linkedProducts },
-          },
-          422,
-        )
+        const copy = issueCopy[ISSUE_CODES.categoryUsedByPublishedProducts]
+        return adminCodedError('publication_blocked', {
+          summary: `Esta categoria é usada por ${linkedProducts} produto(s) ativo(s) e publicado(s).`,
+          entityErrors: [{
+            code: ISSUE_CODES.categoryUsedByPublishedProducts,
+            message: copy.message({ linkedProducts }),
+            suggestion: copy.suggestion ?? null,
+            related: [{ collection: 'products', count: linkedProducts }],
+          }],
+          meta: { linkedProducts },
+        })
       }
       const document = await payload.update({
         collection: 'categories',
@@ -369,7 +368,7 @@ export async function POST(request: Request) {
       const currentIds = current.docs.map((doc) => String(doc.id))
       const incomingIds = orderedIds.map(String)
       const sameSet = incomingIds.length === currentIds.length && currentIds.every((id) => incomingIds.includes(id))
-      if (!sameSet) return NextResponse.json({ error: 'A ordenação precisa conter exatamente todas as categorias atuais.' }, { status: 409 })
+      if (!sameSet) return adminCodedError('revision_conflict', { summary: 'A ordenação precisa conter exatamente todas as categorias atuais.' })
 
       const byId = new Map(current.docs.map((doc) => [String(doc.id), doc]))
       for (let index = 0; index < orderedIds.length; index += 1) {
@@ -391,9 +390,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ updated: orderedIds.length })
     }
 
-    return NextResponse.json({ error: 'Ação não suportada.' }, { status: 400 })
+    return adminCodedError('invalid_request', { summary: 'Ação não suportada.' })
   } catch (error) {
-    payload.logger.error({ err: error }, 'admin category operation failed')
-    return NextResponse.json({ error: errorMessage(error) }, { status: 422 })
+    // Antes qualquer falha virava 422, inclusive NotFound e erro interno. Agora
+    // o serializer classifica por instanceof e o status sai coerente.
+    return adminErrorResponse(error, {
+      entity: 'category',
+      operation: body.action,
+      logger: payload.logger,
+    })
   }
 }

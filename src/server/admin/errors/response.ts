@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
 
-import { normalizeAdminServerError } from './fromPayload'
+import type { PublicationIssue } from '../../../issues/types'
+import { adminErrorCopy } from '../../../issues/copy'
+import { httpStatusByCode, normalizeAdminServerError } from './serialize'
 import {
   ADMIN_ERROR_VERSION,
   type AdminActionPayload,
   type AdminActionStatus,
+  type AdminErrorCode,
   type AdminErrorContext,
   type AdminErrorEnvelope,
-  type FieldError,
   type EntityError,
 } from './types'
 
@@ -34,39 +36,51 @@ export function adminActionResponse<TMeta extends Record<string, unknown> = Reco
   }, { status: httpStatus })
 }
 
-export function adminInputError(
-  summary: string,
-  input: {
-    code?: string
-    detail?: string | null
-    fieldErrors?: FieldError[]
-    entityErrors?: EntityError[]
-    retryable?: boolean
-    meta?: Record<string, unknown>
-  } = {},
-  status = 400,
-) {
+type AdminErrorInput = {
+  summary?: string
+  message?: string
+  detail?: string | null
+  fieldErrors?: PublicationIssue[]
+  entityErrors?: EntityError[]
+  retryable?: boolean
+  meta?: Record<string, unknown>
+}
+
+/**
+ * Erro administrativo com código explícito. O status vem da tabela exclusiva —
+ * não é parâmetro, para não existir caminho que produza um par código/status
+ * incoerente.
+ */
+export function adminCodedError(code: AdminErrorCode, input: AdminErrorInput = {}) {
+  const traceId = traceID()
+  const copy = adminErrorCopy[code] || adminErrorCopy.internal_error
+
   const envelope: AdminErrorEnvelope = {
     ok: false,
     error: {
-      version: ADMIN_ERROR_VERSION,
-      code: input.code === 'revision_conflict'
-        ? 'revision_conflict'
-        : input.code === 'publication_blocked'
-        ? 'publication_blocked'
-        : status === 422
-        ? 'validation_failed'
-        : 'invalid_request',
-      summary: summary.slice(0, 240),
-      detail: input.detail?.slice(0, 1000) || null,
-      retryable: input.retryable ?? false,
-      traceId: null,
+      code,
+      summary: (input.summary || copy.summary).slice(0, 240),
+      message: (input.message || copy.message).slice(0, 500),
       fieldErrors: input.fieldErrors || [],
+      traceId,
+      retryable: input.retryable ?? false,
+
+      version: ADMIN_ERROR_VERSION,
+      detail: input.detail?.slice(0, 1000) || null,
       entityErrors: input.entityErrors || [],
       meta: input.meta,
     },
   }
-  return NextResponse.json(envelope, { status })
+
+  return NextResponse.json(envelope, {
+    status: httpStatusByCode[code],
+    headers: { 'x-esmera-trace-id': traceId },
+  })
+}
+
+/** Atalho para requisição malformada — o caso mais comum de `adminCodedError`. */
+export function adminInputError(summary: string, input: AdminErrorInput = {}) {
+  return adminCodedError('invalid_request', { ...input, summary })
 }
 
 export function adminErrorResponse(
@@ -76,6 +90,8 @@ export function adminErrorResponse(
   const traceId = traceID()
   const normalized = normalizeAdminServerError(thrown, context)
 
+  // O erro completo, com stack, fica só no log do servidor, correlacionado pelo
+  // traceId. A resposta nunca carrega stack, SQL nem mensagem de driver.
   context.logger?.error({
     event: 'admin_action_failed',
     traceId,
@@ -85,25 +101,28 @@ export function adminErrorResponse(
     status: normalized.status,
     retryable: normalized.retryable,
     fieldPaths: normalized.fieldErrors.map((issue) => issue.path),
+    err: thrown,
   }, normalized.summary)
 
   const envelope: AdminErrorEnvelope = {
     ok: false,
     error: {
-      version: ADMIN_ERROR_VERSION,
       code: normalized.code,
       summary: normalized.summary,
-      detail: normalized.detail || null,
-      retryable: normalized.retryable,
-      traceId,
+      message: normalized.message,
       fieldErrors: normalized.fieldErrors,
+      traceId,
+      retryable: normalized.retryable,
+
+      version: ADMIN_ERROR_VERSION,
+      detail: normalized.detail || null,
       entityErrors: normalized.entityErrors,
       meta: normalized.meta,
     },
   }
 
   return NextResponse.json(envelope, {
-    status: Math.max(400, Math.min(599, normalized.status)),
+    status: normalized.status,
     headers: { 'x-esmera-trace-id': traceId },
   })
 }
