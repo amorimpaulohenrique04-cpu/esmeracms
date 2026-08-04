@@ -63,18 +63,35 @@ export function FormShell({
   )
 }
 
+const FOCUSABLE = 'input,select,textarea,button,a[href],[tabindex]:not([tabindex="-1"])'
+
+function isOutOfView(element: HTMLElement) {
+  if (typeof element.getBoundingClientRect !== 'function') return false
+  const rect = element.getBoundingClientRect()
+  const viewport = window.innerHeight || document.documentElement.clientHeight
+  return rect.bottom < 0 || rect.top > viewport
+}
+
+function escapeAttributeValue(value: string) {
+  // `CSS.escape` não existe em todos os runtimes que renderizam este módulo.
+  return typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+    ? CSS.escape(value)
+    : value.replace(/["\\]/g, '\\$&')
+}
+
 function focusIssue(issue: AdminFieldError) {
   const anchor = issue.anchor ? document.getElementById(issue.anchor) : null
-  const path = document.querySelector<HTMLElement>(`[data-field-path="${CSS.escape(issue.path)}"]`)
+  const path = document.querySelector<HTMLElement>(`[data-field-path="${escapeAttributeValue(issue.path)}"]`)
   const target = anchor || path
+  // Issue sem destino resolvível continua listada no resumo; navegar seria
+  // inventar um destino.
   if (!target) return
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  window.setTimeout(() => {
-    const focusable = target.matches('input,select,textarea,button,a[href]')
-      ? target
-      : target.querySelector<HTMLElement>('input,select,textarea,button,a[href],[tabindex]:not([tabindex="-1"])')
-    focusable?.focus({ preventScroll: true })
-  }, 250)
+  const destination = target.matches(FOCUSABLE) ? target : target.querySelector<HTMLElement>(FOCUSABLE)
+  const focusTarget = destination || target
+  // Scroll só quando o destino está fora da viewport — o foco já traz a
+  // rolagem nativa nos demais casos.
+  if (isOutOfView(focusTarget)) focusTarget.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  focusTarget.focus?.({ preventScroll: true })
 }
 
 export function ErrorSummary({
@@ -100,7 +117,15 @@ export function ErrorSummary({
   }, [autoFocus, issueCount])
 
   return (
-    <div ref={ref} className="esmera-error-summary" role="alert" tabIndex={-1} aria-labelledby="esmera-error-summary-title">
+    // Quando o foco vai para o resumo, ele já é lido: manter `role="alert"`
+    // junto faria o leitor de tela anunciar a mesma falha duas vezes.
+    <div
+      ref={ref}
+      className="esmera-error-summary"
+      role={autoFocus ? 'group' : 'alert'}
+      tabIndex={-1}
+      aria-labelledby="esmera-error-summary-title"
+    >
       <strong id="esmera-error-summary-title">{summary}</strong>
       {issueCount ? (
         <ul>
@@ -132,8 +157,8 @@ export function ErrorSummary({
 }
 
 export type PublicationChecklistIssue = {
-  id: string
-  severity: 'blocker' | 'warning' | 'recommendation'
+  code: string
+  severity: 'blocker' | 'warning' | 'info'
   message: string
   suggestion?: string | null
   tab?: string | null
@@ -150,7 +175,7 @@ export function PublicationChecklist({
   const grouped = useMemo(() => ({
     blockers: issues.filter((issue) => issue.severity === 'blocker'),
     warnings: issues.filter((issue) => issue.severity === 'warning'),
-    recommendations: issues.filter((issue) => issue.severity === 'recommendation'),
+    recommendations: issues.filter((issue) => issue.severity === 'info'),
   }), [issues])
 
   const groups: Array<{ key: keyof typeof grouped; label: string }> = [
@@ -175,7 +200,7 @@ export function PublicationChecklist({
           <h3>{group.label}</h3>
           <ul>
             {grouped[group.key].map((issue) => (
-              <li key={issue.id}>
+              <li key={issue.code}>
                 <button type="button" onClick={() => onNavigate?.(issue)}>{issue.message}</button>
                 {issue.suggestion ? <small>{issue.suggestion}</small> : null}
               </li>
@@ -196,6 +221,7 @@ export function ActionBar({
   onPublish,
   onUnpublish,
   secondary,
+  publishLabel = 'Publicar',
 }: {
   dirty?: boolean
   saving?: boolean
@@ -205,6 +231,7 @@ export function ActionBar({
   onPublish?: () => void
   onUnpublish?: () => void
   secondary?: React.ReactNode
+  publishLabel?: string
 }) {
   return (
     <div className="esmera-action-bar" role="region" aria-label="Ações do documento">
@@ -216,7 +243,7 @@ export function ActionBar({
         {onSave ? <Button disabled={saving || !dirty} onClick={onSave}>Salvar rascunho</Button> : null}
         {published
           ? <Button disabled={saving} onClick={onUnpublish}>Despublicar</Button>
-          : <Button tone="primary" disabled={saving || publicationBlocked} onClick={onPublish}>Publicar</Button>}
+          : <Button tone="primary" disabled={saving || publicationBlocked} onClick={onPublish}>{publishLabel}</Button>}
       </div>
     </div>
   )

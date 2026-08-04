@@ -83,18 +83,24 @@ describe('Stage 20 mandatory domain contracts', () => {
   })
 
   it('maps HTTP and mutation failures to the shared error contract', () => {
-    expect(adminErrorCodeFromStatus(401)).toBe('unauthorized')
+    expect(adminErrorCodeFromStatus(400)).toBe('invalid_request')
+    expect(adminErrorCodeFromStatus(401)).toBe('unauthenticated')
     expect(adminErrorCodeFromStatus(403)).toBe('forbidden')
     expect(adminErrorCodeFromStatus(404)).toBe('not_found')
-    expect(adminErrorCodeFromStatus(409, 'duplicate')).toBe('duplicate')
-    expect(adminErrorCodeFromStatus(500)).toBe('query_error')
+    expect(adminErrorCodeFromStatus(409)).toBe('revision_conflict')
+    expect(adminErrorCodeFromStatus(422)).toBe('validation_error')
+    expect(adminErrorCodeFromStatus(500)).toBe('internal_error')
+    expect(adminErrorCodeFromStatus(503)).toBe('verification_failed')
+
+    // O código do corpo vence o status: 422 pode ser validação ou bloqueio.
+    expect(adminErrorCodeFromStatus(422, 'publication_blocked')).toBe('publication_blocked')
 
     const normalized = normalizeAdminError(new AdminRequestError({
-      code: 'mutation_rollback',
-      message: 'A alteração foi revertida.',
+      code: 'revision_conflict',
+      message: 'Este conteúdo foi alterado em outra sessão.',
       status: 409,
-      retryable: true,
+      retryable: false,
     }))
-    expect(normalized).toMatchObject({ code: 'mutation_rollback', status: 409, retryable: true })
+    expect(normalized).toMatchObject({ code: 'revision_conflict', status: 409, retryable: false })
   })
 })

@@ -17,10 +17,10 @@ const DRAFT_UPDATED_AT = '2026-08-04T10:00:05.000Z'
 
 function issue(overrides: Partial<PublicationIssue> = {}): PublicationIssue {
   return {
-    code: 'product.gallery.media_invalid',
+    code: 'product.gallery.empty',
     severity: 'blocker',
     path: 'gallery',
-    tab: 'media',
+    tab: 'gallery',
     label: 'Galeria',
     anchor: 'product-gallery',
     message: 'Adicione imagens válidas.',
@@ -85,7 +85,7 @@ describe('mapCoordinatorOutcome — mapeamento coordenador → item do lote', ()
 
     expect(result.status).toBe('blocked')
     expect(result.issues).toHaveLength(1)
-    expect(result.issues?.[0].code).toBe('product.gallery.media_invalid')
+    expect(result.issues?.[0].code).toBe('product.gallery.empty')
     // PublicationBlockedError é lançado depois do saveDraft do coordenador:
     // sem o updatedAt novo, corrigir e tentar de novo daria revision_conflict.
     expect(result.updatedAt).toBe(DRAFT_UPDATED_AT)
@@ -121,6 +121,8 @@ describe('handshake de confirmação de warnings em duas etapas', () => {
   // documento. Reenviar o updatedAt original da lista faria o coordenador
   // lançar RevisionConflictError antes mesmo de olhar o confirmationToken.
   it('devolve token, revisão e um updatedAt posterior ao primeiro saveDraft', () => {
+    // Código real do registry (não um placeholder) para manter a fixture
+    // consistente com o contrato "issues estruturadas" da PR-06.
     const warning = issue({ code: 'product.base_price.missing', severity: 'warning', message: 'Revise o preço.' })
 
     const result = mapCoordinatorOutcome({

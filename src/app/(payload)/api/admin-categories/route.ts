@@ -39,11 +39,6 @@ function relationID(value: unknown): string | number | null {
   return null
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-  if (error && typeof error === 'object' && 'message' in error) return String((error as { message?: unknown }).message || 'Erro de validação.')
-  return 'Não foi possível atualizar a categoria.'
-}
 
 function categoryDraftData(input: Record<string, unknown> | undefined) {
   const source = input || {}

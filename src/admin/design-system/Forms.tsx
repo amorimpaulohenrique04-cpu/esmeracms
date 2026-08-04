@@ -20,6 +20,25 @@ export function Field({ label, hint, children, className = '', ...props }: Field
   )
 }
 
+/** Props que o `FieldV2` entrega ao controle real — nada aqui é opcional por acaso. */
+export type FieldControlProps = {
+  id: string
+  'aria-describedby'?: string
+  'aria-invalid'?: true
+  'aria-errormessage'?: string
+  required?: boolean
+}
+
+/**
+ * Render prop em vez de `cloneElement`: o controle real recebe os atributos
+ * tipados e o campo deixa de depender de o consumidor repetir o `id` à mão —
+ * era essa a falha do componente anterior, que rotulava um `htmlFor` sem par.
+ *
+ * `announceError` fica com o consumidor: só quem sabe se a falha veio de uma
+ * submissão explícita pode ligar o `role="alert"`. No carregamento inicial o
+ * erro permanece num elemento persistente, sem anúncio, e quem anuncia é o
+ * `ErrorSummary`.
+ */
 export function FieldV2({
   id,
   path,
@@ -29,6 +48,8 @@ export function FieldV2({
   error,
   required,
   optional,
+  describedBy,
+  announceError = false,
   children,
   className = '',
 }: {
@@ -40,13 +61,34 @@ export function FieldV2({
   error?: string | null
   required?: boolean
   optional?: boolean
-  children: React.ReactNode
+  describedBy?: string
+  announceError?: boolean
+  children: (control: FieldControlProps) => React.ReactNode
   className?: string
 }) {
   const generatedID = React.useId()
   const fieldID = id || `esmera-field-${generatedID.replace(/:/g, '')}`
-  const descriptionID = description || hint ? `${fieldID}-description` : undefined
+  const descriptionID = description ? `${fieldID}-description` : undefined
+  const hintID = hint ? `${fieldID}-hint` : undefined
   const errorID = error ? `${fieldID}-error` : undefined
+
+  // Só entram IDs de elementos que este render realmente produz, mais os
+  // externos recebidos. `Set` remove repetições e o `undefined` final evita
+  // `aria-describedby=""`.
+  const describedByIDs = [...new Set([
+    descriptionID,
+    hintID,
+    errorID,
+    ...(describedBy ? describedBy.split(/\s+/) : []),
+  ].filter((value): value is string => Boolean(value)))]
+
+  const control: FieldControlProps = {
+    id: fieldID,
+    'aria-describedby': describedByIDs.length ? describedByIDs.join(' ') : undefined,
+    'aria-invalid': error ? true : undefined,
+    'aria-errormessage': errorID,
+    required: required || undefined,
+  }
 
   return (
     <div
@@ -59,16 +101,11 @@ export function FieldV2({
         {optional ? <span className="esmera-field-v2__optional">Opcional</span> : null}
       </div>
       {description ? <p className="esmera-field-v2__description" id={descriptionID}>{description}</p> : null}
-      <div
-        className="esmera-field-v2__control"
-        data-control-id={fieldID}
-        data-description-id={descriptionID}
-        data-error-id={errorID}
-      >
-        {children}
-      </div>
-      {!description && hint ? <span className="esmera-field-hint" id={descriptionID}>{hint}</span> : null}
-      {error ? <span className="esmera-field-error" id={errorID} role="alert">{error}</span> : null}
+      <div className="esmera-field-v2__control">{children(control)}</div>
+      {hint ? <span className="esmera-field-hint" id={hintID}>{hint}</span> : null}
+      {error ? (
+        <span className="esmera-field-error" id={errorID} role={announceError ? 'alert' : undefined}>{error}</span>
+      ) : null}
     </div>
   )
 }
