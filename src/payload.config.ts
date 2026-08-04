@@ -19,6 +19,7 @@ import { Media } from './collections/Media'
 import { Occurrences } from './collections/Occurrences'
 import { Opportunities } from './collections/Opportunities'
 import { Products } from './collections/Products'
+import { PublicationReceipts } from './collections/PublicationReceipts'
 import { ReportExportFiles } from './collections/ReportExportFiles'
 import { ReportExports } from './collections/ReportExports'
 import { Sales } from './collections/Sales'
@@ -32,6 +33,7 @@ import { Contact } from './globals/Contact'
 import { Home } from './globals/Home'
 import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
+import { RecheckPublicationTask } from './jobs/recheckPublication'
 import { canRunEsmeraJobs, esmeraJobTasks } from './server/jobs'
 import { GenerateReportExportJob } from './server/jobs/reportExport'
 import { parseDecoCorsOrigins } from './server/env/cors'
@@ -132,12 +134,13 @@ export default buildConfig({
       run: canRunEsmeraJobs,
       cancel: ({ req }) => isAdmin(req.user),
     },
-    tasks: [...esmeraJobTasks, GenerateReportExportJob],
+    tasks: [...esmeraJobTasks, GenerateReportExportJob, RecheckPublicationTask],
     enableConcurrencyControl: true,
     shouldAutoRun: async () => process.env.PAYLOAD_JOBS_AUTORUN === 'true',
     autoRun: [
       { cron: '* * * * *', queue: 'operational', limit: 25 },
       { cron: '*/5 * * * *', queue: 'integrations', limit: 10 },
+      { cron: '* * * * *', queue: 'publication-verification', limit: 10 },
     ],
     jobsCollectionOverrides: ({ defaultJobsCollection }) => ({
       ...defaultJobsCollection,
@@ -154,6 +157,7 @@ export default buildConfig({
     ReportExportFiles,
     Categories,
     OperationalProducts,
+    PublicationReceipts,
     Leads,
     Customers,
     ClientInterests,
@@ -188,28 +192,23 @@ export default buildConfig({
   }),
   sharp,
   plugins: [
-  s3Storage({
-    enabled: process.env.MEDIA_STORAGE_DRIVER === 'r2',
-
-    collections: {
-      media: true,
-      'report-export-files': true,
-    },
-
-    bucket: process.env.S3_BUCKET || '',
-
-    clientUploads: true,
-
-    config: {
-      credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+    s3Storage({
+      enabled: process.env.MEDIA_STORAGE_DRIVER === 'r2',
+      collections: {
+        media: true,
+        'report-export-files': true,
       },
-
-      region: process.env.S3_REGION || 'auto',
-      endpoint: process.env.S3_ENDPOINT,
-      forcePathStyle: true,
-    },
-  }),
+      bucket: process.env.S3_BUCKET || '',
+      clientUploads: true,
+      config: {
+        credentials: {
+          accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+        },
+        region: process.env.S3_REGION || 'auto',
+        endpoint: process.env.S3_ENDPOINT,
+        forcePathStyle: true,
+      },
+    }),
   ],
 })
