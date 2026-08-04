@@ -12,6 +12,7 @@ import {
 import { coordinatePublication } from '../../../../server/publication/coordinator'
 import { assessProductPublication } from '../../../../server/publication/productAssessment'
 import { withSerializableTransaction } from '../../../../server/publication/concurrency'
+import { createPayloadPublicationRuntime } from '../../../../server/publication/payloadPublicationRuntime'
 import { createPublicPublicationMetadata } from '../../../../server/publication/publicRevision'
 import { assertExpectedDocumentRevision, createDocumentRevision } from '../../../../server/publication/revision'
 import { stampPublishedDocumentMetadata } from '../../../../server/publication/stampPublicationMetadata'
@@ -79,6 +80,15 @@ function updatedAt(document: unknown): string | null {
   return document && typeof document === 'object' && 'updatedAt' in document && typeof document.updatedAt === 'string'
     ? document.updatedAt
     : null
+}
+
+function publicationMessage(status: string) {
+  if (status === 'requires_confirmation') return 'Revise e confirme os avisos antes de publicar.'
+  if (status === 'published') return 'Visível no site.'
+  if (status === 'published_but_unverified') return 'Publicado; confirmação do site pendente.'
+  if (status === 'published_but_incompatible') return 'Publicado com problema de compatibilidade.'
+  if (status === 'publish_reverted') return 'Publicação desfeita; versão anterior preservada.'
+  return 'Não foi possível concluir a publicação.'
 }
 
 export async function POST(request: Request) {
@@ -158,13 +168,24 @@ export async function POST(request: Request) {
   if (action === 'save-and-publish') {
     if (body.id === undefined || body.id === null) return adminInputError('Produto não informado.')
     try {
+      const runtime = createPayloadPublicationRuntime({
+        payload,
+        user,
+        entity: 'product',
+        collection: 'products',
+        id: body.id,
+        source: 'individual',
+      })
       const result = await coordinatePublication({
         entity: 'product',
         entityId: body.id,
+        actorId: runtime.actorId,
+        source: runtime.source,
         data: draftData(body.data),
         expectedRevision: body.expectedRevision,
         expectedUpdatedAt: body.expectedUpdatedAt,
         confirmationToken: body.confirmationToken,
+        verificationConfig: runtime.verificationConfig,
         readCurrent: () => payload.findByID({
           collection: 'products',
           id: body.id as string | number,
@@ -173,6 +194,7 @@ export async function POST(request: Request) {
           overrideAccess: false,
           user,
         }),
+        readPublishedBefore: runtime.readPublishedBefore,
         saveDraft: (data) => payload.update({
           collection: 'products',
           id: body.id as string | number,
@@ -206,23 +228,33 @@ export async function POST(request: Request) {
             depth: 2,
             overrideAccess: true,
             user,
+            context: {
+              skipPublicRevisionStamp: true,
+              skipPublicationVerification: true,
+            },
           })
         },
+        extractPublicMetadata: runtime.extractPublicMetadata,
+        verify: runtime.verify,
+        persistOperationalState: runtime.persistOperationalState,
+        attemptRollback: runtime.attemptRollback,
+        createReceipt: runtime.createReceipt,
+        scheduleRecheck: runtime.scheduleRecheck,
       })
 
       return adminActionResponse(result.status, {
         entityId: result.entityId,
         revision: result.revision,
         assessment: result.assessment,
-        message: result.status === 'requires_confirmation'
-          ? 'Revise e confirme os avisos antes de publicar.'
-          : result.status === 'published_but_unverified'
-          ? 'Produto publicado, mas a confirmação visual do site está indisponível.'
-          : 'Produto publicado.',
+        message: publicationMessage(result.status),
         meta: {
           confirmationToken: result.confirmationToken,
           verification: result.verification,
           updatedAt: updatedAt(result.document),
+          publicationRevision: result.publicationRevision,
+          retryable: result.retryable,
+          traceId: result.traceId,
+          rollback: result.rollback,
         },
       })
     } catch (error) {
@@ -253,7 +285,7 @@ export async function POST(request: Request) {
     try {
       const result = await publishProductsInBulk(payload, user, body.items)
       return adminActionResponse('bulk_completed', {
-        message: `${result.published} de ${result.requested} produto(s) publicados.`,
+        message: `${result.published} visível(is), ${result.unverified} pendente(s), ${result.incompatible} incompatível(is) e ${result.reverted} revertido(s).`,
         meta: result as unknown as Record<string, unknown>,
       })
     } catch (error) {
@@ -300,7 +332,24 @@ export async function POST(request: Request) {
         })
 
         if (action === 'unpublish') {
-          await payload.update({ collection: 'products', id, data: { _status: 'draft' } as never, draft: true, overrideAccess: false, user })
+          await payload.update({
+            collection: 'products',
+            id,
+            data: {
+              _status: 'draft',
+              publicationOperationalStatus: 'draft',
+              publicationVerificationStatus: 'not_run',
+              publicationVerifiedAt: null,
+              publicationTraceId: null,
+            } as never,
+            draft: true,
+            overrideAccess: true,
+            user,
+            context: {
+              skipPublicRevisionStamp: true,
+              skipPublicationVerification: true,
+            },
+          })
         } else if (action === 'archive' || action === 'restore') {
           const currentStatus = (current as { _status?: string })._status
           const mutated = await payload.update({
