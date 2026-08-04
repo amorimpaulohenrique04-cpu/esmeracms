@@ -10,6 +10,7 @@ import {
   TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
+import { assessProductPublication } from '../../../server/publication/productAssessment'
 import { ProductDocumentView } from './ProductDocumentView'
 import { ProductsWorkspaceClient } from './ProductsWorkspaceClient'
 import type {
@@ -75,7 +76,7 @@ function whereFrom(filters: ProductWorkspaceFilters): Where | undefined {
 }
 
 async function productDetail(props: AdminViewServerProps, id: string) {
-  return await props.initPageResult.req.payload.findByID({
+  const product = await props.initPageResult.req.payload.findByID({
     collection: 'products',
     id,
     depth: 1,
@@ -84,6 +85,13 @@ async function productDetail(props: AdminViewServerProps, id: string) {
     user: props.initPageResult.req.user,
     req: props.initPageResult.req,
   }) as unknown as ProductDetail
+  const assessment = assessProductPublication(product)
+
+  return {
+    ...product,
+    publicationReady: assessment.ready,
+    publicationIssues: assessment.issues.map(({ message }) => ({ message })),
+  }
 }
 
 export async function ProductsView(props: AdminViewServerProps) {

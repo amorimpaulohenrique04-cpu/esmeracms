@@ -3,6 +3,12 @@ import { expect, Page, test } from '@playwright/test'
 import { login } from '../helpers/login'
 import { cleanupTestUser, seedTestUser, testUser } from '../helpers/seedUser'
 
+async function openReportDimensions(page: Page) {
+  const dimensions = page.locator('details.esmera-report-filter-advanced')
+  if (await dimensions.getAttribute('open') === null) await dimensions.locator('summary').click()
+  await expect(dimensions).toHaveAttribute('open', '')
+}
+
 test.describe('Reports workspace', () => {
   let page: Page
 
@@ -32,7 +38,7 @@ test.describe('Reports workspace', () => {
     })
 
     await page.getByRole('combobox', { name: 'Comparar com' }).selectOption('previous_period')
-    await page.getByRole('button', { name: 'Aplicar filtros' }).click()
+    await page.getByRole('button', { name: 'Aplicar período' }).click()
 
     await expect(page).toHaveURL(/compareWith=previous_period/)
     await expect(page.getByTestId('reports-workspace')).toHaveClass(/is-refreshing/)
@@ -47,8 +53,9 @@ test.describe('Reports workspace', () => {
 
   test('copies, opens the exact filtered URL and drills down to real records', async () => {
     await page.goto('http://localhost:3000/admin/reports')
+    await openReportDimensions(page)
     await page.getByRole('combobox', { name: 'Origem' }).selectOption('site')
-    await page.getByRole('button', { name: 'Aplicar filtros' }).click()
+    await page.getByRole('button', { name: 'Aplicar recorte' }).click()
     await expect(page).toHaveURL(/source=site/)
 
     await page.getByRole('button', { name: 'Compartilhar' }).click()
@@ -71,8 +78,9 @@ test.describe('Reports workspace', () => {
 
   test('exports the current URL filters through the native PDF endpoint', async () => {
     await page.goto('http://localhost:3000/admin/reports')
+    await openReportDimensions(page)
     await page.getByRole('combobox', { name: 'Origem' }).selectOption('site')
-    await page.getByRole('button', { name: 'Aplicar filtros' }).click()
+    await page.getByRole('button', { name: 'Aplicar recorte' }).click()
     await expect(page).toHaveURL(/source=site/)
 
     let postedSource: string | null | undefined

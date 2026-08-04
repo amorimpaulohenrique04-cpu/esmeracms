@@ -85,7 +85,7 @@ test.describe('Stages 16–20 hardening', () => {
     await adminPage.keyboard.press('Control+k')
     const palette = adminPage.getByTestId('esmera-command-palette')
     await expect(palette).toBeVisible()
-    await palette.getByPlaceholder('Produto, cliente, venda ou ação…').fill('Dashboard')
+    await palette.getByRole('textbox', { name: 'Buscar no CMS' }).fill('Dashboard')
     await expect(palette.getByRole('option', { name: /Dashboard/ }).first()).toBeVisible()
     await adminPage.keyboard.press('Enter')
     await expect(adminPage).toHaveURL('http://localhost:3000/admin')
@@ -140,10 +140,17 @@ test.describe('Stages 16–20 hardening', () => {
     await commercialPage.goto(`http://localhost:3000/admin/privacy?q=${encodeURIComponent('Cliente Privacidade E2E')}`)
     await expect(commercialPage.getByRole('heading', { name: 'Privacidade' }).first()).toBeVisible()
     const row = commercialPage.getByRole('row').filter({ hasText: 'Cliente Privacidade E2E' })
+    const actions = row.locator('details.esmera-privacy-actions')
+    const openActions = async () => {
+      if (await actions.getAttribute('open') === null) await actions.locator('summary').click()
+      await expect(actions).toHaveAttribute('open', '')
+    }
+    await openActions()
     await row.getByRole('button', { name: 'Registrar consentimento' }).click()
     await expect(row.getByText('Concedido', { exact: true })).toBeVisible({ timeout: 10_000 })
 
-    await row.getByRole('button', { name: 'Solicitar exclusão' }).click()
+    await openActions()
+    await row.getByRole('button', { name: 'Registrar solicitação de exclusão' }).click()
     await expect(row.getByText('Solicitada', { exact: true })).toBeVisible({ timeout: 10_000 })
 
     const exportResponse = await commercialPage.request.get(`http://localhost:3000/api/admin-privacy?customer=${customerId}`)

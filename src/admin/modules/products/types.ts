@@ -1,5 +1,6 @@
 export type ProductMedia = {
   id: string | number
+  _status?: string | null
   url?: string | null
   filename?: string | null
   alt?: string | null
@@ -19,6 +20,8 @@ export type ProductGalleryItem = {
 
 export type ProductCategory = {
   id: string | number
+  _status?: string | null
+  status?: string | null
   title?: string | null
   slug?: string | null
 }

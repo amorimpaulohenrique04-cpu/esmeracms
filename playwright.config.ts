@@ -1,32 +1,34 @@
 import { defineConfig, devices } from '@playwright/test'
 
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
 import 'dotenv/config'
 
-/**
- * See https://playwright.dev/docs/test-configuration.
- */
+const isCI = Boolean(process.env.CI)
+const baseURL = 'http://localhost:3000'
+
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 180_000,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
-  forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+  timeout: isCI ? 90_000 : 180_000,
+  globalTimeout: isCI ? 15 * 60_000 : undefined,
+  expect: {
+    timeout: isCI ? 10_000 : 5_000,
+  },
+  forbidOnly: isCI,
+  fullyParallel: false,
+  maxFailures: 0,
+  retries: 0,
+  workers: isCI ? 1 : undefined,
+  reporter: isCI
+    ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
+    : [['html', { open: 'never', outputFolder: 'playwright-report' }]],
+  outputDir: 'test-results',
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://localhost:3000',
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    baseURL,
+    extraHTTPHeaders: { Origin: baseURL },
+    actionTimeout: isCI ? 15_000 : 0,
+    navigationTimeout: isCI ? 30_000 : 0,
+    screenshot: 'only-on-failure',
+    video: isCI ? 'retain-on-failure' : 'off',
+    trace: isCI ? 'retain-on-failure' : 'on-first-retry',
   },
   projects: [
     {
@@ -35,8 +37,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
-    reuseExistingServer: true,
-    url: 'http://localhost:3000',
+    command: isCI ? 'pnpm start' : 'pnpm dev',
+    reuseExistingServer: !isCI,
+    url: baseURL,
+    timeout: isCI ? 120_000 : 180_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 })

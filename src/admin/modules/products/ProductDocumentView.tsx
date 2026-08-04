@@ -121,7 +121,9 @@ function HistoryTab({ product }: { product: ProductDetail }) {
 
 export function ProductDocumentView({ product, tab, searchParams }: { product: ProductDetail; tab: ProductDocumentTab; searchParams: Record<string, string | string[] | undefined> }) {
   const back = returnHref(searchParams)
-  const context = <div className="esmera-product-document-status"><Status tone={product.catalogStatus === 'active' ? 'success' : 'neutral'}>{product.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</Status><Status tone={product._status === 'published' ? 'info' : 'neutral'}>{product._status === 'published' ? 'Publicado' : 'Rascunho'}</Status><span className={`esmera-product-readiness${product.publicationReady ? ' is-ready' : ' has-issues'}`}><span aria-hidden="true" />{product.publicationReady ? 'Pronto para publicar' : `${product.publicationIssues?.length || 0} pendência${product.publicationIssues?.length === 1 ? '' : 's'}`}</span></div>
+  const issueCount = product.publicationIssues?.length || 0
+  const readinessLabel = product.publicationReady ? 'Pronto para publicar' : 'Com pendências'
+  const context = <div className="esmera-product-document-status"><Status tone={product.catalogStatus === 'active' ? 'success' : 'neutral'}>{product.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</Status><Status tone={product._status === 'published' ? 'info' : 'neutral'}>{product._status === 'published' ? 'Publicado' : 'Rascunho'}</Status><span className={`esmera-product-readiness${product.publicationReady ? ' is-ready' : ' has-issues'}`} title={product.publicationReady ? undefined : `${issueCount} pendência${issueCount === 1 ? '' : 's'} registrada${issueCount === 1 ? '' : 's'}`}><span aria-hidden="true" />{readinessLabel}</span></div>
 
   return (
     <>

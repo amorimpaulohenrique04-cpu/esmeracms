@@ -282,8 +282,8 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
     <section className="esmera-product-draft-form" aria-label="Edição rápida do rascunho">
       <div className="esmera-product-draft-form__status">
         <div><strong>Edição rápida</strong><span>Draft oficial do Payload</span></div>
-        {saveState === 'saving' ? <SavingState state="saving" /> : null}
-        {saveState === 'saved' ? <SavingState state="saved" /> : null}
+        {saveState === 'saving' ? <SavingState state="saving" message="Salvando rascunho…" /> : null}
+        {saveState === 'saved' ? <SavingState state="saved" message="Rascunho salvo" /> : null}
         {saveState === 'error' ? <SavingState state="rollback" message="Falha ao salvar o rascunho." /> : null}
         {saveState === 'idle' && dirty ? <InlineFeedback tone="warning">Alterações aguardando salvamento automático.</InlineFeedback> : null}
         {saveState === 'idle' && !dirty ? <InlineFeedback>Rascunho sincronizado.</InlineFeedback> : null}

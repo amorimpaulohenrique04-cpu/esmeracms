@@ -29,8 +29,10 @@ test.describe('Final operational dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Pipeline compacto' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Pendências do dia' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Catálogo recente' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Tráfego' })).toBeVisible()
-    await expect(page.getByText('Não configurado', { exact: true })).toBeVisible()
+    const traffic = page.locator('.esmera-dashboard-traffic')
+    await traffic.scrollIntoViewIfNeeded()
+    await expect(traffic.getByRole('heading', { name: 'Tráfego' })).toBeVisible()
+    await expect(traffic.getByText('Não configurado', { exact: true })).toBeVisible()
     await expect(page.getByText('15%')).toHaveCount(0)
 
     const newStage = page.getByRole('link', { name: /Novo: \d+ oportunidades/ })

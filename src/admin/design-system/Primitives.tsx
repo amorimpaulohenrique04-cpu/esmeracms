@@ -83,7 +83,7 @@ export function MetricStrip({
 }) {
   return (
     <section
-      className={classes('esmera-metric-strip', className)}
+      className={classes('esmera-metric-strip', 'esmera-metric-grid', className)}
       style={columns ? ({ '--esmera-metric-columns': columns } as React.CSSProperties) : undefined}
       aria-label={label}
     >

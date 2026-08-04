@@ -2,9 +2,10 @@
 
 import { DragDropProvider } from '@dnd-kit/react'
 import { isSortable, useSortable } from '@dnd-kit/react/sortable'
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 
-import { Button, Status } from '../../design-system'
+import { Button, InlineFeedback, SavingState, Status } from '../../design-system'
+import { announceAdmin, announceDraftChanged } from '../../state/AdminStateProvider'
 import { imageURL, relationId, roleLabels, type ProductGalleryItem } from './types'
 
 function SortableMedia({ item, index, total, onMove }: { item: ProductGalleryItem; index: number; total: number; onMove: (from: number, to: number) => void }) {
@@ -13,7 +14,7 @@ function SortableMedia({ item, index, total, onMove }: { item: ProductGalleryIte
   const url = imageURL(item)
 
   return (
-    <li ref={sortable.ref} className={`esmera-product-media-item${sortable.isDragging ? ' is-dragging' : ''}`}>
+    <li ref={sortable.ref} className={`esmera-product-media-item esmera-spatial-selection${sortable.isDragging ? ' is-dragging' : ''}`}>
       <button ref={sortable.handleRef} className="esmera-product-media-handle" type="button" aria-label={`Reordenar ${item.mediaKey || `imagem ${index + 1}`}`}>⋮⋮</button>
       <div className="esmera-product-media-thumb">{url ? <img src={url} alt={item.alt || ''} /> : <span>Sem preview</span>}</div>
       <div className="esmera-product-media-copy">
@@ -34,9 +35,12 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
   const [gallery, setGallery] = useState(initialGallery)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [rollback, setRollback] = useState(false)
+  const lastSaved = useRef(initialGallery)
 
   async function persist(next: ProductGalleryItem[]) {
     setSaving(true)
+    setRollback(false)
     setFeedback(null)
     try {
       const response = await fetch('/api/admin-products', {
@@ -57,10 +61,16 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
       })
       const body = await response.json() as { error?: string }
       if (!response.ok) throw new Error(body.error || 'Não foi possível salvar a ordem da galeria.')
+      lastSaved.current = next
       setFeedback('Ordem da galeria salva no rascunho.')
+      announceDraftChanged({ kind: 'product', id: productId, field: 'gallery' })
+      announceAdmin('Ordem da galeria salva.')
     } catch (error) {
-      setGallery(initialGallery)
-      setFeedback(error instanceof Error ? error.message : 'Não foi possível salvar a ordem da galeria.')
+      setGallery(lastSaved.current)
+      setRollback(true)
+      const message = error instanceof Error ? error.message : 'Não foi possível salvar a ordem da galeria.'
+      setFeedback(`${message} A ordem anterior foi restaurada.`)
+      announceAdmin('Falha ao reordenar. A ordem anterior foi restaurada.', true)
     } finally {
       setSaving(false)
     }
@@ -72,6 +82,7 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
     const [item] = next.splice(from, 1)
     next.splice(to, 0, item)
     setGallery(next)
+    announceAdmin(`${item.mediaKey || `Imagem ${from + 1}`} movida para a posição ${to + 1}.`)
     void persist(next)
   }
 
@@ -81,7 +92,7 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
     <div className="esmera-product-media-manager">
       <div className="esmera-product-media-note">
         <span>Arraste para ordenar. Para teclado ou tecnologia assistiva, use os botões ↑ e ↓.</span>
-        {saving ? <strong>Salvando…</strong> : null}
+        {saving ? <SavingState state="saving" message="Salvando nova ordem…" /> : null}
       </div>
       <DragDropProvider
         onDragEnd={(event) => {
@@ -96,7 +107,7 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
           {gallery.map((item, index) => <SortableMedia key={String(item.id || item.mediaKey || index)} item={item} index={index} total={gallery.length} onMove={move} />)}
         </ol>
       </DragDropProvider>
-      {feedback ? <div className="esmera-products-feedback" role="status" aria-live="polite">{feedback}</div> : null}
+      {feedback ? <InlineFeedback className={rollback ? 'is-rollback' : ''} tone={rollback ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
     </div>
   )
 }

@@ -124,7 +124,7 @@ test.describe('Customer relational workspace', () => {
 
     await page.goto(`http://localhost:3000/admin/customers?customer=${customerId}&tab=sales`)
     await expect(page.getByText(saleNumber)).toBeVisible()
-    await expect(page.getByText('Confirmada')).toBeVisible()
+    await expect(page.getByText('Confirmada', { exact: true })).toBeVisible()
 
     await page.goto(`http://localhost:3000/admin/customers?customer=${customerId}&tab=notes`)
     await expect(page.getByText(noteText)).toBeVisible()

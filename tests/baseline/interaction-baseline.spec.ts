@@ -1,56 +1,18 @@
-import { expect, test } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-const baseURL = process.env.BASELINE_BASE_URL || 'http://127.0.0.1:3000'
-const email = process.env.BASELINE_ADMIN_EMAIL || 'baseline.admin@esmera.local'
-const password = process.env.BASELINE_ADMIN_PASSWORD || 'EsmeraBaseline-2026!'
-
-const viewports = [
-  { name: 'desktop-1440x900', width: 1440, height: 900 },
-  { name: 'notebook-1280x800', width: 1280, height: 800 },
-  { name: 'tablet-landscape-1024x768', width: 1024, height: 768 },
-  { name: 'tablet-768x1024', width: 768, height: 1024 },
-  { name: 'mobile-390x844', width: 390, height: 844 },
-] as const
-
-async function ensureAdmin(page: import('@playwright/test').Page) {
-  const create = await page.request.post(`${baseURL}/api/users`, {
-    data: { email, password, role: 'admin', name: 'Baseline Admin' },
-  })
-  if (!create.ok() && ![400, 401, 403, 409].includes(create.status())) {
-    throw new Error(`Unable to bootstrap interaction baseline admin: HTTP ${create.status()} ${await create.text()}`)
-  }
-
-  const login = await page.request.post(`${baseURL}/api/users/login`, { data: { email, password } })
-  expect(login.ok(), `Interaction baseline login failed: HTTP ${login.status()} ${await login.text()}`).toBeTruthy()
-}
-
-async function settle(page: import('@playwright/test').Page) {
-  await page.evaluate(async () => {
-    if ('fonts' in document) await document.fonts.ready
-  })
-  await page.waitForTimeout(180)
-}
-
-async function waitForInteractiveShell(page: import('@playwright/test').Page) {
-  const header = page.getByTestId('esmera-app-header')
-  await expect(header).toBeVisible({ timeout: 15_000 })
-  await expect(header).toHaveAttribute('data-shortcuts-ready', 'true', { timeout: 15_000 })
-}
+import { baselineViewports } from '../../src/visual-baseline/contract'
+import { expect, settleVisualPage, test, waitForInteractiveShell } from './fixtures'
 
 test('capture critical interactive visual states', async ({ page }) => {
-  await ensureAdmin(page)
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-
-  for (const viewport of viewports) {
+  for (const viewport of baselineViewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     const outputDir = path.join('artifacts', 'admin-baseline', viewport.name)
     await fs.mkdir(outputDir, { recursive: true })
 
     await page.goto('/admin', { waitUntil: 'domcontentloaded' })
     await waitForInteractiveShell(page)
-    await settle(page)
+    await settleVisualPage(page)
 
     await page.keyboard.press('Tab')
     await expect.poll(() => page.evaluate(() => document.activeElement !== document.body)).toBe(true)
@@ -59,7 +21,7 @@ test('capture critical interactive visual states', async ({ page }) => {
     await page.keyboard.press('Control+k')
     const palette = page.getByTestId('esmera-command-palette')
     await expect(palette).toBeVisible({ timeout: 15_000 })
-    await settle(page)
+    await settleVisualPage(page)
     await page.screenshot({ path: path.join(outputDir, 'command-palette.png'), fullPage: true })
     await page.keyboard.press('Escape')
     await expect(palette).toBeHidden()
@@ -68,7 +30,7 @@ test('capture critical interactive visual states', async ({ page }) => {
       await page.getByRole('button', { name: 'Abrir navegação' }).click()
       const mobileNav = page.getByTestId('esmera-mobile-nav')
       await expect(mobileNav).toBeVisible({ timeout: 15_000 })
-      await settle(page)
+      await settleVisualPage(page)
       await page.screenshot({ path: path.join(outputDir, 'mobile-navigation-drawer.png'), fullPage: true })
       await page.keyboard.press('Escape')
       await expect(mobileNav).toBeHidden()
