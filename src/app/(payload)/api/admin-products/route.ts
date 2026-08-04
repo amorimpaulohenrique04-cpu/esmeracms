@@ -6,7 +6,7 @@ import { canManageSite } from '../../../../access/roles'
 import { adminActionResponse, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
 import { coordinatePublication } from '../../../../server/publication/coordinator'
 import { assessProductPublication } from '../../../../server/publication/productAssessment'
-import { createDocumentRevision } from '../../../../server/publication/revision'
+import { assertExpectedDocumentRevision, createDocumentRevision } from '../../../../server/publication/revision'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,6 +90,19 @@ export async function POST(request: Request) {
   if (action === 'save-draft') {
     if (body.id === undefined || body.id === null) return adminInputError('Produto não informado.')
     try {
+      const current = await payload.findByID({
+        collection: 'products',
+        id: body.id,
+        draft: true,
+        depth: 2,
+        overrideAccess: false,
+        user,
+      })
+      assertExpectedDocumentRevision(current, {
+        expectedRevision: body.expectedRevision,
+        expectedUpdatedAt: body.expectedUpdatedAt,
+      })
+
       const document = await payload.update({
         collection: 'products',
         id: body.id,

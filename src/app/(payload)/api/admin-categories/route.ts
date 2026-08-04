@@ -6,7 +6,7 @@ import { canManageSite } from '../../../../access/roles'
 import { adminActionResponse, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
 import { assessCategoryPublication } from '../../../../server/publication/categoryAssessment'
 import { coordinatePublication } from '../../../../server/publication/coordinator'
-import { createDocumentRevision } from '../../../../server/publication/revision'
+import { assertExpectedDocumentRevision, createDocumentRevision } from '../../../../server/publication/revision'
 import type { PublicationAssessment } from '../../../../server/publication/types'
 
 export const dynamic = 'force-dynamic'
@@ -154,6 +154,19 @@ export async function POST(request: Request) {
   if (body.action === 'save-draft') {
     if (body.id === undefined || body.id === null) return adminInputError('Categoria não informada.')
     try {
+      const current = await payload.findByID({
+        collection: 'categories',
+        id: body.id,
+        draft: true,
+        depth: 2,
+        overrideAccess: false,
+        user,
+      })
+      assertExpectedDocumentRevision(current, {
+        expectedRevision: body.expectedRevision,
+        expectedUpdatedAt: body.expectedUpdatedAt,
+      })
+
       const document = await payload.update({
         collection: 'categories',
         id: body.id,

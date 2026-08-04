@@ -65,8 +65,8 @@ export function CategoryDetailView({ category, tab, filters, categories, media, 
         {tabs.map((item) => <Link key={item.id} className={tab === item.id ? 'is-active' : ''} aria-current={tab === item.id ? 'page' : undefined} href={hrefFor(filters, category.id, item.id)}>{item.label}</Link>)}
       </nav>
 
-      {tab === 'general' ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="general" /> : null}
-      {tab === 'media' ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="media" /> : null}
+      {tab === 'general' ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="general" initialRevision={category.revision ?? null} initialUpdatedAt={category.updatedAt ?? null} /> : null}
+      {tab === 'media' ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="media" initialRevision={category.revision ?? null} initialUpdatedAt={category.updatedAt ?? null} /> : null}
       {tab === 'products' ? (
         <div className="esmera-category-related">
           <div className="esmera-category-related__intro">

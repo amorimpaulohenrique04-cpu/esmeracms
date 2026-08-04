@@ -44,6 +44,7 @@ export type CategoryListItem = {
 }
 
 export type CategoryDetail = CategoryListItem & {
+  revision?: string | null
   description?: string | null
   seo?: CategorySeo | null
 }

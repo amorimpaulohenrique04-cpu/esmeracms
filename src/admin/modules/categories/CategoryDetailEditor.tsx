@@ -40,6 +40,7 @@ type AdminActionResult = {
 type FeedbackState = {
   tone: 'success' | 'warning' | 'danger'
   message: string
+  code?: string | null
   details?: Array<{ message: string; suggestion?: string | null; anchor?: string | null }>
   traceId?: string | null
 }
@@ -50,6 +51,8 @@ type Props = {
   media: CategoryMedia[]
   termSuggestions: string[]
   section: 'general' | 'media'
+  initialRevision?: string | null
+  initialUpdatedAt?: string | null
 }
 
 function termId(value: string) {
@@ -65,7 +68,7 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, '')
 }
 
-export function CategoryDetailEditor({ category, categories, media, termSuggestions, section }: Props) {
+export function CategoryDetailEditor({ category, categories, media, termSuggestions, section, initialRevision, initialUpdatedAt }: Props) {
   const router = useRouter()
   const initialTerms = (category.searchTerms || []).map((item, index) => ({ id: `${termId(item.term || '')}-${index}`, value: item.term || '' })).filter((item) => item.value)
   const [terms, setTerms] = useState<TermItem[]>(initialTerms)
@@ -73,8 +76,8 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
   const [confirmationToken, setConfirmationToken] = useState<string | null>(null)
-  const revision = useRef<string | null>(null)
-  const updatedAt = useRef<string | null>(null)
+  const revision = useRef<string | null>(initialRevision ?? null)
+  const updatedAt = useRef<string | null>(initialUpdatedAt ?? null)
   const slugTouched = useRef(Boolean(category.slug))
 
   const [title, setTitle] = useState(category.title || '')
@@ -123,6 +126,7 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
     setFeedback({
       tone: 'danger',
       message: normalized.summary,
+      code: normalized.code,
       details: [
         ...normalized.fieldErrors.map((issue) => ({
           message: issue.message,
@@ -323,6 +327,9 @@ export function CategoryDetailEditor({ category, categories, media, termSuggesti
       {feedback ? (
         <div className="esmera-products-feedback" role="status" aria-live="polite">
           <InlineFeedback tone={feedback.tone}>{feedback.message}</InlineFeedback>
+          {feedback.code === 'revision_conflict' ? (
+            <Button onClick={() => window.location.reload()}>Recarregar versão atual</Button>
+          ) : null}
           {feedback.details?.length ? (
             <ul className="esmera-product-issues">
               {feedback.details.map((detail, index) => (

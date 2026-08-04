@@ -11,6 +11,7 @@ import {
   ViewFrame,
 } from '../../views/shared'
 import { assessProductPublication } from '../../../server/publication/productAssessment'
+import { createDocumentRevision } from '../../../server/publication/revision'
 import { ProductDocumentView } from './ProductDocumentView'
 import { ProductsWorkspaceClient } from './ProductsWorkspaceClient'
 import type {
@@ -76,21 +77,26 @@ function whereFrom(filters: ProductWorkspaceFilters): Where | undefined {
 }
 
 async function productDetail(props: AdminViewServerProps, id: string) {
+  // depth: 2 matches admin-products/route.ts's readCurrent/saveDraft/readDraft —
+  // createDocumentRevision() hashes the resolved relationship shape, so a
+  // mismatched depth here would make every first save 409 with a false conflict.
   const product = await props.initPageResult.req.payload.findByID({
     collection: 'products',
     id,
-    depth: 1,
+    depth: 2,
     draft: true,
     overrideAccess: false,
     user: props.initPageResult.req.user,
     req: props.initPageResult.req,
   }) as unknown as ProductDetail
   const assessment = assessProductPublication(product)
+  const revision = createDocumentRevision(product)
 
   return {
     ...product,
     publicationReady: assessment.ready,
     publicationIssues: assessment.issues.map(({ message }) => ({ message })),
+    revision,
   }
 }
 

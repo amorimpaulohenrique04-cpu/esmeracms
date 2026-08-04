@@ -51,6 +51,7 @@ type LegacyMutationResult = {
 type FeedbackState = {
   tone: 'success' | 'warning' | 'danger'
   message: string
+  code?: string | null
   issues?: PublicationIssue[]
   traceId?: string | null
 }
@@ -60,6 +61,8 @@ type Props = {
   initial: DraftState
   published: boolean
   archived: boolean
+  initialRevision?: string | null
+  initialUpdatedAt?: string | null
 }
 
 function formatCurrencyInputFromCents(value: string) {
@@ -101,7 +104,7 @@ function requestData(value: DraftState) {
   }
 }
 
-export function ProductDraftForm({ productId, initial, published, archived }: Props) {
+export function ProductDraftForm({ productId, initial, published, archived, initialRevision, initialUpdatedAt }: Props) {
   const router = useRouter()
   const [draft, setDraft] = useState<DraftState>(() => ({
     ...initial,
@@ -111,16 +114,21 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
   const [confirmationToken, setConfirmationToken] = useState<string | null>(null)
-  const latestRequest = useRef(0)
-  const activeSave = useRef<AbortController | null>(null)
-  const revision = useRef<string | null>(null)
-  const updatedAt = useRef<string | null>(null)
+  const activeAbort = useRef<AbortController | null>(null)
+  // Fila serial: nunca há mais de um save-draft em voo. Uma resposta antiga não
+  // pode sobrescrever revision.current depois de uma mais nova porque a próxima
+  // gravação só começa depois que a anterior confirma no servidor (abortar o
+  // fetch no browser não garante que a escrita já foi cancelada no servidor).
+  const saveQueue = useRef<Promise<boolean>>(Promise.resolve(true))
+  const revision = useRef<string | null>(initialRevision ?? null)
+  const updatedAt = useRef<string | null>(initialUpdatedAt ?? null)
 
   const applyError = useCallback((error: unknown, fallback: string) => {
     const normalized = normalizeAdminError(error, fallback)
     setFeedback({
       tone: 'danger',
       message: normalized.summary,
+      code: normalized.code,
       issues: [
         ...normalized.fieldErrors.map((issue) => ({
           id: issue.code || undefined,
@@ -142,53 +150,55 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
     })
   }, [])
 
-  const saveDraft = useCallback(async (value: DraftState) => {
-    const requestId = latestRequest.current + 1
-    latestRequest.current = requestId
-    activeSave.current?.abort()
-    const controller = new AbortController()
-    activeSave.current = controller
-    setSaveState('saving')
-    setFeedback(null)
+  const enqueueSave = useCallback((value: DraftState): Promise<boolean> => {
+    const run = async (): Promise<boolean> => {
+      const controller = new AbortController()
+      activeAbort.current = controller
+      setSaveState('saving')
+      setFeedback(null)
 
-    try {
-      const response = await fetch('/api/admin-products', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          action: 'save-draft',
-          id: productId,
-          data: requestData(value),
-          expectedRevision: revision.current,
-          expectedUpdatedAt: updatedAt.current,
-        }),
-      })
-      const result = await expectAdminResponse<AdminActionResult>(response, 'Não foi possível salvar o rascunho.')
-      if (latestRequest.current !== requestId) return false
-      revision.current = result.revision || revision.current
-      updatedAt.current = result.meta?.updatedAt || updatedAt.current
-      setSaveState('saved')
-      setDirty(false)
-      return true
-    } catch (error) {
-      if (controller.signal.aborted || latestRequest.current !== requestId) return false
-      setSaveState('error')
-      applyError(error, 'Não foi possível salvar o rascunho.')
-      return false
-    } finally {
-      if (activeSave.current === controller) activeSave.current = null
+      try {
+        const response = await fetch('/api/admin-products', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            action: 'save-draft',
+            id: productId,
+            data: requestData(value),
+            expectedRevision: revision.current,
+            expectedUpdatedAt: updatedAt.current,
+          }),
+        })
+        const result = await expectAdminResponse<AdminActionResult>(response, 'Não foi possível salvar o rascunho.')
+        revision.current = result.revision || revision.current
+        updatedAt.current = result.meta?.updatedAt || updatedAt.current
+        setSaveState('saved')
+        setDirty(false)
+        return true
+      } catch (error) {
+        if (controller.signal.aborted) return false
+        setSaveState('error')
+        applyError(error, 'Não foi possível salvar o rascunho.')
+        return false
+      } finally {
+        if (activeAbort.current === controller) activeAbort.current = null
+      }
     }
+
+    const next = saveQueue.current.then(run)
+    saveQueue.current = next
+    return next
   }, [applyError, productId])
 
   useEffect(() => {
     if (!dirty) return
-    const timer = window.setTimeout(() => void saveDraft(draft), 700)
+    const timer = window.setTimeout(() => void enqueueSave(draft), 700)
     return () => window.clearTimeout(timer)
-  }, [dirty, draft, saveDraft])
+  }, [dirty, draft, enqueueSave])
 
-  useEffect(() => () => activeSave.current?.abort(), [])
+  useEffect(() => () => activeAbort.current?.abort(), [])
 
   function field<K extends keyof DraftState>(key: K, value: DraftState[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
@@ -199,7 +209,12 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
 
   async function publish(token?: string | null) {
     setFeedback(null)
-    activeSave.current?.abort()
+    // Publish nunca aborta um autosave em voo — ele aguarda a fila confirmar o
+    // último estado salvo (e enfileira o draft atual se ainda houver alterações
+    // pendentes) antes de publicar exatamente essa revisão.
+    const flushed = dirty ? await enqueueSave(draft) : await saveQueue.current
+    if (!flushed) return
+
     setSaveState('saving')
     try {
       const response = await fetch('/api/admin-products', {
@@ -250,7 +265,7 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
   async function legacyAction(name: 'unpublish' | 'archive' | 'restore') {
     setFeedback(null)
     if (dirty) {
-      const saved = await saveDraft(draft)
+      const saved = await enqueueSave(draft)
       if (!saved) return
     }
     try {
@@ -310,6 +325,9 @@ export function ProductDraftForm({ productId, initial, published, archived }: Pr
         {feedback ? (
           <div className="esmera-product-publication-feedback" role="status" aria-live="polite">
             <InlineFeedback tone={feedback.tone}>{feedback.message}</InlineFeedback>
+            {feedback.code === 'revision_conflict' ? (
+              <Button onClick={() => window.location.reload()}>Recarregar versão atual</Button>
+            ) : null}
             {feedback.issues?.length ? (
               <ul className="esmera-product-issues">
                 {feedback.issues.map((issue, index) => (

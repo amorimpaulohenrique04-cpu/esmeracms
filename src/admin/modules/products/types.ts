@@ -81,6 +81,7 @@ export type ProductListItem = {
 }
 
 export type ProductDetail = ProductListItem & {
+  revision?: string | null
   material?: string | null
   description?: unknown
   edition?: string | null
