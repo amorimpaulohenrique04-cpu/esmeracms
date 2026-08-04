@@ -17,6 +17,7 @@
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
     "jobs:run:operational": "pnpm payload jobs:run --cron \"* * * * *\" --queue operational --handle-schedules",
     "jobs:run:integrations": "pnpm payload jobs:run --cron \"*/5 * * * *\" --queue integrations --handle-schedules",
+    "jobs:run:publication-verification": "pnpm payload jobs:run --cron \"* * * * *\" --queue publication-verification --handle-schedules",
     "lint": "cross-env NODE_OPTIONS=--no-deprecation eslint .",
     "migrate": "pnpm payload migrate",
     "migrate:status": "pnpm payload migrate:status",
