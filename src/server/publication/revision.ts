@@ -8,6 +8,10 @@ const VOLATILE_KEYS = new Set([
   'publishedAt',
   'publicationRevision',
   'publicationContractVersion',
+  'publicationOperationalStatus',
+  'publicationVerificationStatus',
+  'publicationVerifiedAt',
+  'publicationTraceId',
 ])
 
 function canonicalValue(value: unknown): unknown {
