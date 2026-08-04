@@ -38,6 +38,7 @@ import { AfterSalesView as AfterSalesView_a04d9bbf6695b6ef28a35977cb48e1eb } fro
 import { ReportsView as ReportsView_a230f9b08237d86547f30e894ddc4104 } from '../../../admin/modules/reports/ReportsView'
 import { SettingsView as SettingsView_59dc6cc19c03fad932b5da08a3d40365 } from '../../../admin/modules/settings/SettingsView'
 import { TechnicalView as TechnicalView_6414fd31981f506c5d49d22d0a7206b3 } from '../../../admin/modules/technical/TechnicalView'
+import { HomeEditView as HomeEditView_pr09b } from '../../../admin/modules/home/HomeEditView'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -82,5 +83,6 @@ export const importMap = {
   "/admin/modules/reports/ReportsView#ReportsView": ReportsView_a230f9b08237d86547f30e894ddc4104,
   "/admin/modules/settings/SettingsView#SettingsView": SettingsView_59dc6cc19c03fad932b5da08a3d40365,
   "/admin/modules/technical/TechnicalView#TechnicalView": TechnicalView_6414fd31981f506c5d49d22d0a7206b3,
+  "/admin/modules/home/HomeEditView#HomeEditView": HomeEditView_pr09b,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }
