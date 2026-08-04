@@ -2,7 +2,13 @@ import { createHash } from 'node:crypto'
 
 import { RevisionConflictError } from './types'
 
-const VOLATILE_KEYS = new Set(['createdAt', 'updatedAt', 'publishedAt'])
+const VOLATILE_KEYS = new Set([
+  'createdAt',
+  'updatedAt',
+  'publishedAt',
+  'publicationRevision',
+  'publicationContractVersion',
+])
 
 function canonicalValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalValue)

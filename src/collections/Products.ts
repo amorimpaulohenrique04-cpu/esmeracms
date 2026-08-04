@@ -8,6 +8,7 @@ import {
   type ProductReadinessInput,
 } from '../businessRules/products/readiness'
 import { seoField, slugify } from '../fields/common'
+import { publicationMetadataFields } from '../server/publication/publicationMetadataFields'
 
 type GalleryItem = {
   mediaKey?: string | null
@@ -467,6 +468,7 @@ export const Products: CollectionConfig = {
         },
       ],
     },
+    ...publicationMetadataFields(),
     {
       name: 'publicationReady',
       type: 'checkbox',
