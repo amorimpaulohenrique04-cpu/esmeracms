@@ -1,10 +1,12 @@
+import { decorateIssues, mergeIssues } from '../../issues/build'
+import { ISSUE_CODES } from '../../issues/codes'
+import type { RawIssue } from '../../issues/types'
 import { validateStorefrontSnapshot } from '../storefront-contract/validate'
 import { createDocumentRevision } from './revision'
 import {
   PUBLICATION_ASSESSMENT_VERSION,
   STOREFRONT_CONTRACT_VERSION,
   type PublicationAssessment,
-  type PublicationIssue,
 } from './types'
 
 type CategoryDocument = {
@@ -28,54 +30,31 @@ function relationID(value: unknown): string | number | null {
   return null
 }
 
-export function assessCategoryPublication(category: CategoryDocument): PublicationAssessment {
-  const issues: PublicationIssue[] = []
+/** Decisão pura de readiness da categoria: nenhuma copy atravessa esta função. */
+export function collectCategoryReadinessIssues(category: CategoryDocument): RawIssue[] {
+  const raws: RawIssue[] = []
   const entityId = category.id ?? 'new'
 
   if (!category.title?.trim()) {
-    issues.push({
-      id: 'category.title_missing',
-      severity: 'blocker',
-      path: 'title',
-      tab: 'content',
-      anchor: 'category-title',
-      message: 'A categoria precisa de um nome.',
-      suggestion: 'Informe o nome que será exibido no catálogo.',
-      source: 'business_rule',
-    })
+    raws.push({ code: ISSUE_CODES.categoryTitleMissing, severity: 'blocker', path: 'title', source: 'readiness' })
   }
   if (!category.slug?.trim()) {
-    issues.push({
-      id: 'category.slug_missing',
-      severity: 'blocker',
-      path: 'slug',
-      tab: 'content',
-      anchor: 'category-slug',
-      message: 'A categoria precisa de um endereço válido.',
-      suggestion: 'Revise o endereço gerado automaticamente.',
-      source: 'business_rule',
-    })
-  }
-  const parentID = relationID(category.parent)
-  if (parentID !== null && String(parentID) === String(entityId)) {
-    issues.push({
-      id: 'category.parent_cycle',
-      severity: 'blocker',
-      path: 'parent',
-      tab: 'content',
-      anchor: 'category-parent',
-      message: 'A categoria não pode ser principal de si mesma.',
-      suggestion: 'Escolha outra categoria principal ou deixe o campo vazio.',
-      source: 'business_rule',
-    })
+    raws.push({ code: ISSUE_CODES.categorySlugMissing, severity: 'blocker', path: 'slug', source: 'readiness' })
   }
 
-  const storefrontValidation = validateStorefrontSnapshot('category', category)
-  const known = new Set(issues.map((entry) => `${entry.path}|${entry.message}`))
-  for (const storefrontIssue of storefrontValidation.issues) {
-    const key = `${storefrontIssue.path}|${storefrontIssue.message}`
-    if (!known.has(key)) issues.push(storefrontIssue)
+  const parentID = relationID(category.parent)
+  if (parentID !== null && String(parentID) === String(entityId)) {
+    raws.push({ code: ISSUE_CODES.categoryParentSelfReference, severity: 'blocker', path: 'parent', source: 'readiness' })
   }
+
+  return raws
+}
+
+export function assessCategoryPublication(category: CategoryDocument): PublicationAssessment {
+  const entityId = category.id ?? 'new'
+  const readinessIssues = decorateIssues(collectCategoryReadinessIssues(category), 'category')
+  const storefrontValidation = validateStorefrontSnapshot('category', category)
+  const issues = mergeIssues(readinessIssues, storefrontValidation.issues)
 
   return {
     version: PUBLICATION_ASSESSMENT_VERSION,

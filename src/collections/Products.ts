@@ -43,12 +43,14 @@ function validateGallery(value: unknown, { siblingData }: { siblingData?: Produc
   return true
 }
 
+// O `validate` de campo do Payload espera uma string legível ou `true`; a decisão
+// continua vindo das issues estruturadas, só a mensagem é extraída aqui.
 function validateOptionDefinitions(value: unknown) {
-  return getOptionDefinitionIssues(value)[0] || true
+  return getOptionDefinitionIssues(value)[0]?.message ?? true
 }
 
 function validateVariants(value: unknown, { siblingData }: { siblingData?: ProductSiblingData }) {
-  return getVariantIssues({ ...(siblingData || {}), variants: Array.isArray(value) ? value as VariantItem[] : [] })[0] || true
+  return getVariantIssues({ ...(siblingData || {}), variants: Array.isArray(value) ? value as VariantItem[] : [] })[0]?.message ?? true
 }
 
 export const Products: CollectionConfig = {
@@ -118,7 +120,10 @@ export const Products: CollectionConfig = {
         const product = { ...(originalDoc || {}), ...data } as ProductReadinessInput
         const readiness = getProductReadiness(product)
         data.publicationReady = readiness.ready
-        data.publicationIssues = readiness.issues.map((message) => ({ message }))
+        // O campo persistido tem um único subcampo `message` e continua assim: a
+        // PR-06 não altera schema. A estrutura completa da issue segue disponível
+        // via assessment para quem precisa de code/path/aba.
+        data.publicationIssues = readiness.issues.map((issue) => ({ message: issue.message }))
 
         const skus = (product.variants || []).map((variant) => variant.sku).filter(Boolean) as string[]
         if (skus.length) {
@@ -144,11 +149,13 @@ export const Products: CollectionConfig = {
         }
 
         if (product._status === 'published' && !readiness.ready) {
+          // Cada pendência aponta para o campo real (`variants.0.sku`,
+          // `gallery.1.alt`), em vez de colapsar tudo em `publicationIssues`.
           throw new ValidationError({
             collection: 'products',
             id: id ?? undefined,
             req,
-            errors: readiness.issues.map((message) => ({ path: 'publicationIssues', message })),
+            errors: readiness.issues.map((issue) => ({ path: issue.path, message: issue.message })),
           })
         }
         return data

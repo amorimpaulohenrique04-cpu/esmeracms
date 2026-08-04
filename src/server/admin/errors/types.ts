@@ -1,34 +1,34 @@
+import type { EditorialFieldLocation } from '../../../issues/registry'
+import type { IssueSeverity, PublicationIssue } from '../../../issues/types'
+
+export type { IssueSeverity, PublicationIssue }
+
 export const ADMIN_ERROR_VERSION = '1' as const
 
+/**
+ * Códigos de erro administrativo (PR-06, §4.3 do plano do CMS).
+ *
+ * O plano define sete; `invalid_request` e `unauthenticated` são a extensão mínima
+ * aprovada, porque o mesmo §4.3 exige HTTP 400 e 401 e nenhum dos sete os
+ * representa. `unauthenticated` (e não `unauthorized`) para não confundir ausência
+ * de autenticação com falta de permissão — `forbidden` fica exclusivo do 403.
+ *
+ * A relação código ↔ status é exclusiva e vive em `httpStatusByCode`
+ * (`./serialize`); não existe caminho que produza um status fora dessa tabela.
+ */
 export const adminErrorCodes = [
   'invalid_request',
-  'validation_failed',
-  'publication_blocked',
-  'revision_conflict',
-  'unauthorized',
+  'unauthenticated',
   'forbidden',
   'not_found',
-  'duplicate',
-  'mutation_rollback',
-  'job_failed',
-  'integration_unconfigured',
-  'integration_unavailable',
-  'query_error',
-  'unknown',
+  'revision_conflict',
+  'validation_error',
+  'publication_blocked',
+  'verification_failed',
+  'internal_error',
 ] as const
 
 export type AdminErrorCode = (typeof adminErrorCodes)[number]
-export type IssueSeverity = 'blocker' | 'warning' | 'recommendation'
-
-export type FieldError = {
-  path: string
-  tab?: string | null
-  anchor?: string | null
-  code?: string | null
-  message: string
-  suggestion?: string | null
-  severity?: IssueSeverity
-}
 
 export type EntityError = {
   code: string
@@ -37,17 +37,29 @@ export type EntityError = {
   related?: Array<Record<string, unknown>>
 }
 
+/**
+ * Corpo do erro na rede.
+ *
+ * As seis primeiras chaves são exatamente o `AdminErrorResponse` do plano. As
+ * demais são aditivas e preservam consumidores atuais do admin (`version`,
+ * `detail`, `entityErrors`, `meta`), mantidas porque a PR-06 não altera a UI.
+ */
 export type AdminError = {
-  version: typeof ADMIN_ERROR_VERSION
   code: AdminErrorCode
   summary: string
-  detail?: string | null
+  message: string
+  fieldErrors: PublicationIssue[]
+  traceId: string
   retryable: boolean
-  traceId?: string | null
-  fieldErrors: FieldError[]
+
+  version: typeof ADMIN_ERROR_VERSION
+  detail?: string | null
   entityErrors: EntityError[]
   meta?: Record<string, unknown>
 }
+
+/** Alias com o nome usado no plano; a forma é a mesma de `AdminError`. */
+export type AdminErrorResponse = AdminError
 
 export type AdminErrorEnvelope = {
   ok: false
@@ -89,7 +101,7 @@ export type AdminActionResult<TMeta extends Record<string, unknown> = Record<str
 export type AdminErrorContext = {
   entity?: string
   operation?: string
-  fieldRegistry?: Record<string, { tab?: string; anchor?: string; suggestion?: string }>
+  fieldRegistry?: Record<string, EditorialFieldLocation>
   logger?: {
     error: (data: unknown, message?: string) => void
   }
