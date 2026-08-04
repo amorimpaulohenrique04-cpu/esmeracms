@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 
 import { coordinatePublication, type PublicationCoordinatorResult } from './coordinator'
+import { createPayloadPublicationRuntime } from './payloadPublicationRuntime'
 import { assessProductPublication } from './productAssessment'
 import { createPublicPublicationMetadata } from './publicRevision'
 import {
@@ -12,6 +13,8 @@ import {
 } from './types'
 
 export const BULK_PUBLICATION_LIMIT = 25
+
+type PublicDocument = Record<string, unknown>
 
 export type BulkPublicationItemInput = {
   id: string | number
@@ -49,6 +52,14 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
+const resultMessages = {
+  published: 'Visível no site.',
+  published_but_unverified: 'Publicado; confirmação do site pendente.',
+  published_but_incompatible: 'Publicado com problema de compatibilidade.',
+  publish_reverted: 'Publicação desfeita; versão anterior preservada.',
+  failed: 'Não foi possível concluir a publicação.',
+} as const
+
 export function mapCoordinatorOutcome(
   outcome: CoordinatorOutcome,
   context: OutcomeContext,
@@ -67,15 +78,36 @@ export function mapCoordinatorOutcome(
         updatedAt: context.updatedAt,
         issues: issuesOfSeverity(result.assessment?.issues, 'warning'),
         confirmationToken: result.confirmationToken,
+        traceId: result.traceId,
       }
     }
 
+    const status = result.status === 'published' ||
+        result.status === 'published_but_unverified' ||
+        result.status === 'published_but_incompatible' ||
+        result.status === 'publish_reverted'
+      ? result.status
+      : 'failed'
+
     return {
       ...base,
-      status: 'published',
-      message: 'Produto publicado.',
+      status,
+      message: resultMessages[status],
       revision: result.revision,
+      publicationRevision: result.publicationRevision,
+      traceId: result.traceId,
+      retryable: result.retryable,
       updatedAt: documentUpdatedAt(result.document) || context.updatedAt,
+      issues: status === 'published_but_incompatible'
+        ? result.verification?.issues?.map((issue) => ({
+          id: issue.code,
+          severity: 'blocker',
+          path: issue.path || null,
+          message: issue.message,
+          suggestion: null,
+          source: 'storefront_contract',
+        }))
+        : undefined,
     }
   }
 
@@ -112,10 +144,10 @@ async function publishSingleProduct(
   user: PayloadRequest['user'],
   item: BulkPublicationItemInput,
 ): Promise<BulkPublicationItemResult> {
-  let lastCurrent: unknown = null
-  let lastDraft: unknown = null
+  let lastCurrent: PublicDocument | null = null
+  let lastDraft: PublicDocument | null = null
 
-  const read = (req?: PayloadRequest) => payload.findByID({
+  const read = async (req?: PayloadRequest): Promise<PublicDocument> => await payload.findByID({
     collection: 'products',
     id: item.id,
     draft: true,
@@ -123,21 +155,33 @@ async function publishSingleProduct(
     overrideAccess: false,
     user,
     req,
-  })
+  }) as unknown as PublicDocument
 
   try {
-    const result = await coordinatePublication({
+    const runtime = createPayloadPublicationRuntime({
+      payload,
+      user,
+      entity: 'product',
+      collection: 'products',
+      id: item.id,
+      source: 'bulk',
+    })
+    const result = await coordinatePublication<PublicDocument, Record<string, unknown>>({
       entity: 'product',
       entityId: item.id,
+      actorId: runtime.actorId,
+      source: runtime.source,
       data: { _status: 'draft' },
       expectedRevision: item.expectedRevision,
       expectedUpdatedAt: item.expectedUpdatedAt,
       confirmationToken: item.confirmationToken,
+      verificationConfig: runtime.verificationConfig,
       readCurrent: async () => {
         lastCurrent = await read()
         return lastCurrent
       },
-      saveDraft: (data) => payload.update({
+      readPublishedBefore: runtime.readPublishedBefore,
+      saveDraft: async (data) => await payload.update({
         collection: 'products',
         id: item.id,
         data: data as never,
@@ -145,19 +189,19 @@ async function publishSingleProduct(
         depth: 2,
         overrideAccess: false,
         user,
-      }),
+      }) as unknown as PublicDocument,
       readDraft: async () => {
         lastDraft = await read()
         return lastDraft
       },
       assess: (document) => assessProductPublication(document as never),
-      publish: (snapshot) => {
+      publish: async (snapshot) => {
         const publicSnapshot = {
           ...(snapshot as Record<string, unknown>),
           _status: 'published',
         }
         const metadata = createPublicPublicationMetadata('product', publicSnapshot)
-        return payload.update({
+        return await payload.update({
           collection: 'products',
           id: item.id,
           data: {
@@ -169,8 +213,18 @@ async function publishSingleProduct(
           depth: 2,
           overrideAccess: true,
           user,
-        })
+          context: {
+            skipPublicRevisionStamp: true,
+            skipPublicationVerification: true,
+          },
+        }) as unknown as PublicDocument
       },
+      extractPublicMetadata: runtime.extractPublicMetadata,
+      verify: runtime.verify,
+      persistOperationalState: runtime.persistOperationalState,
+      attemptRollback: runtime.attemptRollback,
+      createReceipt: runtime.createReceipt,
+      scheduleRecheck: runtime.scheduleRecheck,
     })
 
     return mapCoordinatorOutcome({ ok: true, result }, {
@@ -210,6 +264,9 @@ export async function publishProductsInBulk(
   return {
     requested: items.length,
     published: results.filter((result) => result.status === 'published').length,
+    unverified: results.filter((result) => result.status === 'published_but_unverified').length,
+    incompatible: results.filter((result) => result.status === 'published_but_incompatible').length,
+    reverted: results.filter((result) => result.status === 'publish_reverted').length,
     blocked: results.filter((result) => result.status === 'blocked').length,
     conflicts: results.filter((result) => result.status === 'revision_conflict').length,
     failed: results.filter((result) => result.status === 'failed').length,
