@@ -13,13 +13,15 @@ import {
   type EntityError,
 } from './types'
 
-function traceID(): string {
+export function newTraceId(): string {
   try {
     return crypto.randomUUID()
   } catch {
     return `trace_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
   }
 }
+
+const traceID = newTraceId
 
 export function adminActionResponse<TMeta extends Record<string, unknown> = Record<string, unknown>>(
   status: AdminActionStatus,

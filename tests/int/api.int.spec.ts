@@ -273,8 +273,10 @@ describe('Esméra access and data contract', () => {
         { sku: 'SKU-1', status: 'enabled', priceMode: 'inherit', selection: [{ option: 'cor', value: 'azul' }] },
       ],
     })
-    expect(variantIssues.some((issue) => issue.includes('repetido'))).toBe(true)
-    expect(variantIssues.some((issue) => issue.includes('inexistente'))).toBe(true)
+    // Antes: `issue.includes('repetido')` / `.includes('inexistente')`. A asserção
+    // por substring quebrava a qualquer ajuste de copy — agora é pelo código.
+    expect(variantIssues.some((issue) => issue.code === 'product.variant.sku_duplicated')).toBe(true)
+    expect(variantIssues.some((issue) => issue.code === 'product.variant.value_unknown')).toBe(true)
   })
 
   it('persists readiness and enforces globally unique variant SKUs', async () => {

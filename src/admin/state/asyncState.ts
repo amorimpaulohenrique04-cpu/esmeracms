@@ -1,29 +1,29 @@
+// Espelho dos 9 códigos do servidor (src/server/admin/errors/types.ts), mais
+// `query_error` e `unknown`, que só existem no cliente e nunca cruzam a rede.
 export const adminErrorCodes = [
   'invalid_request',
-  'validation_failed',
-  'publication_blocked',
-  'revision_conflict',
-  'query_error',
-  'unauthorized',
+  'unauthenticated',
   'forbidden',
   'not_found',
-  'conflict',
-  'duplicate',
-  'mutation_rollback',
-  'job_failed',
-  'integration_unconfigured',
-  'integration_unavailable',
+  'revision_conflict',
+  'validation_error',
+  'publication_blocked',
+  'verification_failed',
+  'internal_error',
+  'query_error',
   'unknown',
 ] as const
 
 export type AdminErrorCode = (typeof adminErrorCodes)[number]
-export type AdminIssueSeverity = 'blocker' | 'warning' | 'recommendation'
+export type AdminIssueSeverity = 'blocker' | 'warning' | 'info'
 
 export type AdminFieldError = {
   path: string
   tab?: string | null
   anchor?: string | null
   code?: string | null
+  label?: string | null
+  source?: string | null
   message: string
   suggestion?: string | null
   severity?: AdminIssueSeverity
@@ -64,12 +64,13 @@ export type AdminRequestErrorInput = {
 
 const statusCodes: Record<number, AdminErrorCode> = {
   400: 'invalid_request',
-  401: 'unauthorized',
+  401: 'unauthenticated',
   403: 'forbidden',
   404: 'not_found',
   409: 'revision_conflict',
-  422: 'validation_failed',
-  503: 'integration_unavailable',
+  422: 'validation_error',
+  500: 'internal_error',
+  503: 'verification_failed',
 }
 
 const knownCodes = new Set<string>(adminErrorCodes)
@@ -119,7 +120,9 @@ function fieldErrors(value: unknown): AdminFieldError[] {
       anchor: typeof entry?.anchor === 'string' ? entry.anchor : null,
       code: typeof entry?.code === 'string' ? entry.code : null,
       suggestion: typeof entry?.suggestion === 'string' ? entry.suggestion : null,
-      severity: entry?.severity === 'warning' || entry?.severity === 'recommendation'
+      label: typeof entry?.label === 'string' ? entry.label : null,
+      source: typeof entry?.source === 'string' ? entry.source : null,
+      severity: entry?.severity === 'warning' || entry?.severity === 'info'
         ? entry.severity
         : 'blocker',
     }]
@@ -224,7 +227,7 @@ export async function expectAdminResponse<T>(response: Response, fallback: strin
     status: response.status,
     retryable: typeof structuredError?.retryable === 'boolean'
       ? structuredError.retryable
-      : response.status >= 500 || response.status === 408 || response.status === 429 || code === 'job_failed' || code === 'mutation_rollback',
+      : response.status >= 500 || response.status === 408 || response.status === 429,
     detail: typeof structuredError?.detail === 'string'
       ? structuredError.detail
       : typeof legacyRecord?.detail === 'string'

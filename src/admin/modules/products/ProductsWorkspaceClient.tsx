@@ -10,7 +10,7 @@ import {
 } from '@tanstack/react-table'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   BulkActionBar,
@@ -24,6 +24,13 @@ import {
   SegmentedControlLink,
   SplitWorkspace,
 } from '../../design-system'
+// Contrato real do lote (PR-06). Importado como tipo: nada do runtime do
+// servidor entra no bundle do cliente, e o painel não redeclara o contrato.
+import type {
+  BulkPublicationItemResult,
+  BulkPublicationItemStatus,
+  BulkPublicationResult,
+} from '../../../server/publication/types'
 import {
   availabilityLabels,
   coverItem,
@@ -45,45 +52,126 @@ type WorkspaceProps = {
 // items[] com token de concorrência por produto, não ids[].
 type MutationAction = 'unpublish' | 'archive' | 'restore' | 'add-category' | 'set-availability'
 
-type BulkItemStatus =
-  | 'published'
-  | 'blocked'
-  | 'warning_requires_confirmation'
-  | 'revision_conflict'
-  | 'failed'
-
-type BulkItemResult = {
-  id: string | number
-  title?: string
-  status: BulkItemStatus
-  message: string
-  revision?: string
-  updatedAt?: string
-  issues?: Array<{ message: string; suggestion?: string | null }>
-  confirmationToken?: string
-}
-
-type BulkResult = {
-  requested: number
-  published: number
-  blocked: number
-  conflicts: number
-  failed: number
-  results: BulkItemResult[]
-}
-
 type PublishItemRequest = {
   id: string | number
   expectedUpdatedAt: string
   confirmationToken?: string
 }
 
-const bulkStatusLabels: Record<BulkItemStatus, string> = {
+// Ordem de leitura do painel: o que deu certo primeiro, depois o que exige
+// ação. As chaves são exatamente os status do contrato — nenhum status novo.
+const bulkStatusOrder: BulkPublicationItemStatus[] = [
+  'published',
+  'warning_requires_confirmation',
+  'blocked',
+  'revision_conflict',
+  'failed',
+]
+
+const bulkStatusLabels: Record<BulkPublicationItemStatus, string> = {
   published: 'Publicado',
   blocked: 'Pendências impedem publicar',
   warning_requires_confirmation: 'Avisos aguardando confirmação',
   revision_conflict: 'Alterado em outra sessão',
   failed: 'Não foi possível publicar',
+}
+
+/** Único estado de sucesso definitivo do contrato do lote. */
+function isBulkSettled(item: BulkPublicationItemResult) {
+  return item.status === 'published'
+}
+
+/**
+ * Única nova tentativa que o contrato autoriza explicitamente.
+ *
+ * `BulkPublicationItemResult` não expõe `retryable` — essa indicação vive no
+ * envelope de erro (`AdminError.retryable`), não por item. Portanto o painel
+ * não infere retry: o handshake de confirmação de avisos é a única repetição
+ * que o contrato descreve, e ele exige o `confirmationToken` emitido pelo
+ * servidor para aquele item. `updatedAt` entra apenas como o token de
+ * concorrência que o próprio handshake pede, nunca como sinal de "pode tentar
+ * de novo": nenhum outro status recebe ação de reenvio.
+ */
+function confirmationRequestFor(item: BulkPublicationItemResult): PublishItemRequest | null {
+  if (item.status !== 'warning_requires_confirmation') return null
+  if (!item.confirmationToken || !item.updatedAt) return null
+  return {
+    id: item.id,
+    expectedUpdatedAt: item.updatedAt,
+    confirmationToken: item.confirmationToken,
+  }
+}
+
+/**
+ * Funde o retorno de uma nova tentativa ao resultado já exibido: os itens já
+ * concluídos continuam visíveis e os contadores voltam a bater com a lista.
+ * A forma devolvida é a do próprio contrato.
+ */
+function mergeBulkResults(
+  previous: BulkPublicationResult | null,
+  next: BulkPublicationResult,
+): BulkPublicationResult {
+  if (!previous) return next
+  const byId = new Map(previous.results.map((item) => [String(item.id), item]))
+  for (const item of next.results) byId.set(String(item.id), item)
+  const results = [...byId.values()]
+  const count = (status: BulkPublicationItemStatus) => results.filter((item) => item.status === status).length
+  return {
+    requested: results.length,
+    published: count('published'),
+    blocked: count('blocked'),
+    conflicts: count('revision_conflict'),
+    failed: count('failed'),
+    results,
+  }
+}
+
+function bulkReportPayload(result: BulkPublicationResult) {
+  return {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      requested: result.requested,
+      published: result.published,
+      blocked: result.blocked,
+      conflicts: result.conflicts,
+      failed: result.failed,
+    },
+    // Só o que não terminou em sucesso definitivo entra no relatório.
+    items: result.results.filter((item) => !isBulkSettled(item)).map((item) => ({
+      id: item.id,
+      title: item.title || `Produto ${item.id}`,
+      status: item.status,
+      statusLabel: bulkStatusLabels[item.status],
+      message: item.message,
+      canConfirm: confirmationRequestFor(item) !== null,
+      issues: (item.issues || []).map((issue) => ({
+        label: issue.label,
+        tab: issue.tab,
+        message: issue.message,
+        suggestion: issue.suggestion ?? null,
+      })),
+    })),
+  }
+}
+
+function bulkReportText(result: BulkPublicationResult) {
+  const payload = bulkReportPayload(result)
+  const lines = [
+    'Relatório de publicação em lote',
+    `Solicitados: ${payload.summary.requested} · Publicados: ${payload.summary.published} · Bloqueados: ${payload.summary.blocked} · Conflitos: ${payload.summary.conflicts} · Falhas: ${payload.summary.failed}`,
+    '',
+  ]
+  for (const item of payload.items) {
+    lines.push(`${item.title} (ID ${item.id})`)
+    lines.push(`Status: ${item.statusLabel}`)
+    lines.push(`Mensagem: ${item.message}`)
+    lines.push(`Nova tentativa: ${item.canConfirm ? 'disponível (confirmação de avisos)' : 'indisponível'}`)
+    for (const issue of item.issues) {
+      lines.push(`- ${issue.label} (${issue.tab}): ${issue.message}${issue.suggestion ? ` — ${issue.suggestion}` : ''}`)
+    }
+    lines.push('')
+  }
+  return lines.join('\n').trim()
 }
 
 function money(cents: number | null | undefined) {
@@ -179,13 +267,24 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
   const [selection, setSelection] = useState<RowSelectionState>({})
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
-  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null)
+  const bulkPanel = useRef<HTMLElement | null>(null)
+  const [bulkResult, setBulkResult] = useState<BulkPublicationResult | null>(null)
+  const [bulkAnnouncement, setBulkAnnouncement] = useState('')
+  const [bulkFocusToken, setBulkFocusToken] = useState(0)
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState('')
   const [bulkAvailability, setBulkAvailability] = useState('')
   const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     return new URLSearchParams(window.location.search).get('inspect')
   })
+
+  // O foco só se move quando há algo a resolver; o token evita mover o foco de
+  // novo quando o painel apenas rerenderiza.
+  useEffect(() => {
+    if (!bulkFocusToken) return
+    bulkPanel.current?.focus()
+  }, [bulkFocusToken])
 
   const openInspector = (id: string | number, trigger: HTMLButtonElement) => {
     inspectorTrigger.current = trigger
@@ -263,20 +362,32 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
       })
       const body = await response.json() as {
         ok?: boolean
-        result?: { meta?: BulkResult }
+        result?: { meta?: BulkPublicationResult }
         error?: { summary?: string }
       }
       if (!response.ok || !body.result?.meta) {
         throw new Error(body.error?.summary || 'Não foi possível publicar os produtos.')
       }
 
-      const result = body.result.meta
+      // Uma nova tentativa devolve só os itens reenviados: fundir preserva os
+      // que já foram concluídos em tentativas anteriores.
+      const result = mergeBulkResults(bulkResult, body.result.meta)
       setBulkResult(result)
+      setReportFeedback(null)
+
+      if (result.results.some((item) => !isBulkSettled(item))) {
+        // O anúncio vem do foco no painel nomeado. Escrever também na região
+        // live faria o leitor de tela ler o mesmo resultado duas vezes.
+        setBulkAnnouncement('')
+        setBulkFocusToken((token) => token + 1)
+      } else {
+        setBulkAnnouncement(`${result.published} de ${result.requested} produto(s) publicados.`)
+      }
 
       // Só os publicados saem da seleção. Bloqueados, conflitos, falhas e
       // itens aguardando confirmação permanecem selecionados para retry.
       const publishedIds = new Set(
-        result.results.filter((item) => item.status === 'published').map((item) => String(item.id)),
+        result.results.filter(isBulkSettled).map((item) => String(item.id)),
       )
       setSelection((current) => Object.fromEntries(
         Object.entries(current).filter(([id, selected]) => selected && !publishedIds.has(id)),
@@ -289,12 +400,48 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     }
   }
 
-  // Reenvia apenas os itens em aviso, usando o updatedAt devolvido pelo
-  // servidor — o updatedAt original da linha já está vencido, porque o
-  // coordenador gravou o rascunho antes de pedir a confirmação.
-  const pendingConfirmation = (bulkResult?.results || []).filter(
-    (item) => item.status === 'warning_requires_confirmation' && item.confirmationToken && item.updatedAt,
-  )
+  const unsettled = (bulkResult?.results || []).filter((item) => !isBulkSettled(item))
+
+  const dismissBulkResult = () => {
+    setBulkResult(null)
+    setBulkAnnouncement('')
+    setReportFeedback(null)
+  }
+
+  // O texto vai para a região live e para o painel: só a região live anuncia,
+  // então o leitor de tela recebe o retorno uma única vez.
+  const announceReport = (message: string) => {
+    setReportFeedback(message)
+    setBulkAnnouncement(message)
+  }
+
+  async function copyReport() {
+    if (!bulkResult) return
+    try {
+      await navigator.clipboard.writeText(bulkReportText(bulkResult))
+      announceReport('Relatório copiado para a área de transferência.')
+    } catch {
+      announceReport('Não foi possível copiar o relatório.')
+    }
+  }
+
+  function exportReport() {
+    if (!bulkResult) return
+    try {
+      const blob = new Blob([JSON.stringify(bulkReportPayload(bulkResult), null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `publicacao-em-lote-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      announceReport('Relatório exportado.')
+    } catch {
+      announceReport('Não foi possível exportar o relatório.')
+    }
+  }
 
   async function mutate(action: MutationAction) {
     if (!selectedIds.length || busy) return
@@ -363,56 +510,86 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
     {feedback ? <InlineFeedback busy={busy} tone={feedback.includes('não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
 
+    {/* Região live sempre montada: só recebe texto quando o foco NÃO se move. */}
+    <p className="esmera-sr-only" role="status" aria-live="polite">{bulkAnnouncement}</p>
+
     {bulkResult ? (
-      <section className="esmera-products-bulk-result" aria-label="Resultado da publicação em lote">
+      <section
+        className="esmera-products-bulk-result"
+        role="region"
+        aria-labelledby="esmera-bulk-result-title"
+        tabIndex={-1}
+        ref={bulkPanel}
+      >
         <div className="esmera-products-bulk-result__header">
-          <InlineFeedback tone={bulkResult.published === bulkResult.requested ? 'success' : 'warning'}>
-            {bulkResult.published} de {bulkResult.requested} produto(s) publicados.
-          </InlineFeedback>
-          <button className="esmera-icon-button" type="button" onClick={() => setBulkResult(null)} aria-label="Fechar resultado da publicação">×</button>
+          <div>
+            <strong id="esmera-bulk-result-title">Resultado da publicação em lote</strong>
+            <p className="esmera-products-bulk-result__status">
+              {bulkResult.requested} solicitado(s) · {bulkResult.published} publicado(s) · {bulkResult.blocked} bloqueado(s) · {bulkResult.conflicts} conflito(s) · {bulkResult.failed} falha(s)
+            </p>
+          </div>
+          <button className="esmera-icon-button" type="button" onClick={dismissBulkResult} aria-label="Fechar resultado da publicação">×</button>
         </div>
 
-        <ul className="esmera-products-bulk-result__list">
-          {bulkResult.results.filter((item) => item.status !== 'published').map((item) => (
-            <li key={String(item.id)}>
-              <div>
-                <strong>{item.title || `Produto ${item.id}`}</strong>
-                <span className="esmera-products-bulk-result__status">{bulkStatusLabels[item.status]}</span>
-                <p>{item.message}</p>
-                {item.issues?.length ? (
-                  <ul className="esmera-product-issues">
-                    {item.issues.map((issue, index) => (
-                      <li key={`${item.id}-issue-${index}`}>
-                        {issue.message}
-                        {issue.suggestion ? <small>{issue.suggestion}</small> : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-              <div className="esmera-actions">
-                <Link className="esmera-button" href={productHref(filters, item.id)}>Abrir produto</Link>
-                {item.status === 'revision_conflict' ? <Button onClick={() => router.refresh()}>Recarregar lista</Button> : null}
-              </div>
-            </li>
-          ))}
-        </ul>
+        {bulkStatusOrder.map((status) => {
+          const group = bulkResult.results.filter((item) => item.status === status)
+          if (!group.length) return null
+          return (
+            <section key={status} className="esmera-products-bulk-result__group" aria-labelledby={`esmera-bulk-group-${status}`}>
+              <strong id={`esmera-bulk-group-${status}`}>{bulkStatusLabels[status]} ({group.length})</strong>
+              <ul className="esmera-products-bulk-result__list">
+                {group.map((item) => {
+                  const confirmation = confirmationRequestFor(item)
+                  return (
+                    <li key={String(item.id)} data-status={item.status} data-can-confirm={confirmation ? 'true' : 'false'}>
+                      <div>
+                        <strong>{item.title || `Produto ${item.id}`}</strong>
+                        <span className="esmera-products-bulk-result__status">{bulkStatusLabels[item.status]}</span>
+                        <p>{item.message}</p>
+                        {item.issues?.length ? (
+                          <ul className="esmera-product-issues">
+                            {item.issues.map((issue, index) => (
+                              <li key={`${item.id}-${issue.code}-${index}`}>
+                                <strong>{issue.label}</strong>
+                                {issue.tab ? <span className="esmera-products-bulk-result__status">{issue.tab}</span> : null}
+                                <p>{issue.message}</p>
+                                {issue.suggestion ? <small>{issue.suggestion}</small> : null}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                      {/* Cada status recebe só a ação que o contrato e os
+                          mecanismos atuais do workspace já sustentam. `failed`
+                          não tem nenhuma: o contrato não descreve repetição
+                          segura para ele. */}
+                      <div className="esmera-actions">
+                        {item.status === 'blocked' ? (
+                          <Link className="esmera-button" href={productHref(filters, item.id)}>Corrigir produto</Link>
+                        ) : null}
+                        {item.status === 'published' ? (
+                          <Link className="esmera-button" href={productHref(filters, item.id)}>Abrir produto</Link>
+                        ) : null}
+                        {item.status === 'revision_conflict' ? <Button onClick={() => router.refresh()}>Recarregar</Button> : null}
+                        {confirmation ? (
+                          <Button disabled={busy} onClick={() => void publishSelected([confirmation])}>
+                            Confirmar avisos e publicar
+                          </Button>
+                        ) : null}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )
+        })}
 
-        {pendingConfirmation.length ? (
-          <div className="esmera-actions">
-            <Button
-              tone="primary"
-              disabled={busy}
-              onClick={() => void publishSelected(pendingConfirmation.map((item) => ({
-                id: item.id,
-                expectedUpdatedAt: item.updatedAt as string,
-                confirmationToken: item.confirmationToken,
-              })))}
-            >
-              Confirmar avisos e publicar ({pendingConfirmation.length})
-            </Button>
-          </div>
-        ) : null}
+        <div className="esmera-actions">
+          <Button disabled={!unsettled.length} onClick={() => void copyReport()}>Copiar relatório</Button>
+          <Button disabled={!unsettled.length} onClick={exportReport}>Exportar relatório</Button>
+        </div>
+        {reportFeedback ? <p className="esmera-products-bulk-result__status">{reportFeedback}</p> : null}
       </section>
     ) : null}
 

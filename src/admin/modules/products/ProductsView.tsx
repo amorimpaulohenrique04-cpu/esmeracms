@@ -95,7 +95,9 @@ async function productDetail(props: AdminViewServerProps, id: string) {
   return {
     ...product,
     publicationReady: assessment.ready,
-    publicationIssues: assessment.issues.map(({ message }) => ({ message })),
+    // Cópia estrutural do array, sem tocar nos itens: o checklist do editor
+    // precisa de severity, path, tab, anchor, label e suggestion.
+    publicationIssues: [...assessment.issues],
     revision,
   }
 }
