@@ -7,6 +7,7 @@ import { adminActionResponse, adminErrorResponse, adminInputError } from '../../
 import { assessCategoryPublication } from '../../../../server/publication/categoryAssessment'
 import { coordinatePublication } from '../../../../server/publication/coordinator'
 import { withSerializableTransaction } from '../../../../server/publication/concurrency'
+import { createPayloadPublicationRuntime } from '../../../../server/publication/payloadPublicationRuntime'
 import { createPublicPublicationMetadata } from '../../../../server/publication/publicRevision'
 import { assertExpectedDocumentRevision, createDocumentRevision } from '../../../../server/publication/revision'
 import { stampPublishedDocumentMetadata } from '../../../../server/publication/stampPublicationMetadata'
@@ -81,6 +82,15 @@ function updatedAt(document: unknown): string | null {
   return document && typeof document === 'object' && 'updatedAt' in document && typeof document.updatedAt === 'string'
     ? document.updatedAt
     : null
+}
+
+function publicationMessage(status: string) {
+  if (status === 'requires_confirmation') return 'Revise e confirme os avisos antes de publicar.'
+  if (status === 'published') return 'Visível no site.'
+  if (status === 'published_but_unverified') return 'Publicado; confirmação do site pendente.'
+  if (status === 'published_but_incompatible') return 'Publicado com problema de compatibilidade.'
+  if (status === 'publish_reverted') return 'Publicação desfeita; versão anterior preservada.'
+  return 'Não foi possível concluir a publicação.'
 }
 
 async function activePublishedProductCount(payload: Awaited<ReturnType<typeof getPayload>>, user: unknown, categoryId: string | number) {
@@ -215,13 +225,24 @@ export async function POST(request: Request) {
   if (body.action === 'save-and-publish' || body.action === 'publish') {
     if (body.id === undefined || body.id === null) return adminInputError('Categoria não informada.')
     try {
+      const runtime = createPayloadPublicationRuntime({
+        payload,
+        user,
+        entity: 'category',
+        collection: 'categories',
+        id: body.id,
+        source: 'individual',
+      })
       const result = await coordinatePublication({
         entity: 'category',
         entityId: body.id,
+        actorId: runtime.actorId,
+        source: runtime.source,
         data: categoryDraftData(body.data),
         expectedRevision: body.expectedRevision,
         expectedUpdatedAt: body.expectedUpdatedAt,
         confirmationToken: body.confirmationToken,
+        verificationConfig: runtime.verificationConfig,
         readCurrent: () => payload.findByID({
           collection: 'categories',
           id: body.id as string | number,
@@ -230,6 +251,7 @@ export async function POST(request: Request) {
           overrideAccess: false,
           user,
         }),
+        readPublishedBefore: runtime.readPublishedBefore,
         saveDraft: (data) => payload.update({
           collection: 'categories',
           id: body.id as string | number,
@@ -266,20 +288,33 @@ export async function POST(request: Request) {
             depth: 2,
             overrideAccess: true,
             user,
+            context: {
+              skipPublicRevisionStamp: true,
+              skipPublicationVerification: true,
+            },
           })
         },
+        extractPublicMetadata: runtime.extractPublicMetadata,
+        verify: runtime.verify,
+        persistOperationalState: runtime.persistOperationalState,
+        attemptRollback: runtime.attemptRollback,
+        createReceipt: runtime.createReceipt,
+        scheduleRecheck: runtime.scheduleRecheck,
       })
 
       return adminActionResponse(result.status, {
         entityId: result.entityId,
         revision: result.revision,
         assessment: result.assessment,
-        message: result.status === 'requires_confirmation'
-          ? 'Revise e confirme os avisos antes de publicar.'
-          : 'Categoria publicada.',
+        message: publicationMessage(result.status),
         meta: {
           confirmationToken: result.confirmationToken,
           updatedAt: updatedAt(result.document),
+          publicationRevision: result.publicationRevision,
+          verification: result.verification,
+          retryable: result.retryable,
+          traceId: result.traceId,
+          rollback: result.rollback,
         },
       })
     } catch (error) {
@@ -315,11 +350,21 @@ export async function POST(request: Request) {
       const document = await payload.update({
         collection: 'categories',
         id: body.id,
-        data: { _status: 'draft' } as never,
+        data: {
+          _status: 'draft',
+          publicationOperationalStatus: 'draft',
+          publicationVerificationStatus: 'not_run',
+          publicationVerifiedAt: null,
+          publicationTraceId: null,
+        } as never,
         draft: true,
         depth: 1,
-        overrideAccess: false,
+        overrideAccess: true,
         user,
+        context: {
+          skipPublicRevisionStamp: true,
+          skipPublicationVerification: true,
+        },
       })
       return adminActionResponse('unpublished', {
         entityId: body.id,
