@@ -179,38 +179,47 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_BRANCH: ${{ github.base_ref || github.ref_name }}
+          HEAD_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           set -euo pipefail
           rm -rf artifacts/reference-baseline
           mkdir -p artifacts/reference-baseline
 
-          RUN_IDS=$(gh api --method GET \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${GITHUB_REPOSITORY}/actions/workflows/stage0-baseline.yml/runs" \
-            -f branch="${BASE_BRANCH}" \
-            -f status="success" \
-            -f per_page=40 \
-            --jq '.workflow_runs[] | select(.id != ${{ github.run_id }}) | .id')
-
           FOUND=false
-          for RUN_ID in ${RUN_IDS}; do
-            ARTIFACT_ID=$(gh api \
-              -H "Accept: application/vnd.github+json" \
-              "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
-              --jq '[.artifacts[] | select(.expired == false and (.name | startswith("admin-baseline-")))][0].id // empty')
+          SEARCHED_BRANCHES=""
 
-            if [ -z "${ARTIFACT_ID}" ]; then
+          for REFERENCE_BRANCH in "${BASE_BRANCH}" "${HEAD_BRANCH}"; do
+            if [ -z "${REFERENCE_BRANCH}" ] || [[ " ${SEARCHED_BRANCHES} " == *" ${REFERENCE_BRANCH} "* ]]; then
               continue
             fi
+            SEARCHED_BRANCHES="${SEARCHED_BRANCHES} ${REFERENCE_BRANCH}"
 
-            rm -rf /tmp/esmera-reference-candidate /tmp/esmera-reference.zip
-            mkdir -p /tmp/esmera-reference-candidate
-            gh api \
+            RUN_IDS=$(gh api --method GET \
               -H "Accept: application/vnd.github+json" \
-              "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" > /tmp/esmera-reference.zip
-            unzip -q /tmp/esmera-reference.zip -d /tmp/esmera-reference-candidate
+              "/repos/${GITHUB_REPOSITORY}/actions/workflows/stage0-baseline.yml/runs" \
+              -f branch="${REFERENCE_BRANCH}" \
+              -f status="success" \
+              -f per_page=40 \
+              --jq '.workflow_runs[] | select(.id != ${{ github.run_id }}) | .id')
 
-            if node - /tmp/esmera-reference-candidate/baseline-manifest.json <<'NODE'
+            for RUN_ID in ${RUN_IDS}; do
+              ARTIFACT_ID=$(gh api \
+                -H "Accept: application/vnd.github+json" \
+                "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
+                --jq '[.artifacts[] | select(.expired == false and (.name | startswith("admin-baseline-")))][0].id // empty')
+
+              if [ -z "${ARTIFACT_ID}" ]; then
+                continue
+              fi
+
+              rm -rf /tmp/esmera-reference-candidate /tmp/esmera-reference.zip
+              mkdir -p /tmp/esmera-reference-candidate
+              gh api \
+                -H "Accept: application/vnd.github+json" \
+                "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" > /tmp/esmera-reference.zip
+              unzip -q /tmp/esmera-reference.zip -d /tmp/esmera-reference-candidate
+
+              if node - /tmp/esmera-reference-candidate/baseline-manifest.json <<'NODE'
           const fs = require('fs')
           const file = process.argv[2]
           if (!fs.existsSync(file)) process.exit(1)
@@ -223,16 +232,17 @@ jobs:
             && manifest.files.length === manifest.actualPngs
           process.exit(valid ? 0 : 1)
           NODE
-            then
-              cp -a /tmp/esmera-reference-candidate/. artifacts/reference-baseline/
-              echo "Compatible reference ${ARTIFACT_ID} loaded from run ${RUN_ID}."
-              FOUND=true
-              break
-            fi
+              then
+                cp -a /tmp/esmera-reference-candidate/. artifacts/reference-baseline/
+                echo "Compatible reference ${ARTIFACT_ID} loaded from run ${RUN_ID} on ${REFERENCE_BRANCH}."
+                FOUND=true
+                break 2
+              fi
+            done
           done
 
           if [ "${FOUND}" != "true" ]; then
-            echo "No compatible reference found. The comparator will require an explicit bootstrap approval for base ${VISUAL_BASE_SHA}."
+            echo "No compatible reference found on base or head branch. The comparator will require an explicit bootstrap approval for base ${VISUAL_BASE_SHA}."
           fi
 
       - name: Compare visual regression
