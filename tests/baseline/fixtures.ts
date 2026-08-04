@@ -11,10 +11,10 @@ export const baselineAuthFile = path.join('artifacts', '.auth', 'baseline-admin.
 const fixtureMapPath = path.join('artifacts', 'admin-baseline', 'fixture-map.json')
 
 export const test = base.extend({
-  page: async ({ page }, use) => {
+  page: async ({ page }, applyFixture) => {
     await page.clock.setFixedTime(new Date(VISUAL_FIXED_TIME))
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await use(page)
+    await applyFixture(page)
   },
 })
 
