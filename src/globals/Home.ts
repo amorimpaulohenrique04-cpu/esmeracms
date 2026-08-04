@@ -17,7 +17,19 @@ export const HOME_DISABLED_SECTIONS = [
 export const Home: GlobalConfig = {
   slug: 'home',
   label: 'Home',
-  admin: { group: 'Site', hidden: ({ user }) => !canManageSite(user) },
+  admin: {
+    group: 'Site',
+    hidden: ({ user }) => !canManageSite(user),
+    components: {
+      views: {
+        edit: {
+          default: {
+            Component: '/admin/modules/home/HomeEditView#HomeEditView',
+          },
+        },
+      },
+    },
+  },
   access: {
     read: publishedGlobalOrAuthenticated,
     update: siteEditors,
@@ -31,12 +43,12 @@ export const Home: GlobalConfig = {
       hasMany: true,
       label: 'Seções desativadas',
       options: [
-        { label: 'Hero', value: 'hero' },
+        { label: 'Capa principal', value: 'hero' },
         { label: 'Manifesto', value: 'manifesto' },
         { label: 'Seleção de objetos', value: 'selectedObjects' },
-        { label: 'Matter', value: 'matter' },
-        { label: 'Signature', value: 'signature' },
-        { label: 'Matter Interlude', value: 'matterInterlude' },
+        { label: 'Matéria', value: 'matter' },
+        { label: 'Destaques', value: 'signature' },
+        { label: 'Intervalo visual', value: 'matterInterlude' },
         { label: 'Proveniência', value: 'provenance' },
         { label: 'Convite privado', value: 'privateInvitation' },
       ],
@@ -45,12 +57,12 @@ export const Home: GlobalConfig = {
       type: 'tabs',
       tabs: [
         {
-          label: 'Galeria Hero',
+          label: 'Capa principal',
           fields: [
             {
               name: 'heroMode',
               type: 'select',
-              label: 'Modo da Hero',
+              label: 'Modo da capa',
               required: true,
               defaultValue: 'single',
               options: [
@@ -61,7 +73,7 @@ export const Home: GlobalConfig = {
             {
               name: 'heroSlides',
               type: 'array',
-              label: 'Galeria da Hero',
+              label: 'Galeria da capa',
               minRows: 0,
               maxRows: 5,
               required: false,
@@ -126,12 +138,12 @@ export const Home: GlobalConfig = {
           ],
         },
         {
-          label: 'Matter',
+          label: 'Matéria',
           fields: [
             {
               name: 'matterPanels',
               type: 'array',
-              label: 'Painéis Matter',
+              label: 'Painéis da matéria',
               minRows: 0,
               maxRows: 3,
               fields: [
@@ -146,12 +158,12 @@ export const Home: GlobalConfig = {
           ],
         },
         {
-          label: 'Signature',
+          label: 'Destaques',
           fields: [
             {
               name: 'signatureSlides',
               type: 'array',
-              label: 'Slides Signature',
+              label: 'Slides de destaque',
               minRows: 0,
               maxRows: 6,
               fields: [
