@@ -73,6 +73,12 @@ export type ProductListItem = {
   _status?: string | null
   publicationReady?: boolean | null
   publicationIssues?: Array<{ message?: string | null }> | null
+  publicationRevision?: string | null
+  publicationContractVersion?: string | null
+  publicationOperationalStatus?: string | null
+  publicationVerificationStatus?: string | null
+  publicationVerifiedAt?: string | null
+  publicationTraceId?: string | null
   categories?: Array<ProductCategory | string | number> | null
   gallery?: ProductGalleryItem[] | null
   priceMode?: string | null
