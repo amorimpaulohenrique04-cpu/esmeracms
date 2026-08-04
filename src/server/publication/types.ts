@@ -63,6 +63,76 @@ export class RevisionConflictError extends Error {
   }
 }
 
+// Forward-declared for the coordinator/bulk/verify work in later phases (see docs/cms-implementation-plan.md).
+// Not yet consumed by production code — kept here so tests can assert against the agreed shape early.
+export type OperationalPublicationStatus =
+  | 'draft'
+  | 'ready'
+  | 'publishing'
+  | 'pending_verification'
+  | 'published'
+  | 'published_but_unverified'
+  | 'published_but_incompatible'
+  | 'publish_reverted'
+  | 'blocked'
+  | 'conflict'
+  | 'failed'
+
+export type StorefrontVerification = {
+  status: 'compatible' | 'incompatible' | 'revision_mismatch' | 'unavailable' | 'not_run'
+  expectedRevision: string
+  observedRevision?: string
+  contractVersion: string
+  checkedAt: string
+  publicUrl?: string
+  issues?: Array<{
+    code: string
+    path?: string
+    message: string
+  }>
+  retryAfterMs?: number
+}
+
+export type PublicationReceipt = {
+  traceId: string
+  entity: PublicationEntity
+  documentId: string | number
+  actorId: string | number
+  expectedRevision?: string | null
+  savedRevision?: string
+  publishedRevision?: string
+  previousPublishedRevision?: string
+  status: OperationalPublicationStatus
+  verificationStatus?: StorefrontVerification['status']
+  contractVersion?: string
+  startedAt: string
+  completedAt: string
+  durationMs: number
+  issues?: PublicationIssue[]
+}
+
+export type BulkPublicationResult = {
+  requested: number
+  published: number
+  unverified: number
+  incompatible: number
+  reverted: number
+  blocked: number
+  conflicted: number
+  failed: number
+  results: Array<{
+    id: string | number
+    title?: string
+    expectedRevision?: string
+    publishedRevision?: string
+    status: OperationalPublicationStatus
+    message: string
+    fieldErrors?: PublicationIssue[]
+    verification?: StorefrontVerification
+    retryable: boolean
+  }>
+}
+
 export class PublicationBlockedError extends Error {
   status = 422
   code = 'publication_blocked'
