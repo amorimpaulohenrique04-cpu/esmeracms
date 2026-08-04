@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { DataTable, EmptyState, Status } from '../../design-system'
 import { CategoryDetailEditor } from './CategoryDetailEditor'
+import { CategoryPublicationRecheck } from './CategoryPublicationRecheck'
 import {
   categoryStatusLabels,
   type CategoryDetail,
@@ -85,6 +86,13 @@ export function CategoryDetailView({ category, tab, filters, categories, media, 
         <div className="esmera-category-detail__status">
           <Status tone={category.status === 'active' ? 'success' : 'neutral'}>{categoryStatusLabels[category.status || ''] || '—'}</Status>
           <Status tone={publicationTone(category)}>{publicationLabel(category)}</Status>
+          <CategoryPublicationRecheck
+            categoryId={category.id}
+            publicationRevision={category.publicationRevision}
+            contractVersion={category.publicationContractVersion}
+            parentTraceId={category.publicationTraceId}
+            operationalStatus={category.publicationOperationalStatus}
+          />
         </div>
       </header>
 
