@@ -29,6 +29,20 @@ const tabs: Array<{ id: CategoryTab; label: string }> = [
   { id: 'products', label: 'Produtos relacionados' },
 ]
 
+const operationalLabels: Record<string, string> = {
+  draft: 'Rascunho',
+  ready: 'Pronta',
+  publishing: 'Publicando',
+  pending_verification: 'Aguardando confirmação',
+  published: 'Visível no site',
+  published_but_unverified: 'Confirmação pendente',
+  published_but_incompatible: 'Problema de compatibilidade',
+  publish_reverted: 'Publicação desfeita',
+  blocked: 'Bloqueada',
+  conflict: 'Conflito',
+  failed: 'Falhou',
+}
+
 function hrefFor(filters: CategoryWorkspaceFilters, categoryId: string | number, tab: CategoryTab) {
   const params = new URLSearchParams()
   params.set('category', String(categoryId))
@@ -45,6 +59,18 @@ function backHref(filters: CategoryWorkspaceFilters) {
   return `/admin/categories?${params.toString()}`
 }
 
+function publicationLabel(category: CategoryDetail) {
+  return operationalLabels[category.publicationOperationalStatus || ''] ||
+    (category._status === 'published' ? 'Publicada no Payload' : 'Rascunho')
+}
+
+function publicationTone(category: CategoryDetail) {
+  if (category.publicationOperationalStatus === 'published' || category.publicationOperationalStatus === 'publish_reverted') return 'success' as const
+  if (category.publicationOperationalStatus === 'published_but_incompatible' || category.publicationOperationalStatus === 'failed') return 'danger' as const
+  if (category._status === 'published') return 'warning' as const
+  return 'neutral' as const
+}
+
 export function CategoryDetailView({ category, tab, filters, categories, media, termSuggestions, relatedProducts, relatedTotal }: Props) {
   return (
     <section className="esmera-category-detail" aria-label={`Detalhe de ${category.title || 'categoria'}`}>
@@ -54,10 +80,11 @@ export function CategoryDetailView({ category, tab, filters, categories, media, 
           <span className="esmera-eyebrow">Categoria</span>
           <h2>{category.title || 'Categoria sem título'}</h2>
           <p>/{category.slug || 'sem-slug'} · ordem {category.order ?? '—'} · {relatedTotal} produto{relatedTotal === 1 ? '' : 's'}</p>
+          {category.publicationTraceId ? <small>Referência técnica: {category.publicationTraceId}</small> : null}
         </div>
         <div className="esmera-category-detail__status">
           <Status tone={category.status === 'active' ? 'success' : 'neutral'}>{categoryStatusLabels[category.status || ''] || '—'}</Status>
-          <Status tone={category._status === 'published' ? 'info' : 'neutral'}>{category._status === 'published' ? 'Publicada' : 'Rascunho'}</Status>
+          <Status tone={publicationTone(category)}>{publicationLabel(category)}</Status>
         </div>
       </header>
 
@@ -81,7 +108,7 @@ export function CategoryDetailView({ category, tab, filters, categories, media, 
                   <tr key={String(product.id)}>
                     <td><Link className="esmera-row-title" href={`/admin/products?product=${product.id}&tab=overview`}>{product.title || 'Produto sem título'}</Link><small className="esmera-category-related__code">{product.code || 'Sem código'}</small></td>
                     <td><Status tone={product.catalogStatus === 'active' ? 'success' : 'neutral'}>{product.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</Status></td>
-                    <td><Status tone={product._status === 'published' ? 'info' : 'neutral'}>{product._status === 'published' ? 'Publicado' : 'Rascunho'}</Status></td>
+                    <td><Status tone={product._status === 'published' ? 'info' : 'neutral'}>{product._status === 'published' ? 'Publicado no Payload' : 'Rascunho'}</Status></td>
                     <td>{product.availability || '—'}</td>
                   </tr>
                 ))}
