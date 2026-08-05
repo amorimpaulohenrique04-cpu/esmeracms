@@ -40,16 +40,16 @@ async function railPeekHasNoReflow(page: Page, width: number) {
 
   const link = nav.getByRole('link', { name: 'Produtos' })
   await link.hover()
-  await page.waitForTimeout(200)
   await expect(nav).toHaveAttribute('data-peek', 'open')
   await expect(link.locator('span')).toBeVisible()
+  await page.waitForTimeout(300)
 
   const during = await workspaceGeometry(page)
   expectSameGeometry(before, during)
 
   await page.getByTestId('esmera-app-header').hover()
-  await page.waitForTimeout(200)
   await expect(nav).toHaveAttribute('data-peek', 'closed')
+  await page.waitForTimeout(300)
 
   const after = await workspaceGeometry(page)
   expectSameGeometry(before, after)

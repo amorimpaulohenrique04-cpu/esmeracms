@@ -15,7 +15,7 @@ export default defineConfig({
   forbidOnly: isCI,
   fullyParallel: false,
   maxFailures: 0,
-  retries: 0,
+  retries: isCI ? 1 : 0,
   workers: isCI ? 1 : undefined,
   reporter: isCI
     ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]

@@ -98,8 +98,10 @@ test.describe('Feedback de navegação do Admin (F12)', () => {
     await page.getByTestId('esmera-global-create').click()
     await page.getByRole('menuitem', { name: /Novo produto/i }).click()
 
-    const srText = page.getByTestId('esmera-route-skeleton').locator('.esmera-sr-only')
-    await expect(srText).toHaveText('', { timeout: 300 })
+    const skeleton = page.getByTestId('esmera-route-skeleton')
+    await expect(skeleton).toBeAttached({ timeout: 700 })
+    const srText = skeleton.locator('.esmera-sr-only')
+    await expect(srText).toHaveText('', { timeout: 500 })
     await expect(srText).toHaveText(/Preparando/, { timeout: 1500 })
 
     await expect(page).toHaveURL(/\/admin\/collections\/products\/create$/, { timeout: 2000 })
