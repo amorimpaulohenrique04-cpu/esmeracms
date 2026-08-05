@@ -149,6 +149,49 @@ body {
   color: var(--esmera-text-secondary);
 }
 
+/*
+ * Responsive containment: keep wide child content inside the owning workspace.
+ * This fixes the two genuine horizontal-overflow regressions found by the visual
+ * audit without hiding document overflow globally.
+ */
+.esmera-product-document-full,
+.esmera-product-document-full > .esmera-form-shell,
+.esmera-product-document-full .esmera-form-shell__body,
+.esmera-product-document-full .esmera-form-shell__content,
+.esmera-product-document-full .esmera-form-shell__aside,
+.esmera-product-document-full .esmera-publication-checklist,
+.esmera-product-document-full .esmera-publication-checklist__group,
+.esmera-product-document-full .esmera-publication-checklist__group li {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.esmera-product-document-full .esmera-publication-checklist__group li {
+  display: grid;
+  gap: 4px;
+}
+
+.esmera-product-document-full .esmera-publication-checklist__group button,
+.esmera-product-document-full .esmera-publication-checklist__group small {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.esmera-product-document-full .esmera-publication-checklist__group button {
+  width: fit-content;
+  text-align: left;
+}
+
+.esmera-pipeline {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto !important;
