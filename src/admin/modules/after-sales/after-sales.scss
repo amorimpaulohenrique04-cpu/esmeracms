@@ -126,13 +126,13 @@
   color: var(--esmera-text);
 }
 
+/* grid-template-columns não é animado: layout estrutural muda de uma vez. */
 .esmera-after-sales-workspace {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 16px;
-  transition: grid-template-columns var(--esmera-motion-standard);
 }
 .esmera-after-sales-workspace.has-inspector { grid-template-columns: minmax(0, 1fr) minmax(360px, 410px); }
 
