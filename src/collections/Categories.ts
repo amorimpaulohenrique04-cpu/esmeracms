@@ -47,7 +47,10 @@ export const Categories: CollectionConfig = {
             collection: 'categories',
             id,
             req,
-            errors: hierarchyIssues.map((issue) => ({ path: issue.path, message: issue.message })),
+            // `label` (not just `message`) is required: Payload's ValidationError builds its
+            // top-level, always-serialized message from `label ?? path` — the nested
+            // `message` only survives in some response-serialization paths, not all.
+            errors: hierarchyIssues.map((issue) => ({ path: issue.path, message: issue.message, label: issue.message })),
           })
         }
 

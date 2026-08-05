@@ -207,7 +207,12 @@
   .esmera-grid-equal,
   .esmera-grid-3 { grid-template-columns: 1fr; }
 
-  .esmera-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  // Compound selector: `.esmera-metric-strip` (design-system.scss) sets a fixed
+  // `grid-template-columns: repeat(var(--esmera-metric-columns), ...)` at the same
+  // specificity as a bare `.esmera-metric-grid`, so source order would decide the
+  // winner. Every consumer (Primitives.tsx MetricGrid) carries both classes, so
+  // matching both here wins deterministically regardless of stylesheet order.
+  .esmera-metric-strip.esmera-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .esmera-metric:nth-child(2n) { border-right: 0; }
   .esmera-metric:nth-child(n+3) { border-top: 1px solid var(--esmera-line-default); }
 }
@@ -226,7 +231,7 @@
 @container esmera-workspace (max-width: 560px) {
   .esmera-actions,
   .esmera-actions .esmera-button { width: 100%; }
-  .esmera-metric-grid { grid-template-columns: 1fr; }
+  .esmera-metric-strip.esmera-metric-grid { grid-template-columns: 1fr; }
   .esmera-metric { min-height: 112px; border-right: 0; border-top: 1px solid var(--esmera-line-default); }
   .esmera-metric:first-child { border-top: 0; }
   .esmera-list-row { grid-template-columns: 1fr; gap: var(--esmera-space-2); }

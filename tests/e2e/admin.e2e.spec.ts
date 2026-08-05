@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
+import { fetchProductUpdatedAt } from '../helpers/createDraftEntities'
 import { login } from '../helpers/login'
 import { seedTestUser, cleanupTestUser, testUser } from '../helpers/seedUser'
 
@@ -166,13 +167,15 @@ test.describe('Admin Panel', () => {
     await page.getByLabel('Subtítulo').fill('Rascunho salvo automaticamente')
     await expect(page.getByText('Rascunho salvo', { exact: true })).toBeVisible({ timeout: 10_000 })
 
+    const expectedUpdatedAt = await fetchProductUpdatedAt(page, productId as string | number)
     const publish = await page.request.post('http://localhost:3000/api/admin-products', {
-      data: { action: 'publish', ids: [productId] },
+      data: { action: 'publish', items: [{ id: productId, expectedUpdatedAt }] },
     })
     expect(publish.status()).toBe(422)
-    const publishBody = await publish.json() as { updated?: number; errors?: Array<{ message?: string }> }
-    expect(publishBody.updated).toBe(0)
-    expect(publishBody.errors?.length).toBeGreaterThan(0)
+    const publishBody = await publish.json() as { result?: { meta?: { published?: number; blocked?: number; results?: Array<{ status?: string; message?: string }> } } }
+    expect(publishBody.result?.meta?.published).toBe(0)
+    expect(publishBody.result?.meta?.blocked).toBeGreaterThan(0)
+    expect(publishBody.result?.meta?.results?.some((item) => item.message)).toBeTruthy()
 
     await page.goto(`http://localhost:3000/admin/products?product=${productId}&tab=media`)
     await expect(page.getByRole('heading', { name: 'Galeria' })).toBeVisible()
