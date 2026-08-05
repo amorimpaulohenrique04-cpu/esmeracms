@@ -4,6 +4,7 @@ import { Dialog } from '@base-ui/react/dialog'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 
+import { useNavigationFeedback } from '../navigation/NavigationFeedbackProvider'
 import { expectAdminResponse } from '../state/asyncState'
 import { recentAdminItems, savedAdminViews } from '../state/continuity'
 import { ShellIcon } from './ShellIcon'
@@ -81,6 +82,7 @@ function uniqueResults(results: CommandResult[]) {
 
 export function CommandPalette({ open, onOpenChange, selection, currentHref }: { open: boolean; onOpenChange: (open: boolean) => void; selection: CommandSelection | null; currentHref: string }) {
   const router = useRouter()
+  const { beginNavigation } = useNavigationFeedback()
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
@@ -141,7 +143,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
 
   const reset = () => { setQuery(''); setServerResults([]); setLoading(false); setError(null); setActiveIndex(0); setRetryTick(0) }
   const handleOpenChange = (nextOpen: boolean) => { if (!nextOpen) reset(); onOpenChange(nextOpen) }
-  const goTo = (result: CommandResult | undefined) => { if (!result) return; handleOpenChange(false); router.push(result.href) }
+  const goTo = (result: CommandResult | undefined) => { if (!result) return; handleOpenChange(false); beginNavigation(result.href); router.push(result.href) }
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') { event.preventDefault(); setActiveIndex((index) => results.length ? (index + 1) % results.length : 0) }
     else if (event.key === 'ArrowUp') { event.preventDefault(); setActiveIndex((index) => results.length ? (index - 1 + results.length) % results.length : 0) }

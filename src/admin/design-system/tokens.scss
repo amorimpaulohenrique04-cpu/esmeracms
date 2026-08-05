@@ -213,7 +213,8 @@
   .esmera-inline-feedback.is-busy::before,
   .esmera-state-panel.is-loading .esmera-state-panel__mark,
   .esmera-state-panel.is-saving .esmera-state-panel__mark,
-  .esmera-button__spinner {
+  .esmera-button__spinner,
+  .esmera-view {
     animation: none;
   }
 

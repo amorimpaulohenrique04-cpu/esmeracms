@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import React, { useEffect, useMemo, useState } from 'react'
 
 import type { EsmeraRole } from '../../access/roles'
+import { useNavigationFeedback } from '../navigation/NavigationFeedbackProvider'
 import { ADMIN_CREATE_EVENT } from '../state/AdminStateProvider'
 import { ShellIcon } from './ShellIcon'
 
@@ -37,6 +38,7 @@ function matchesContext(pathname: string, action: CreateAction) {
 
 export function GlobalCreateMenu({ role }: { role: EsmeraRole | null }) {
   const router = useRouter()
+  const { beginNavigation } = useNavigationFeedback()
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const visible = useMemo(() => {
@@ -69,6 +71,7 @@ export function GlobalCreateMenu({ role }: { role: EsmeraRole | null }) {
                 key={action.href}
                 onClick={() => {
                   setOpen(false)
+                  beginNavigation(action.href)
                   router.push(action.href)
                 }}
               >

@@ -33,6 +33,19 @@ export function ensureUser(props: AdminViewServerProps, area: OperationalArea = 
   }
 }
 
+/**
+ * Identifica a view/documento atual sem depender de searchParams — usada
+ * como `key` de `.esmera-view` para forçar remount (e replay da entrada
+ * local em navigation-feedback.scss) só em navegação de rota real. Troca de
+ * filtro/paginação (searchParams) na mesma view não deve remontar.
+ */
+function viewIdentity(props: AdminViewServerProps) {
+  const segments = props.params?.segments
+  const segmentKey = Array.isArray(segments) ? segments.join('/') : typeof segments === 'string' ? segments : ''
+  const parts = [props.viewType, props.collectionSlug, props.globalSlug, props.docID, segmentKey]
+  return parts.filter((part) => part !== undefined && part !== null && part !== '').join(':') || 'view'
+}
+
 export function ViewFrame({
   props,
   children,
@@ -49,7 +62,7 @@ export function ViewFrame({
   const { initPageResult, params, searchParams } = props
   const content = (
     <div className={`esmera-workspace-frame is-${width}${className ? ` ${className}` : ''}`}>
-      <main className="esmera-view">{children}</main>
+      <main className="esmera-view" key={viewIdentity(props)}>{children}</main>
     </div>
   )
 

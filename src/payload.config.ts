@@ -74,7 +74,10 @@ export default buildConfig({
     components: {
       Nav: '/admin/components/Nav#EsmeraNav',
       header: ['/admin/shell/AppHeader#AppHeader'],
-      providers: ['/admin/state/AdminStateProvider#AdminStateProvider'],
+      providers: [
+        '/admin/state/AdminStateProvider#AdminStateProvider',
+        '/admin/navigation/NavigationFeedbackProvider#NavigationFeedbackProvider',
+      ],
       graphics: {
         Icon: '/admin/components/Brand#EsmeraIcon',
         Logo: '/admin/components/Brand#EsmeraLogo',

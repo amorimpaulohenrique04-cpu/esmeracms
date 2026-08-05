@@ -12,6 +12,15 @@
 .esmera-workspace-frame.is-wide .esmera-view { max-width: var(--esmera-workspace-wide); }
 .esmera-workspace-frame.is-fluid .esmera-view { max-width: var(--esmera-workspace-fluid); }
 
+/* Entrada local da view nova (ver .agents/skills/esmera-motion-system/SKILL.md
+   §6): a `key` em ViewFrame (shared.tsx) força remount de `.esmera-view` só
+   em navegação de rota real, então este keyframe roda uma vez por navegação
+   — nunca em troca de searchParams (filtro/paginação) na mesma view. */
+@keyframes esmera-view-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .esmera-view {
   width: 100%;
   min-width: 0;
@@ -25,6 +34,7 @@
   font-size: var(--esmera-font-body);
   line-height: var(--esmera-line-body);
   font-variant-numeric: tabular-nums;
+  animation: esmera-view-enter var(--esmera-motion-component) var(--esmera-ease-enter);
 }
 
 .esmera-view > * { min-width: 0; }
