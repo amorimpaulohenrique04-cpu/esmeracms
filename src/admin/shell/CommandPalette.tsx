@@ -85,35 +85,31 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
   const [serverResults, setServerResults] = useState<CommandResult[]>([])
-  const [serverSearchKey, setServerSearchKey] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [retryTick, setRetryTick] = useState(0)
 
   useEffect(() => {
     if (!open) return
-    const searchKey = `${currentHref}\n${query.trim()}`
     const controller = new AbortController()
+    const currentQuery = query.trim()
     const timer = window.setTimeout(async () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await fetch(`/api/admin-search?q=${encodeURIComponent(query.trim())}&context=${encodeURIComponent(currentHref)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: controller.signal })
+        const response = await fetch(`/api/admin-search?q=${encodeURIComponent(currentQuery)}&context=${encodeURIComponent(currentHref)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: controller.signal })
         const body = await expectAdminResponse<SearchResponse>(response, 'Não foi possível pesquisar.')
         setServerResults(body.results || [])
-        setServerSearchKey(searchKey)
-        setActiveIndex(0)
       } catch (cause) {
         if (controller.signal.aborted) return
-        setServerResults([])
-        setServerSearchKey(searchKey)
         setError(cause instanceof Error ? cause.message : 'Não foi possível pesquisar.')
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
-    }, query.trim() ? 140 : 0)
+    }, currentQuery ? 140 : 0)
     return () => { window.clearTimeout(timer); controller.abort() }
-  }, [currentHref, open, query])
+  }, [currentHref, open, query, retryTick])
 
   useEffect(() => {
     if (!open) return
@@ -125,10 +121,12 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
     const local = open ? localCommands(selection, currentHref) : []
     const needle = query.trim().toLocaleLowerCase('pt-BR')
     const filteredLocal = needle ? local.filter((item) => `${item.label} ${item.meta || ''} ${item.group}`.toLocaleLowerCase('pt-BR').includes(needle)) : local
-    const currentSearchKey = `${currentHref}\n${query.trim()}`
-    const currentServerResults = serverSearchKey === currentSearchKey ? serverResults : []
-    return uniqueResults([...filteredLocal, ...currentServerResults]).slice(0, 40)
-  }, [currentHref, open, query, selection, serverResults, serverSearchKey])
+    return uniqueResults([...filteredLocal, ...serverResults]).slice(0, 40)
+  }, [currentHref, open, query, selection, serverResults])
+
+  useEffect(() => {
+    setActiveIndex((index) => (results.length ? Math.min(index, results.length - 1) : 0))
+  }, [results.length])
 
   const grouped = useMemo(() => {
     const order = ['Seleção atual', 'Recentes', 'Filtros salvos', 'Ações contextuais', 'Ações', 'Seções de Relatórios', 'Produtos', 'Categorias', 'Clientes', 'Oportunidades', 'Leads', 'Vendas']
@@ -140,7 +138,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   const searchState: SearchState = error ? 'error' : loading && !results.length ? 'loading' : results.length ? 'results' : query.trim() ? 'empty' : 'idle'
   const stateLabel = loading && results.length ? `Atualizando · ${results.length} resultado${results.length === 1 ? '' : 's'}` : searchState === 'loading' ? 'Pesquisando registros…' : searchState === 'results' ? `${results.length} resultado${results.length === 1 ? '' : 's'}` : searchState === 'empty' ? 'Nenhum resultado' : searchState === 'error' ? 'Busca indisponível' : 'Atalhos e busca global'
 
-  const reset = () => { setQuery(''); setServerResults([]); setServerSearchKey(''); setLoading(false); setError(null); setActiveIndex(0) }
+  const reset = () => { setQuery(''); setServerResults([]); setLoading(false); setError(null); setActiveIndex(0); setRetryTick(0) }
   const handleOpenChange = (nextOpen: boolean) => { if (!nextOpen) reset(); onOpenChange(nextOpen) }
   const goTo = (result: CommandResult | undefined) => { if (!result) return; handleOpenChange(false); router.push(result.href) }
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -164,7 +162,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
             </div>
             <div className="esmera-command-results" id={`${inputId}-results`} role="listbox" aria-label="Resultados da busca">
               {loading && !results.length ? <div className="esmera-command-state is-loading"><span aria-hidden="true" />Pesquisando registros e ações…</div> : null}
-              {error ? <div className="esmera-command-state esmera-command-state--error" role="alert"><strong>Não foi possível pesquisar</strong><span>{error}</span></div> : null}
+              {error ? <div className="esmera-command-state esmera-command-state--error" role="alert"><strong>Não foi possível pesquisar</strong><span>{error}</span><button type="button" className="esmera-command-retry" onClick={() => setRetryTick((tick) => tick + 1)}>Tentar novamente</button></div> : null}
               {!loading && !error && !results.length && query.trim() ? <div className="esmera-command-state"><strong>Nenhum resultado</strong><span>Tente nome, código, cliente, venda, filtro salvo ou uma ação diferente.</span></div> : null}
               {!loading && !error && !results.length && !query.trim() ? <div className="esmera-command-state"><strong>Busca global</strong><span>Digite para localizar registros ou use os atalhos, recentes e recortes salvos.</span></div> : null}
               {grouped.map(([group, items]) => <section className="esmera-command-group" key={group} aria-label={group}><div className="esmera-command-group-label">{group}</div>{items.map((result) => { const index = results.indexOf(result); return <button type="button" role="option" aria-selected={activeIndex === index} className={`esmera-command-result${activeIndex === index ? ' is-active' : ''}${result.local ? ' is-local' : ''}`} id={`${inputId}-result-${index}`} key={result.id} onMouseEnter={() => setActiveIndex(index)} onClick={() => goTo(result)}><span className="esmera-command-result-icon"><ShellIcon name={result.icon || 'arrow'} /></span><span className="esmera-command-result-copy"><strong>{result.label}</strong>{result.meta ? <small>{result.meta}</small> : null}</span><ShellIcon name="arrow" className="esmera-command-arrow" /></button> })}</section>)}

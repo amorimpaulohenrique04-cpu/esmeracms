@@ -13,7 +13,7 @@
   box-sizing: border-box;
   border-bottom: 1px solid var(--esmera-line-default);
   background: color-mix(in srgb, var(--esmera-surface-canvas) 94%, transparent);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(var(--esmera-blur-header));
   color: var(--esmera-text);
   font-family: var(--esmera-font-sans);
 }
@@ -123,6 +123,9 @@
 .esmera-command-state.is-loading > span:first-child { width: 16px; height: 16px; border: 1px solid var(--esmera-line-strong); border-top-color: var(--esmera-primary); border-radius: 50%; animation: esmera-command-spin .7s linear infinite; }
 .esmera-command-state--error strong,
 .esmera-command-state--error { color: var(--esmera-danger); }
+.esmera-command-retry { min-height: 34px; padding: 0 14px; border: 1px solid var(--esmera-line-strong); border-radius: var(--esmera-control-radius); background: var(--esmera-surface-panel); color: var(--esmera-text); font-family: var(--esmera-font-sans); font-size: var(--esmera-font-caption); font-weight: var(--esmera-weight-semibold); cursor: pointer; }
+.esmera-command-retry:hover { background: var(--esmera-surface-hover); }
+.esmera-command-retry:focus-visible { outline: 2px solid var(--esmera-focus); outline-offset: 2px; box-shadow: var(--esmera-focus-ring); }
 .esmera-command-group + .esmera-command-group { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--esmera-line-subtle); }
 .esmera-command-group-label { padding: 7px 10px 5px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); font-weight: var(--esmera-weight-semibold); letter-spacing: .1em; text-transform: uppercase; }
 .esmera-command-result { width: 100%; min-height: 54px; display: grid; grid-template-columns: 32px minmax(0, 1fr) 18px; align-items: center; gap: 10px; padding: 6px 10px; border: 0; border-radius: var(--esmera-control-radius); background: transparent; color: var(--esmera-text); font-family: var(--esmera-font-sans); text-align: left; cursor: pointer; }
@@ -138,7 +141,22 @@
 .esmera-command-footer { min-height: 38px; display: flex; align-items: center; gap: 14px; padding: 0 16px; border-top: 1px solid var(--esmera-line-default); color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 
 .esmera-mobile-nav-viewport { position: fixed; inset: 0; z-index: calc(var(--esmera-z-overlay) + 1); display: grid; justify-items: start; pointer-events: none; }
-.esmera-mobile-nav { width: min(330px, calc(100vw - 38px)); height: 100dvh; display: flex; flex-direction: column; overflow: auto; pointer-events: auto; border-right: 1px solid var(--esmera-line-default); background: var(--esmera-surface-canvas); color: var(--esmera-text); box-shadow: var(--esmera-shadow-overlay); font-family: var(--esmera-font-sans); }
+.esmera-mobile-nav {
+  width: min(330px, calc(100vw - 38px));
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  pointer-events: auto;
+  border-right: 1px solid var(--esmera-line-default);
+  background: var(--esmera-surface-canvas);
+  color: var(--esmera-text);
+  box-shadow: var(--esmera-shadow-overlay);
+  font-family: var(--esmera-font-sans);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+}
 .esmera-mobile-nav-head { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 14px; border-bottom: 1px solid var(--esmera-line-default); }
 .esmera-mobile-nav-brand { display: flex; align-items: center; gap: 10px; }
 .esmera-mobile-nav-brand .esmera-brand-icon { width: 34px; height: 34px; }
@@ -146,30 +164,40 @@
 .esmera-mobile-nav-brand small { display: block; }
 .esmera-mobile-nav-brand strong { font-size: var(--esmera-font-ui); font-weight: var(--esmera-weight-semibold); }
 .esmera-mobile-nav-brand small { margin-top: 2px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
-.esmera-mobile-nav-close { width: 38px; height: 38px; display: grid; place-items: center; padding: 0; border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-control-radius); background: var(--esmera-surface-panel); color: var(--esmera-text); cursor: pointer; }
+.esmera-mobile-nav-close { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-control-radius); background: var(--esmera-surface-panel); color: var(--esmera-text); cursor: pointer; }
 .esmera-mobile-nav-close svg { width: 17px; height: 17px; }
 .esmera-mobile-nav-links { display: grid; gap: 3px; padding: 12px 10px 0; }
-.esmera-mobile-nav-link { position: relative; min-height: 42px; display: flex; align-items: center; gap: 11px; padding: 0 11px; border-radius: var(--esmera-control-radius); color: var(--esmera-text-secondary); font-size: var(--esmera-font-ui-sm); font-weight: var(--esmera-weight-medium); text-decoration: none; }
+.esmera-mobile-nav-link { position: relative; min-height: 44px; display: flex; align-items: center; gap: 11px; padding: 0 11px; border-radius: var(--esmera-control-radius); color: var(--esmera-text-secondary); font-size: var(--esmera-font-ui-sm); font-weight: var(--esmera-weight-medium); text-decoration: none; }
 .esmera-mobile-nav-link:hover { background: var(--esmera-surface-selected); color: var(--esmera-text); }
 .esmera-mobile-nav-link.is-active { background: var(--esmera-surface-selected); color: var(--esmera-text); box-shadow: inset 2px 0 0 var(--esmera-selection-bar); }
 .esmera-mobile-nav-link svg { width: 18px; height: 18px; }
 .esmera-mobile-nav-divider { height: 1px; margin: 16px 16px 12px; background: var(--esmera-line-default); }
 .esmera-mobile-nav-caption { padding: 0 20px 2px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); font-weight: var(--esmera-weight-semibold); letter-spacing: .1em; text-transform: uppercase; }
 .esmera-mobile-nav-footer { margin-top: auto; padding: 14px; border-top: 1px solid var(--esmera-line-default); }
-.esmera-mobile-user { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: center; padding: 7px; border-radius: var(--esmera-control-radius); color: var(--esmera-text); text-decoration: none; }
+.esmera-mobile-user { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: center; min-height: 44px; padding: 7px; border-radius: var(--esmera-control-radius); color: var(--esmera-text); text-decoration: none; }
 .esmera-mobile-user strong,
 .esmera-mobile-user small { display: block; }
 .esmera-mobile-user strong { font-size: var(--esmera-font-ui-sm); }
 .esmera-mobile-user small { margin-top: 2px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
-.esmera-mobile-logout { width: 100%; min-height: 36px; margin-top: 4px; padding: 0 7px; border: 0; border-radius: var(--esmera-control-radius); background: transparent; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); text-align: left; cursor: pointer; }
+.esmera-mobile-logout { width: 100%; min-height: 44px; margin-top: 4px; padding: 0 7px; border: 0; border-radius: var(--esmera-control-radius); background: transparent; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); text-align: left; cursor: pointer; }
 .esmera-mobile-logout:hover { background: var(--esmera-surface-selected); color: var(--esmera-text); }
 
+@media (max-width: 767px) {
+  .esmera-mobile-nav-viewport { justify-items: stretch; }
+  .esmera-mobile-nav { width: 100%; border-right: 0; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .esmera-mobile-nav { width: min(360px, calc(100vw - 48px)); }
+}
+
 @media (max-width: 1023px) {
-  .esmera-shell-mobile-trigger { display: grid; }
+  .esmera-shell-mobile-trigger { display: grid; width: 44px; height: 44px; }
   .esmera-app-header { padding-inline: 16px; }
-  .esmera-command-trigger { min-width: 0; width: 40px; height: 40px; justify-content: center; padding: 0; }
+  .esmera-command-trigger { min-width: 0; width: 44px; height: 44px; justify-content: center; padding: 0; }
   .esmera-command-trigger > span,
   .esmera-command-trigger kbd { display: none; }
+  .esmera-header-user { min-height: 44px; }
 }
 
 @media (max-width: 720px) {
@@ -180,7 +208,7 @@
 @media (max-width: 620px) {
   .esmera-app-header { min-height: 60px; }
   .esmera-header-user-copy { display: none; }
-  .esmera-shell-create { min-width: 40px; width: 40px; padding: 0; justify-content: center; }
+  .esmera-shell-create { min-width: 44px; width: 44px; min-height: 44px; padding: 0; justify-content: center; }
   .esmera-shell-create > span { display: none; }
   .esmera-command-viewport { align-items: end; padding: 0; }
   .esmera-command { width: 100%; max-height: 88dvh; border-right: 0; border-bottom: 0; border-left: 0; border-radius: var(--esmera-panel-radius) var(--esmera-panel-radius) 0 0; }
