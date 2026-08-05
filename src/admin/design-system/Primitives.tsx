@@ -1,5 +1,7 @@
 import React from 'react'
 
+import { type Announcement, announcementProps } from './Feedback'
+
 export type Density = 'compact' | 'standard'
 export type FeedbackTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info'
 
@@ -111,7 +113,17 @@ export function MetricStripItem({
 }) {
   const content = <><span>{label}</span><strong>{value}</strong>{meta ? <small>{meta}</small> : null}</>
   const classNames = classes('esmera-metric-strip__item', `is-${tone}`, active && 'is-active', className)
-  return href ? <a className={classNames} href={href}>{content}</a> : <article className={classNames}>{content}</article>
+  // Sem `href` o item é informativo: permanece <article>, sem superfície interativa.
+  if (!href) return <article className={classNames}>{content}</article>
+  return (
+    <a
+      className={classes(classNames, 'is-interactive-surface')}
+      href={href}
+      aria-current={active ? 'page' : undefined}
+    >
+      {content}
+    </a>
+  )
 }
 
 export function FilterPanel({
@@ -250,14 +262,24 @@ export function InlineFeedback({
   children,
   tone = 'neutral',
   busy = false,
+  announcement = 'polite',
   className = '',
 }: {
   children: React.ReactNode
   tone?: FeedbackTone
   busy?: boolean
+  announcement?: Announcement
   className?: string
 }) {
-  return <div className={classes('esmera-inline-feedback', `is-${tone}`, busy && 'is-busy', className)} role="status" aria-live="polite" aria-busy={busy || undefined}>{children}</div>
+  return (
+    <div
+      className={classes('esmera-inline-feedback', `is-${tone}`, busy && 'is-busy', className)}
+      {...announcementProps(announcement)}
+      aria-busy={busy || undefined}
+    >
+      {children}
+    </div>
+  )
 }
 
 export function SectionNav({ label = 'Seções', children, className = '' }: { label?: string; children: React.ReactNode; className?: string }) {

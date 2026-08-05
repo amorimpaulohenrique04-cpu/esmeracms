@@ -1,4 +1,17 @@
-.esmera-dashboard-metrics { margin-bottom: var(--esmera-space-7); }
+.esmera-dashboard-metrics.esmera-metric-strip {
+  gap: var(--esmera-space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  margin-bottom: var(--esmera-space-7);
+}
+.esmera-dashboard-metrics .esmera-metric-strip__item {
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-panel-radius);
+  background: var(--esmera-surface-panel);
+}
+.esmera-dashboard-metrics .esmera-metric-strip__item > strong { font-variant-numeric: tabular-nums; }
 
 .esmera-dashboard-primary-grid,
 .esmera-dashboard-secondary-grid {
@@ -37,6 +50,12 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  animation: esmera-dashboard-pipeline-enter var(--esmera-motion-data) var(--esmera-ease-enter);
+}
+
+@keyframes esmera-dashboard-pipeline-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .esmera-dashboard-pipeline__stage {
@@ -63,7 +82,7 @@
   background: var(--esmera-chart-1);
   transition: width var(--esmera-motion-slow) var(--esmera-ease);
 }
-.esmera-dashboard-pipeline__stage > strong { color: var(--esmera-text); font-size: var(--esmera-font-body); font-weight: var(--esmera-weight-semibold); text-align: right; }
+.esmera-dashboard-pipeline__stage > strong { color: var(--esmera-text); font-size: var(--esmera-font-body); font-weight: var(--esmera-weight-semibold); text-align: right; font-variant-numeric: tabular-nums; }
 .esmera-dashboard-source { margin: 17px 0 0; padding-top: 13px; border-top: 1px solid var(--esmera-line-subtle); color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); line-height: var(--esmera-line-body); }
 
 .esmera-dashboard-task-list,
@@ -95,8 +114,21 @@
 .esmera-dashboard-product__copy strong { display: block; color: var(--esmera-text); font-size: var(--esmera-font-body); font-weight: var(--esmera-weight-semibold); overflow-wrap: anywhere; }
 .esmera-dashboard-task__copy small,
 .esmera-dashboard-product__copy small { display: block; margin-top: 4px; color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); line-height: 1.45; overflow-wrap: anywhere; }
-.esmera-dashboard-task__actions { display: grid; justify-items: end; gap: 5px; }
+.esmera-dashboard-product__copy strong { letter-spacing: -.01em; }
+.esmera-dashboard-product__copy small { color: var(--esmera-text-subtle); font-weight: var(--esmera-weight-regular); }
+.esmera-dashboard-task__actions {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  opacity: 0;
+  transition: opacity var(--esmera-motion-fast) var(--esmera-ease-standard);
+}
 .esmera-dashboard-task__actions a + a { color: var(--esmera-text-muted); font-weight: var(--esmera-weight-regular); }
+.esmera-dashboard-task:hover .esmera-dashboard-task__actions,
+.esmera-dashboard-task:focus-within .esmera-dashboard-task__actions { opacity: 1; }
+@media (hover: none) {
+  .esmera-dashboard-task__actions { opacity: 1; }
+}
 
 .esmera-dashboard-product {
   min-width: 0;
@@ -146,5 +178,7 @@
   .esmera-dashboard-pipeline__stage,
   .esmera-dashboard-pipeline__track > span,
   .esmera-dashboard-task,
+  .esmera-dashboard-task__actions,
   .esmera-dashboard-product { transition: none; }
+  .esmera-dashboard-pipeline__list { animation: none; }
 }

@@ -3,11 +3,18 @@ import { NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
 
 import { canManageSite } from '../../../../access/roles'
-import { adminActionResponse, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
+import { decorateIssue } from '../../../../issues/build'
+import { ISSUE_CODES } from '../../../../issues/codes'
+import { issueCopy } from '../../../../issues/copy'
+import { adminActionResponse, adminCodedError, adminErrorResponse, adminInputError } from '../../../../server/admin/errors'
 import { assessCategoryPublication } from '../../../../server/publication/categoryAssessment'
 import { coordinatePublication } from '../../../../server/publication/coordinator'
-import { createDocumentRevision } from '../../../../server/publication/revision'
-import type { PublicationAssessment } from '../../../../server/publication/types'
+import { withSerializableTransaction } from '../../../../server/publication/concurrency'
+import { createPublicPublicationMetadata } from '../../../../server/publication/publicRevision'
+import { assertExpectedDocumentRevision, createDocumentRevision } from '../../../../server/publication/revision'
+import { stampPublishedDocumentMetadata } from '../../../../server/publication/stampPublicationMetadata'
+import { probeStorefrontRevision } from '../../../../server/publication/storefrontProbe'
+import { RevisionConflictError, STOREFRONT_CONTRACT_VERSION, type PublicationAssessment } from '../../../../server/publication/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,11 +39,6 @@ function relationID(value: unknown): string | number | null {
   return null
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-  if (error && typeof error === 'object' && 'message' in error) return String((error as { message?: unknown }).message || 'Erro de validação.')
-  return 'Não foi possível atualizar a categoria.'
-}
 
 function categoryDraftData(input: Record<string, unknown> | undefined) {
   const source = input || {}
@@ -122,17 +124,16 @@ async function assessCategoryWithHierarchy(
   }
 
   if (parentID !== null) hierarchyCycle = true
-  if (hierarchyCycle && !assessment.issues.some((issue) => issue.id === 'category.parent_cycle')) {
-    assessment.issues.push({
-      id: 'category.parent_cycle',
+  // A caminhada acima detecta um ciclo na cadeia de ancestrais — condição
+  // distinta da auto-referência que `assessCategoryPublication` já cobre, por
+  // isso um código próprio. Copy, aba, rótulo e âncora vêm do catálogo/registry.
+  if (hierarchyCycle && !assessment.issues.some((issue) => issue.code === ISSUE_CODES.categoryParentCycle)) {
+    assessment.issues.push(decorateIssue({
+      code: ISSUE_CODES.categoryParentCycle,
       severity: 'blocker',
       path: 'parent',
-      tab: 'content',
-      anchor: 'category-parent',
-      message: 'A categoria cria um ciclo na hierarquia.',
-      suggestion: 'Escolha uma categoria principal fora da própria cadeia de descendência.',
-      source: 'business_rule',
-    })
+      source: 'readiness',
+    }, 'category'))
     assessment.ready = false
   }
   return assessment
@@ -141,28 +142,58 @@ async function assessCategoryWithHierarchy(
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers: request.headers })
-  if (!user) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-  if (!canManageSite(user)) return NextResponse.json({ error: 'Sem permissão para operar categorias.' }, { status: 403 })
+  if (!user) return adminCodedError('unauthenticated')
+  if (!canManageSite(user)) return adminCodedError('forbidden', { summary: 'Sem permissão para operar categorias.' })
 
   let body: RequestBody
   try {
     body = await request.json() as RequestBody
   } catch {
-    return NextResponse.json({ error: 'Corpo da requisição inválido.' }, { status: 400 })
+    return adminCodedError('invalid_request', { summary: 'Corpo da requisição inválido.' })
   }
 
   if (body.action === 'save-draft') {
     if (body.id === undefined || body.id === null) return adminInputError('Categoria não informada.')
     try {
-      const document = await payload.update({
+      const document = await withSerializableTransaction(payload, user, async (req) => {
+        const current = await payload.findByID({
+          collection: 'categories',
+          id: body.id as string | number,
+          draft: true,
+          depth: 2,
+          overrideAccess: false,
+          user,
+          req,
+        })
+        assertExpectedDocumentRevision(current, {
+          expectedRevision: body.expectedRevision,
+          expectedUpdatedAt: body.expectedUpdatedAt,
+        })
+
+        return await payload.update({
+          collection: 'categories',
+          id: body.id as string | number,
+          data: categoryDraftData(body.data) as never,
+          draft: true,
+          depth: 2,
+          overrideAccess: false,
+          user,
+          req,
+        })
+      })
+
+      const persisted = await payload.findByID({
         collection: 'categories',
         id: body.id,
-        data: categoryDraftData(body.data) as never,
         draft: true,
         depth: 2,
         overrideAccess: false,
         user,
       })
+      if (createDocumentRevision(persisted) !== createDocumentRevision(document)) {
+        throw new RevisionConflictError('O conteúdo foi alterado por outra sessão durante a gravação. Tente novamente.')
+      }
+
       return adminActionResponse('saved', {
         entityId: body.id,
         revision: createDocumentRevision(document),
@@ -215,13 +246,39 @@ export async function POST(request: Request) {
           user,
         }),
         assess: (document) => assessCategoryWithHierarchy(payload, user, document as unknown as Record<string, unknown>),
-        publish: () => payload.update({
+        publish: (snapshot) => {
+          const publicSnapshot = {
+            ...(snapshot as unknown as Record<string, unknown>),
+            _status: 'published',
+          }
+          const metadata = createPublicPublicationMetadata('category', publicSnapshot)
+          return payload.update({
+            collection: 'categories',
+            id: body.id as string | number,
+            data: {
+              _status: publicSnapshot._status,
+              publicationRevision: metadata.revision,
+              publicationContractVersion: metadata.contractVersion,
+            } as never,
+            draft: false,
+            depth: 2,
+            overrideAccess: true,
+            user,
+          })
+        },
+        verify: (published, revision) => probeStorefrontRevision({
+          entity: 'category',
+          entityId: body.id as string | number,
+          expectedRevision: revision,
+          contractVersion: STOREFRONT_CONTRACT_VERSION,
+        }),
+        revertPublish: () => payload.update({
           collection: 'categories',
           id: body.id as string | number,
-          data: { _status: 'published' } as never,
+          data: { _status: 'draft' } as never,
           draft: false,
           depth: 2,
-          overrideAccess: false,
+          overrideAccess: true,
           user,
         }),
       })
@@ -232,9 +289,16 @@ export async function POST(request: Request) {
         assessment: result.assessment,
         message: result.status === 'requires_confirmation'
           ? 'Revise e confirme os avisos antes de publicar.'
+          : result.status === 'publish_reverted'
+          ? 'A publicação foi revertida: a vitrine reportou incompatibilidade e a categoria voltou para rascunho.'
+          : result.status === 'published_but_incompatible'
+          ? 'Categoria publicada, mas a vitrine reportou incompatibilidade e não foi possível reverter automaticamente.'
+          : result.status === 'published_but_unverified'
+          ? 'Categoria publicada, mas a confirmação visual do site está indisponível.'
           : 'Categoria publicada.',
         meta: {
           confirmationToken: result.confirmationToken,
+          verification: result.verification,
           updatedAt: updatedAt(result.document),
         },
       })
@@ -250,23 +314,20 @@ export async function POST(request: Request) {
 
   try {
     if (body.action === 'unpublish') {
-      if (body.id === undefined || body.id === null) return NextResponse.json({ error: 'Categoria não informada.' }, { status: 400 })
+      if (body.id === undefined || body.id === null) return adminCodedError('invalid_request', { summary: 'Categoria não informada.' })
       const linkedProducts = await activePublishedProductCount(payload, user, body.id)
       if (linkedProducts > 0) {
-        return adminInputError(
-          `Esta categoria é usada por ${linkedProducts} produto(s) ativo(s) e publicado(s).`,
-          {
-            code: 'publication_blocked',
-            entityErrors: [{
-              code: 'category.used_by_published_products',
-              message: `A categoria está vinculada a ${linkedProducts} produto(s) ativo(s) e publicado(s).`,
-              suggestion: 'Mova ou arquive esses produtos antes de despublicar a categoria.',
-              related: [{ collection: 'products', count: linkedProducts }],
-            }],
-            meta: { linkedProducts },
-          },
-          422,
-        )
+        const copy = issueCopy[ISSUE_CODES.categoryUsedByPublishedProducts]
+        return adminCodedError('publication_blocked', {
+          summary: `Esta categoria é usada por ${linkedProducts} produto(s) ativo(s) e publicado(s).`,
+          entityErrors: [{
+            code: ISSUE_CODES.categoryUsedByPublishedProducts,
+            message: copy.message({ linkedProducts }),
+            suggestion: copy.suggestion ?? null,
+            related: [{ collection: 'products', count: linkedProducts }],
+          }],
+          meta: { linkedProducts },
+        })
       }
       const document = await payload.update({
         collection: 'categories',
@@ -302,7 +363,7 @@ export async function POST(request: Request) {
       const currentIds = current.docs.map((doc) => String(doc.id))
       const incomingIds = orderedIds.map(String)
       const sameSet = incomingIds.length === currentIds.length && currentIds.every((id) => incomingIds.includes(id))
-      if (!sameSet) return NextResponse.json({ error: 'A ordenação precisa conter exatamente todas as categorias atuais.' }, { status: 409 })
+      if (!sameSet) return adminCodedError('revision_conflict', { summary: 'A ordenação precisa conter exatamente todas as categorias atuais.' })
 
       const byId = new Map(current.docs.map((doc) => [String(doc.id), doc]))
       for (let index = 0; index < orderedIds.length; index += 1) {
@@ -310,21 +371,28 @@ export async function POST(request: Request) {
         const doc = byId.get(String(id))
         const nextOrder = (index + 1) * 100
         if (!doc || doc.order === nextOrder) continue
-        await payload.update({
+        const mutated = await payload.update({
           collection: 'categories',
           id,
           data: { order: nextOrder } as never,
           draft: doc._status !== 'published',
+          depth: 2,
           overrideAccess: false,
           user,
         })
+        await stampPublishedDocumentMetadata({ payload, entity: 'category', collection: 'categories', id, user, document: mutated })
       }
       return NextResponse.json({ updated: orderedIds.length })
     }
 
-    return NextResponse.json({ error: 'Ação não suportada.' }, { status: 400 })
+    return adminCodedError('invalid_request', { summary: 'Ação não suportada.' })
   } catch (error) {
-    payload.logger.error({ err: error }, 'admin category operation failed')
-    return NextResponse.json({ error: errorMessage(error) }, { status: 422 })
+    // Antes qualquer falha virava 422, inclusive NotFound e erro interno. Agora
+    // o serializer classifica por instanceof e o status sai coerente.
+    return adminErrorResponse(error, {
+      entity: 'category',
+      operation: body.action,
+      logger: payload.logger,
+    })
   }
 }

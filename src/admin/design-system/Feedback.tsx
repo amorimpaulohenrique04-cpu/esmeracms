@@ -5,6 +5,24 @@ import { normalizeAdminError } from '../state/asyncState'
 export type StatusTone = 'neutral' | 'success' | 'danger' | 'warning' | 'info'
 export type StateKind = 'loading' | 'empty-result' | 'empty-system' | 'integration-unconfigured' | 'partial-data' | 'permission-denied' | 'recoverable-error' | 'destructive-error' | 'saving' | 'saved' | 'rollback'
 
+/**
+ * Semântica de anúncio compartilhada pelos estados. O tom `danger` nunca vira
+ * `alert` sozinho: interromper o leitor de tela é decisão de quem chama.
+ */
+export type Announcement = 'none' | 'polite' | 'assertive'
+
+export function announcementProps(announcement: Announcement): { role?: 'status' | 'alert'; 'aria-live'?: 'polite' | 'assertive' } {
+  if (announcement === 'polite') return { role: 'status', 'aria-live': 'polite' }
+  if (announcement === 'assertive') return { role: 'alert', 'aria-live': 'assertive' }
+  return {}
+}
+
+/** `live` é a prop legada: mantida temporariamente e resolvida como `polite`. */
+export function resolveAnnouncement(announcement: Announcement | undefined, live: boolean | undefined): Announcement {
+  if (announcement) return announcement
+  return live ? 'polite' : 'none'
+}
+
 export function Status({ tone = 'neutral', children, className = '' }: { tone?: StatusTone; children: React.ReactNode; className?: string }) {
   const toneClass = tone === 'neutral' ? '' : ` esmera-status--${tone}`
   return <span className={`esmera-status${toneClass}${className ? ` ${className}` : ''}`}>{children}</span>
@@ -17,7 +35,8 @@ export function StatePanel({
   detail,
   action,
   compact = false,
-  live = false,
+  live,
+  announcement,
 }: {
   kind: StateKind
   title: React.ReactNode
@@ -25,15 +44,15 @@ export function StatePanel({
   detail?: React.ReactNode
   action?: React.ReactNode
   compact?: boolean
+  /** @deprecated use `announcement="polite"`. */
   live?: boolean
+  announcement?: Announcement
 }) {
-  const error = kind === 'recoverable-error' || kind === 'destructive-error'
   return (
     <div
       className={`esmera-state-panel is-${kind}${compact ? ' is-compact' : ''}`}
       data-state={kind}
-      role={error ? 'alert' : live ? 'status' : undefined}
-      aria-live={live ? 'polite' : undefined}
+      {...announcementProps(resolveAnnouncement(announcement, live))}
       aria-busy={kind === 'loading' || kind === 'saving' ? true : undefined}
     >
       <span className="esmera-state-panel__mark" aria-hidden="true" />
@@ -90,12 +109,14 @@ export function ErrorState({
   detail,
   action,
   destructive = false,
+  announcement = 'none',
 }: {
   title: string
   error?: unknown
   detail?: string
   action?: React.ReactNode
   destructive?: boolean
+  announcement?: Announcement
 }) {
   const normalized = normalizeAdminError(error, detail || 'Não foi possível concluir esta operação.')
   return (
@@ -105,17 +126,18 @@ export function ErrorState({
       copy={normalized.message}
       detail={detail && normalized.message !== detail ? detail : undefined}
       action={action}
+      announcement={announcement}
     />
   )
 }
 
-export function SavingState({ state, message }: { state: 'saving' | 'saved' | 'rollback'; message?: string }) {
+export function SavingState({ state, message, announcement = 'polite' }: { state: 'saving' | 'saved' | 'rollback'; message?: string; announcement?: Announcement }) {
   const defaults = {
     saving: 'Salvando alterações…',
     saved: 'Alterações salvas.',
     rollback: 'A alteração não foi salva e o estado anterior foi restaurado.',
   }
-  return <StatePanel kind={state} title={message || defaults[state]} compact live />
+  return <StatePanel kind={state} title={message || defaults[state]} compact announcement={announcement} />
 }
 
 export function Skeleton({ width = '100%', height = 16, className = '' }: { width?: string | number; height?: string | number; className?: string }) {

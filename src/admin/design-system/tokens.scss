@@ -10,7 +10,8 @@
   --esmera-text: #17201c;
   --esmera-text-secondary: #3f4944;
   --esmera-text-muted: #65706b;
-  --esmera-text-subtle: #7b8580;
+  /* Recalibrado para >= 4.5:1 sobre canvas, panel e raised. */
+  --esmera-text-subtle: #68736e;
 
   --esmera-danger: #913f3a;
   --esmera-danger-soft: #fbefee;
@@ -28,7 +29,6 @@
   --esmera-surface-selected: #eef2f0;
   --esmera-surface-hover: #f7f9f8;
   --esmera-surface-disabled: #f0f2f1;
-  --esmera-backdrop: rgba(15, 24, 20, .24);
 
   /* Lines and selection */
   --esmera-line-subtle: #e5e9e7;
@@ -100,19 +100,32 @@
   --esmera-space-10: 40px;
   --esmera-space-12: 48px;
 
-  /* Motion */
+  /* Motion: escala canônica única. Nomes antigos viram alias no fim do bloco. */
   --esmera-motion-instant: 80ms;
   --esmera-motion-fast: 120ms;
-  --esmera-motion-standard: 160ms;
-  --esmera-motion-slow: 220ms;
-  --esmera-ease: cubic-bezier(.2, 0, 0, 1);
+  --esmera-motion-component: 180ms;
+  --esmera-motion-panel: 220ms;
+  --esmera-motion-navigation: 280ms;
+  --esmera-motion-data: 420ms;
+
+  --esmera-ease-standard: cubic-bezier(.2, 0, 0, 1);
   --esmera-ease-enter: cubic-bezier(.16, 1, .3, 1);
   --esmera-ease-exit: cubic-bezier(.4, 0, 1, 1);
+  --esmera-ease-emphasized: cubic-bezier(.16, 1, .3, 1);
 
   /* Depth */
   --esmera-shadow-min: 0 1px 2px rgba(20, 33, 29, .025);
-  --esmera-shadow-raised: 0 10px 28px rgba(20, 33, 29, .08);
-  --esmera-shadow-overlay: 0 18px 48px rgba(20, 33, 29, .12);
+  --esmera-shadow-interactive:
+    0 8px 22px rgba(20, 33, 29, .07),
+    0 1px 2px rgba(20, 33, 29, .03);
+  --esmera-shadow-floating:
+    0 20px 48px rgba(20, 33, 29, .12);
+
+  --esmera-backdrop-strong: rgba(15, 24, 20, .28);
+  --esmera-blur-header: 14px;
+  --esmera-blur-overlay: 8px;
+  --esmera-hover-lift: -1px;
+  --esmera-press-scale: .99;
 
   --esmera-focus: #58786c;
   --esmera-focus-ring: var(--esmera-selection-ring);
@@ -135,4 +148,74 @@
   --esmera-control-sm: 32px;
   --esmera-control-md: var(--esmera-control-compact);
   --esmera-control-lg: var(--esmera-control-standard);
+
+  /* Motion e profundidade: nomes legados resolvem na escala canônica, nunca em
+     valores próprios. Não reintroduzir literais aqui. */
+  --esmera-motion-standard: var(--esmera-motion-component);
+  --esmera-motion-slow: var(--esmera-motion-panel);
+  --esmera-ease: var(--esmera-ease-standard);
+  --esmera-shadow-raised: var(--esmera-shadow-interactive);
+  --esmera-shadow-overlay: var(--esmera-shadow-floating);
+  --esmera-backdrop: var(--esmera-backdrop-strong);
+}
+
+/* Política compartilhada de reduced motion.
+   Vive em tokens.scss porque este é o único módulo importado por todos os
+   entry points do admin (custom.scss, shell.scss, nav.scss, design-system.scss),
+   o que evita políticas divergentes por folha. Overlays continuam abrindo,
+   fechando, recebendo foco e devolvendo foco: só o movimento é removido. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .esmera-button,
+  .esmera-icon-button,
+  .is-interactive-surface,
+  .esmera-segmented-control__item,
+  .esmera-metric-strip__item,
+  .esmera-section-nav__link,
+  .esmera-quick-actions__item,
+  .esmera-menu-item,
+  .esmera-select-item,
+  .esmera-combobox-item,
+  .esmera-filter-panel__advanced summary::after,
+  .esmera-overlay-backdrop,
+  .esmera-dialog,
+  .esmera-drawer,
+  .esmera-menu-popup,
+  .esmera-popover-popup,
+  .esmera-select-popup,
+  .esmera-combobox-popup,
+  .esmera-tooltip-popup,
+  .esmera-spatial-selection::after,
+  .esmera-state-panel,
+  .esmera-inline-feedback {
+    transition-duration: 1ms;
+    transition-delay: 0s;
+    transform: none;
+  }
+
+  .esmera-button:active,
+  .is-interactive-surface:active,
+  .is-interactive-surface:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .esmera-skeleton,
+  .esmera-inline-feedback.is-busy::before,
+  .esmera-state-panel.is-loading .esmera-state-panel__mark,
+  .esmera-state-panel.is-saving .esmera-state-panel__mark,
+  .esmera-button__spinner {
+    animation: none;
+  }
+
+  .esmera-split-workspace__detail,
+  .esmera-context-inspector[data-rollback='true'],
+  .esmera-inline-feedback.is-rollback {
+    animation: none;
+  }
 }

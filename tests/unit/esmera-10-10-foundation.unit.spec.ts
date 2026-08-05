@@ -1,6 +1,8 @@
+import { ValidationError } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { normalizeAdminServerError } from '../../src/server/admin/errors/fromPayload'
+import { ISSUE_CODES } from '../../src/issues/codes'
+import { normalizeAdminServerError } from '../../src/server/admin/errors/serialize'
 import { coordinatePublication } from '../../src/server/publication/coordinator'
 import { assessProductPublication } from '../../src/server/publication/productAssessment'
 import { canonicalizeForRevision, createDocumentRevision } from '../../src/server/publication/revision'
@@ -32,18 +34,21 @@ function validProduct() {
 
 describe('administrative error contract', () => {
   it('preserves nested field paths and maps them to an editorial location', () => {
-    const normalized = normalizeAdminServerError({
-      name: 'ValidationError',
-      status: 422,
+    const normalized = normalizeAdminServerError(new ValidationError({
+      collection: 'products',
+      req: undefined as never,
       errors: [{ path: 'gallery.1.alt', message: 'Informe o texto alternativo.' }],
-    }, { entity: 'product' })
+    }), { entity: 'product' })
 
-    expect(normalized.code).toBe('validation_failed')
+    expect(normalized.code).toBe('validation_error')
+    expect(normalized.status).toBe(422)
     expect(normalized.fieldErrors).toEqual([
       expect.objectContaining({
         path: 'gallery.1.alt',
         tab: 'gallery',
-        anchor: 'product-gallery',
+        // A âncora agora identifica o item, não só a galeria inteira.
+        anchor: 'product-gallery-item-2-alt',
+        label: 'Texto alternativo da imagem 2',
         message: 'Informe o texto alternativo.',
       }),
     ])
@@ -101,9 +106,10 @@ describe('storefront and publication assessment', () => {
     product.gallery[0].image._status = 'draft'
 
     expect(assessProductPublication(product).issues).toContainEqual(expect.objectContaining({
-      id: 'storefront.media.unpublished',
+      code: ISSUE_CODES.storefrontMediaUnpublished,
       path: 'gallery.0.image',
       severity: 'blocker',
+      source: 'media',
     }))
   })
 })

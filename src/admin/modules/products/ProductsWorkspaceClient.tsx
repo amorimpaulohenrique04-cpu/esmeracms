@@ -10,7 +10,7 @@ import {
 } from '@tanstack/react-table'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   BulkActionBar,
@@ -24,6 +24,13 @@ import {
   SegmentedControlLink,
   SplitWorkspace,
 } from '../../design-system'
+// Contrato real do lote (PR-06). Importado como tipo: nada do runtime do
+// servidor entra no bundle do cliente, e o painel não redeclara o contrato.
+import type {
+  BulkPublicationItemResult,
+  BulkPublicationItemStatus,
+  BulkPublicationResult,
+} from '../../../server/publication/types'
 import {
   availabilityLabels,
   coverItem,
@@ -41,7 +48,131 @@ type WorkspaceProps = {
   totalPages: number
 }
 
-type MutationAction = 'publish' | 'unpublish' | 'archive' | 'restore' | 'add-category' | 'set-availability'
+// 'publish' saiu daqui: a publicação em lote passa pelo coordenador e usa
+// items[] com token de concorrência por produto, não ids[].
+type MutationAction = 'unpublish' | 'archive' | 'restore' | 'add-category' | 'set-availability'
+
+type PublishItemRequest = {
+  id: string | number
+  expectedUpdatedAt: string
+  confirmationToken?: string
+}
+
+// Ordem de leitura do painel: o que deu certo primeiro, depois o que exige
+// ação. As chaves são exatamente os status do contrato — nenhum status novo.
+const bulkStatusOrder: BulkPublicationItemStatus[] = [
+  'published',
+  'warning_requires_confirmation',
+  'blocked',
+  'revision_conflict',
+  'failed',
+]
+
+const bulkStatusLabels: Record<BulkPublicationItemStatus, string> = {
+  published: 'Publicado',
+  blocked: 'Pendências impedem publicar',
+  warning_requires_confirmation: 'Avisos aguardando confirmação',
+  revision_conflict: 'Alterado em outra sessão',
+  failed: 'Não foi possível publicar',
+}
+
+/** Único estado de sucesso definitivo do contrato do lote. */
+function isBulkSettled(item: BulkPublicationItemResult) {
+  return item.status === 'published'
+}
+
+/**
+ * Única nova tentativa que o contrato autoriza explicitamente.
+ *
+ * `BulkPublicationItemResult` não expõe `retryable` — essa indicação vive no
+ * envelope de erro (`AdminError.retryable`), não por item. Portanto o painel
+ * não infere retry: o handshake de confirmação de avisos é a única repetição
+ * que o contrato descreve, e ele exige o `confirmationToken` emitido pelo
+ * servidor para aquele item. `updatedAt` entra apenas como o token de
+ * concorrência que o próprio handshake pede, nunca como sinal de "pode tentar
+ * de novo": nenhum outro status recebe ação de reenvio.
+ */
+function confirmationRequestFor(item: BulkPublicationItemResult): PublishItemRequest | null {
+  if (item.status !== 'warning_requires_confirmation') return null
+  if (!item.confirmationToken || !item.updatedAt) return null
+  return {
+    id: item.id,
+    expectedUpdatedAt: item.updatedAt,
+    confirmationToken: item.confirmationToken,
+  }
+}
+
+/**
+ * Funde o retorno de uma nova tentativa ao resultado já exibido: os itens já
+ * concluídos continuam visíveis e os contadores voltam a bater com a lista.
+ * A forma devolvida é a do próprio contrato.
+ */
+function mergeBulkResults(
+  previous: BulkPublicationResult | null,
+  next: BulkPublicationResult,
+): BulkPublicationResult {
+  if (!previous) return next
+  const byId = new Map(previous.results.map((item) => [String(item.id), item]))
+  for (const item of next.results) byId.set(String(item.id), item)
+  const results = [...byId.values()]
+  const count = (status: BulkPublicationItemStatus) => results.filter((item) => item.status === status).length
+  return {
+    requested: results.length,
+    published: count('published'),
+    blocked: count('blocked'),
+    conflicts: count('revision_conflict'),
+    failed: count('failed'),
+    results,
+  }
+}
+
+function bulkReportPayload(result: BulkPublicationResult) {
+  return {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      requested: result.requested,
+      published: result.published,
+      blocked: result.blocked,
+      conflicts: result.conflicts,
+      failed: result.failed,
+    },
+    // Só o que não terminou em sucesso definitivo entra no relatório.
+    items: result.results.filter((item) => !isBulkSettled(item)).map((item) => ({
+      id: item.id,
+      title: item.title || `Produto ${item.id}`,
+      status: item.status,
+      statusLabel: bulkStatusLabels[item.status],
+      message: item.message,
+      canConfirm: confirmationRequestFor(item) !== null,
+      issues: (item.issues || []).map((issue) => ({
+        label: issue.label,
+        tab: issue.tab,
+        message: issue.message,
+        suggestion: issue.suggestion ?? null,
+      })),
+    })),
+  }
+}
+
+function bulkReportText(result: BulkPublicationResult) {
+  const payload = bulkReportPayload(result)
+  const lines = [
+    'Relatório de publicação em lote',
+    `Solicitados: ${payload.summary.requested} · Publicados: ${payload.summary.published} · Bloqueados: ${payload.summary.blocked} · Conflitos: ${payload.summary.conflicts} · Falhas: ${payload.summary.failed}`,
+    '',
+  ]
+  for (const item of payload.items) {
+    lines.push(`${item.title} (ID ${item.id})`)
+    lines.push(`Status: ${item.statusLabel}`)
+    lines.push(`Mensagem: ${item.message}`)
+    lines.push(`Nova tentativa: ${item.canConfirm ? 'disponível (confirmação de avisos)' : 'indisponível'}`)
+    for (const issue of item.issues) {
+      lines.push(`- ${issue.label} (${issue.tab}): ${issue.message}${issue.suggestion ? ` — ${issue.suggestion}` : ''}`)
+    }
+    lines.push('')
+  }
+  return lines.join('\n').trim()
+}
 
 function money(cents: number | null | undefined) {
   if (typeof cents !== 'number') return 'Sob consulta'
@@ -136,12 +267,24 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
   const [selection, setSelection] = useState<RowSelectionState>({})
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const bulkPanel = useRef<HTMLElement | null>(null)
+  const [bulkResult, setBulkResult] = useState<BulkPublicationResult | null>(null)
+  const [bulkAnnouncement, setBulkAnnouncement] = useState('')
+  const [bulkFocusToken, setBulkFocusToken] = useState(0)
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState('')
   const [bulkAvailability, setBulkAvailability] = useState('')
   const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     return new URLSearchParams(window.location.search).get('inspect')
   })
+
+  // O foco só se move quando há algo a resolver; o token evita mover o foco de
+  // novo quando o painel apenas rerenderiza.
+  useEffect(() => {
+    if (!bulkFocusToken) return
+    bulkPanel.current?.focus()
+  }, [bulkFocusToken])
 
   const openInspector = (id: string | number, trigger: HTMLButtonElement) => {
     inspectorTrigger.current = trigger
@@ -171,7 +314,17 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
       header: 'Produto',
       cell: ({ row }) => {
         const product = row.original
-        return <div className="esmera-product-cell"><Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link><small>{product.code || 'Sem código'} · {product.slug || 'sem-slug'}</small></div>
+        const cover = coverItem(product.gallery)
+        const coverURL = imageURL(cover)
+        return (
+          <div className="esmera-product-cell">
+            <span className="esmera-product-list-thumb">{coverURL ? <img src={coverURL} alt="" /> : null}</span>
+            <div className="esmera-product-cell__copy">
+              <Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link>
+              <small>{product.code || 'Sem código'} · {product.slug || 'sem-slug'}</small>
+            </div>
+          </div>
+        )
       },
     },
     { accessorKey: 'availability', header: 'Disponibilidade', cell: ({ getValue }) => availabilityLabels[String(getValue() || '')] || '—' },
@@ -183,7 +336,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     {
       id: 'inspect',
       header: '',
-      cell: ({ row }) => <Button type="button" onClick={(event) => openInspector(row.original.id, event.currentTarget)}>Inspecionar</Button>,
+      cell: ({ row }) => <Button className="esmera-product-row-action" type="button" onClick={(event) => openInspector(row.original.id, event.currentTarget)}>Inspecionar</Button>,
     },
   ], [filters])
 
@@ -199,6 +352,106 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
   const selectedIds = table.getSelectedRowModel().rows.map((row) => row.original.id)
   const selectedProduct = products.find((product) => String(product.id) === selectedProductId)
+
+  async function publishSelected(override?: PublishItemRequest[]) {
+    if (busy) return
+    const items: PublishItemRequest[] = override || table.getSelectedRowModel().rows.map((row) => ({
+      id: row.original.id,
+      expectedUpdatedAt: row.original.updatedAt || '',
+    }))
+    if (!items.length) return
+
+    setBusy(true)
+    setFeedback(null)
+    try {
+      const response = await fetch('/api/admin-products', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'publish', items }),
+      })
+      const body = await response.json() as {
+        ok?: boolean
+        result?: { meta?: BulkPublicationResult }
+        error?: { summary?: string }
+      }
+      if (!response.ok || !body.result?.meta) {
+        throw new Error(body.error?.summary || 'Não foi possível publicar os produtos.')
+      }
+
+      // Uma nova tentativa devolve só os itens reenviados: fundir preserva os
+      // que já foram concluídos em tentativas anteriores.
+      const result = mergeBulkResults(bulkResult, body.result.meta)
+      setBulkResult(result)
+      setReportFeedback(null)
+
+      if (result.results.some((item) => !isBulkSettled(item))) {
+        // O anúncio vem do foco no painel nomeado. Escrever também na região
+        // live faria o leitor de tela ler o mesmo resultado duas vezes.
+        setBulkAnnouncement('')
+        setBulkFocusToken((token) => token + 1)
+      } else {
+        setBulkAnnouncement(`${result.published} de ${result.requested} produto(s) publicados.`)
+      }
+
+      // Só os publicados saem da seleção. Bloqueados, conflitos, falhas e
+      // itens aguardando confirmação permanecem selecionados para retry.
+      const publishedIds = new Set(
+        result.results.filter(isBulkSettled).map((item) => String(item.id)),
+      )
+      setSelection((current) => Object.fromEntries(
+        Object.entries(current).filter(([id, selected]) => selected && !publishedIds.has(id)),
+      ))
+      router.refresh()
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Não foi possível publicar os produtos.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const unsettled = (bulkResult?.results || []).filter((item) => !isBulkSettled(item))
+
+  const dismissBulkResult = () => {
+    setBulkResult(null)
+    setBulkAnnouncement('')
+    setReportFeedback(null)
+  }
+
+  // O texto vai para a região live e para o painel: só a região live anuncia,
+  // então o leitor de tela recebe o retorno uma única vez.
+  const announceReport = (message: string) => {
+    setReportFeedback(message)
+    setBulkAnnouncement(message)
+  }
+
+  async function copyReport() {
+    if (!bulkResult) return
+    try {
+      await navigator.clipboard.writeText(bulkReportText(bulkResult))
+      announceReport('Relatório copiado para a área de transferência.')
+    } catch {
+      announceReport('Não foi possível copiar o relatório.')
+    }
+  }
+
+  function exportReport() {
+    if (!bulkResult) return
+    try {
+      const blob = new Blob([JSON.stringify(bulkReportPayload(bulkResult), null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `publicacao-em-lote-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      announceReport('Relatório exportado.')
+    } catch {
+      announceReport('Não foi possível exportar o relatório.')
+    }
+  }
 
   async function mutate(action: MutationAction) {
     if (!selectedIds.length || busy) return
@@ -267,23 +520,120 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
     {feedback ? <InlineFeedback busy={busy} tone={feedback.includes('não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
 
+    {/* Região live sempre montada: só recebe texto quando o foco NÃO se move. */}
+    <p className="esmera-sr-only" role="status" aria-live="polite">{bulkAnnouncement}</p>
+
+    {bulkResult ? (
+      <section
+        className="esmera-products-bulk-result"
+        role="region"
+        aria-labelledby="esmera-bulk-result-title"
+        tabIndex={-1}
+        ref={bulkPanel}
+      >
+        <div className="esmera-products-bulk-result__header">
+          <div>
+            <strong id="esmera-bulk-result-title">Resultado da publicação em lote</strong>
+            <p className="esmera-products-bulk-result__status">
+              {bulkResult.requested} solicitado(s) · {bulkResult.published} publicado(s) · {bulkResult.blocked} bloqueado(s) · {bulkResult.conflicts} conflito(s) · {bulkResult.failed} falha(s)
+            </p>
+          </div>
+          <button className="esmera-icon-button" type="button" onClick={dismissBulkResult} aria-label="Fechar resultado da publicação">×</button>
+        </div>
+
+        {bulkStatusOrder.map((status) => {
+          const group = bulkResult.results.filter((item) => item.status === status)
+          if (!group.length) return null
+          return (
+            <section key={status} className="esmera-products-bulk-result__group" aria-labelledby={`esmera-bulk-group-${status}`}>
+              <strong id={`esmera-bulk-group-${status}`}>{bulkStatusLabels[status]} ({group.length})</strong>
+              <ul className="esmera-products-bulk-result__list">
+                {group.map((item) => {
+                  const confirmation = confirmationRequestFor(item)
+                  return (
+                    <li key={String(item.id)} data-status={item.status} data-can-confirm={confirmation ? 'true' : 'false'}>
+                      <div>
+                        <strong>{item.title || `Produto ${item.id}`}</strong>
+                        <span className="esmera-products-bulk-result__status">{bulkStatusLabels[item.status]}</span>
+                        <p>{item.message}</p>
+                        {item.issues?.length ? (
+                          <ul className="esmera-product-issues">
+                            {item.issues.map((issue, index) => (
+                              <li key={`${item.id}-${issue.code}-${index}`}>
+                                <strong>{issue.label}</strong>
+                                {issue.tab ? <span className="esmera-products-bulk-result__status">{issue.tab}</span> : null}
+                                <p>{issue.message}</p>
+                                {issue.suggestion ? <small>{issue.suggestion}</small> : null}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                      {/* Cada status recebe só a ação que o contrato e os
+                          mecanismos atuais do workspace já sustentam. `failed`
+                          não tem nenhuma: o contrato não descreve repetição
+                          segura para ele. */}
+                      <div className="esmera-actions">
+                        {item.status === 'blocked' ? (
+                          <Link className="esmera-button" href={productHref(filters, item.id)}>Corrigir produto</Link>
+                        ) : null}
+                        {item.status === 'published' ? (
+                          <Link className="esmera-button" href={productHref(filters, item.id)}>Abrir produto</Link>
+                        ) : null}
+                        {item.status === 'revision_conflict' ? <Button onClick={() => router.refresh()}>Recarregar</Button> : null}
+                        {confirmation ? (
+                          <Button disabled={busy} onClick={() => void publishSelected([confirmation])}>
+                            Confirmar avisos e publicar
+                          </Button>
+                        ) : null}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )
+        })}
+
+        <div className="esmera-actions">
+          <Button disabled={!unsettled.length} onClick={() => void copyReport()}>Copiar relatório</Button>
+          <Button disabled={!unsettled.length} onClick={exportReport}>Exportar relatório</Button>
+        </div>
+        {reportFeedback ? <p className="esmera-products-bulk-result__status">{reportFeedback}</p> : null}
+      </section>
+    ) : null}
+
     {!products.length ? (
       <EmptyState title="Nenhum produto encontrado" copy="Ajuste os filtros ou crie um novo produto para iniciar o catálogo." action={<Link className="esmera-button esmera-button--primary" href="/admin/collections/products/create">Novo produto</Link>} />
     ) : filters.view === 'list' ? (
       <DataTable label="Produtos do catálogo">
         <thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead>
-        <tbody>{table.getRowModel().rows.map((row) => <tr key={row.id} className={String(row.original.id) === selectedProductId ? 'is-selected' : ''}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody>
+        <tbody>{table.getRowModel().rows.map((row) => {
+          const rowClass = [
+            String(row.original.id) === selectedProductId ? 'is-selected' : '',
+            row.getIsSelected() ? 'is-checked' : '',
+          ].filter(Boolean).join(' ')
+          return <tr key={row.id} className={rowClass}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>
+        })}</tbody>
       </DataTable>
     ) : (
       <div className="esmera-products-grid">
         {products.map((product) => {
           const cover = coverItem(product.gallery)
           const coverURL = imageURL(cover)
-          return <article className={`esmera-product-tile${String(product.id) === selectedProductId ? ' is-selected' : ''}`} key={String(product.id)}>
+          const row = table.getRow(String(product.id))
+          const checked = row.getIsSelected()
+          const tileClass = [
+            'esmera-product-tile',
+            String(product.id) === selectedProductId ? 'is-selected' : '',
+            checked ? 'is-checked' : '',
+          ].filter(Boolean).join(' ')
+          return <article className={tileClass} key={String(product.id)}>
+            <span className="esmera-product-tile__select"><input aria-label={`Selecionar ${product.title || 'produto'}`} type="checkbox" checked={checked} onChange={row.getToggleSelectedHandler()} /></span>
             <Link className="esmera-product-tile__media" href={productHref(filters, product.id)}>{coverURL ? <img src={coverURL} alt={cover?.alt || product.title || ''} /> : <span>Sem imagem</span>}</Link>
             <div className="esmera-product-tile__body"><div><Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link><small>{product.code || 'Sem código'}</small></div><Readiness product={product} /></div>
             <div className="esmera-product-tile__meta"><span>{availabilityLabels[product.availability || ''] || '—'}</span><span>{product.priceMode === 'fixed' ? money(product.basePriceCents) : 'Sob consulta'}</span></div>
-            <Button type="button" onClick={(event) => openInspector(product.id, event.currentTarget)}>Inspecionar</Button>
+            <Button className="esmera-product-tile__inspect" type="button" onClick={(event) => openInspector(product.id, event.currentTarget)}>Inspecionar</Button>
           </article>
         })}
       </div>
@@ -297,7 +647,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
     {selectedIds.length ? (
       <BulkActionBar count={selectedIds.length}>
-        <Button disabled={busy} onClick={() => void mutate('publish')} tone="primary">Publicar</Button>
+        <Button disabled={busy} onClick={() => void publishSelected()} tone="primary">Publicar</Button>
         <Button disabled={busy} onClick={() => void mutate('unpublish')}>Despublicar</Button>
         <Button disabled={busy} onClick={() => void mutate('archive')}>Arquivar</Button>
         <Button disabled={busy} onClick={() => void mutate('restore')}>Restaurar</Button>

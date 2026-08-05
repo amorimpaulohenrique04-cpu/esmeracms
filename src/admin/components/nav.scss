@@ -14,7 +14,6 @@
   background: var(--esmera-surface-canvas);
   color: var(--esmera-text);
   font-family: var(--esmera-font-sans);
-  transition: width var(--esmera-motion-standard) var(--esmera-ease), padding var(--esmera-motion-standard) var(--esmera-ease);
 }
 
 .esmera-nav-brand { display: flex; align-items: center; gap: 11px; padding: 2px 8px 26px; border-radius: var(--esmera-control-radius); color: inherit; text-decoration: none; }
@@ -71,18 +70,71 @@
 @media (min-width: 1024px) and (max-width: 1279px) {
   .template-default { grid-template-columns: var(--esmera-rail-width) minmax(0, 1fr) !important; }
   .template-default__nav-toggler-wrapper { display: none !important; }
-  .esmera-nav { padding: 14px 8px 12px; overflow: visible; }
+
+  // Largura real (não clip-path): getBoundingClientRect() ignora clip-path, então
+  // um rail "recolhido" via clip mediria 260px em vez de 72px, e a área
+  // clipada-mas-ainda-presente no box seguiria capturando pointer/hover por
+  // cima do workspace. A coluna do grid é `var(--esmera-rail-width)` (fixa,
+  // não deriva do conteúdo), então o workspace nunca se move nos dois estados.
+  .esmera-nav {
+    position: relative;
+    z-index: var(--esmera-z-popover);
+    width: var(--esmera-rail-width);
+    padding: 14px 8px 12px;
+    overflow: hidden;
+    transition: width var(--esmera-motion-fast) var(--esmera-ease-exit);
+  }
+  .esmera-nav[data-peek='open'] {
+    width: var(--esmera-sidebar-width);
+    padding: 14px 12px 12px;
+    overflow: visible;
+    box-shadow: var(--esmera-shadow-floating);
+    transition: width var(--esmera-motion-fast) var(--esmera-ease-enter);
+  }
+
   .esmera-nav-brand { justify-content: center; padding: 2px 0 20px; }
+  .esmera-nav[data-peek='open'] .esmera-nav-brand { justify-content: flex-start; padding: 2px 8px 26px; }
+
   .esmera-nav-brand > div,
   .esmera-nav-link > span,
   .esmera-nav-caption,
   .esmera-user-copy,
-  .esmera-logout { display: none; }
+  .esmera-logout {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    opacity: 0;
+    transition: opacity var(--esmera-motion-fast) var(--esmera-ease-exit);
+  }
+  .esmera-nav[data-peek='open'] .esmera-nav-brand > div,
+  .esmera-nav[data-peek='open'] .esmera-nav-link > span,
+  .esmera-nav[data-peek='open'] .esmera-nav-caption,
+  .esmera-nav[data-peek='open'] .esmera-user-copy,
+  .esmera-nav[data-peek='open'] .esmera-logout {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    opacity: 1;
+    transition: opacity var(--esmera-motion-fast) var(--esmera-ease-enter);
+  }
+
   .esmera-nav-link { min-height: 42px; justify-content: center; padding: 0; }
+  .esmera-nav[data-peek='open'] .esmera-nav-link { justify-content: flex-start; padding: 0 11px; }
   .esmera-nav-link.is-active { box-shadow: inset 2px 0 0 var(--esmera-selection-bar); }
-  .esmera-nav-link .esmera-nav-icon { width: 19px; height: 19px; }
+  .esmera-nav-link .esmera-nav-icon { width: 19px; height: 19px; flex: 0 0 auto; }
   .esmera-nav-divider { margin: 14px 5px 10px; }
   .esmera-user { display: flex; justify-content: center; padding: 6px 0; }
+  .esmera-nav[data-peek='open'] .esmera-user { justify-content: flex-start; padding: 7px 8px; }
 }
 
 @media (max-width: 1023px) {
@@ -92,4 +144,9 @@
 @media (prefers-reduced-motion: reduce) {
   .esmera-nav,
   .esmera-nav-link { transition: none; }
+  .esmera-nav-brand > div,
+  .esmera-nav-link > span,
+  .esmera-nav-caption,
+  .esmera-user-copy,
+  .esmera-logout { transition: none; }
 }

@@ -26,17 +26,21 @@ export function MobileNav({
   const pathname = usePathname()
   const roleLabel = role === 'admin' ? 'Administrador' : role === 'editor' ? 'Editorial' : role === 'commercial' ? 'Comercial' : 'Sem papel'
 
-  const renderLinks = (items: ReturnType<typeof visibleOperationalLinks>) => items.map((item) => (
-    <Link
-      key={item.href}
-      className={`esmera-mobile-nav-link${isShellLinkActive(pathname, item) ? ' is-active' : ''}`}
-      href={item.href}
-      onClick={() => onOpenChange(false)}
-    >
-      <ShellIcon name={item.icon} />
-      <span>{item.label}</span>
-    </Link>
-  ))
+  const renderLinks = (items: ReturnType<typeof visibleOperationalLinks>) => items.map((item) => {
+    const active = isShellLinkActive(pathname, item)
+    return (
+      <Link
+        key={item.href}
+        className={`esmera-mobile-nav-link${active ? ' is-active' : ''}`}
+        href={item.href}
+        aria-current={active ? 'page' : undefined}
+        onClick={() => onOpenChange(false)}
+      >
+        <ShellIcon name={item.icon} />
+        <span>{item.label}</span>
+      </Link>
+    )
+  })
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>

@@ -1,0 +1,33 @@
+[
+  {
+    "name": "sorts_object_keys_alphabetically",
+    "input": { "b": 1, "a": 2 },
+    "canonical": "{\"a\":2,\"b\":1}"
+  },
+  {
+    "name": "strips_volatile_keys_at_any_depth",
+    "input": {
+      "title": "Objeto",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-02T00:00:00.000Z",
+      "publishedAt": "2026-01-03T00:00:00.000Z",
+      "nested": { "updatedAt": "x", "value": 1 }
+    },
+    "canonical": "{\"nested\":{\"value\":1},\"title\":\"Objeto\"}"
+  },
+  {
+    "name": "arrays_preserve_order_while_sorting_nested_object_keys",
+    "input": {
+      "gallery": [
+        { "role": "cover", "alt": "A", "updatedAt": "x" },
+        { "alt": "B", "role": "detail" }
+      ]
+    },
+    "canonical": "{\"gallery\":[{\"alt\":\"A\",\"role\":\"cover\"},{\"alt\":\"B\",\"role\":\"detail\"}]}"
+  },
+  {
+    "name": "preserves_explicit_null",
+    "input": { "a": null },
+    "canonical": "{\"a\":null}"
+  }
+]

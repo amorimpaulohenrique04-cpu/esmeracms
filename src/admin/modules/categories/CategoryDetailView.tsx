@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { DataTable, EmptyState, Status } from '../../design-system'
-import { CategoryDetailEditor } from './CategoryDetailEditor'
+import { CategoryDetailEditor, type CategoryEditorTab } from './CategoryDetailEditor'
 import {
   categoryStatusLabels,
   type CategoryDetail,
@@ -23,19 +23,11 @@ type Props = {
   relatedTotal: number
 }
 
-const tabs: Array<{ id: CategoryTab; label: string }> = [
-  { id: 'general', label: 'Geral' },
-  { id: 'media', label: 'Mídia & SEO' },
-  { id: 'products', label: 'Produtos relacionados' },
-]
-
-function hrefFor(filters: CategoryWorkspaceFilters, categoryId: string | number, tab: CategoryTab) {
-  const params = new URLSearchParams()
-  params.set('category', String(categoryId))
-  params.set('tab', tab)
-  params.set('status', filters.status)
-  if (filters.q) params.set('q', filters.q)
-  return `/admin/categories?${params.toString()}`
+// A aba pedida pela URL continua valendo como aba inicial do editor.
+const editorTabs: Record<CategoryTab, CategoryEditorTab> = {
+  general: 'content',
+  media: 'media',
+  products: 'related',
 }
 
 function backHref(filters: CategoryWorkspaceFilters) {
@@ -61,13 +53,18 @@ export function CategoryDetailView({ category, tab, filters, categories, media, 
         </div>
       </header>
 
-      <nav className="esmera-category-tabs" aria-label="Seções da categoria">
-        {tabs.map((item) => <Link key={item.id} className={tab === item.id ? 'is-active' : ''} aria-current={tab === item.id ? 'page' : undefined} href={hrefFor(filters, category.id, item.id)}>{item.label}</Link>)}
-      </nav>
-
-      {tab === 'general' ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="general" /> : null}
-      {tab === 'media' ? <CategoryDetailEditor category={category} categories={categories} media={media} termSuggestions={termSuggestions} section="media" /> : null}
-      {tab === 'products' ? (
+      {/* As abas passaram a ser as do FormShell dentro do editor: com uma única
+          barra, a navegação a partir de uma issue consegue abrir a aba certa. */}
+      <CategoryDetailEditor
+        category={category}
+        categories={categories}
+        media={media}
+        termSuggestions={termSuggestions}
+        filters={filters}
+        initialTab={editorTabs[tab]}
+        initialRevision={category.revision ?? null}
+        initialUpdatedAt={category.updatedAt ?? null}
+        relatedSection={(
         <div className="esmera-category-related">
           <div className="esmera-category-related__intro">
             <div><span className="esmera-eyebrow">Relação derivada</span><h3>Produtos relacionados</h3></div>
@@ -90,7 +87,8 @@ export function CategoryDetailView({ category, tab, filters, categories, media, 
           ) : <EmptyState title="Nenhum produto relacionado" copy="A relação aparece automaticamente quando um produto usa esta categoria." />}
           {relatedTotal > relatedProducts.length ? <p className="esmera-category-related__more">Mostrando {relatedProducts.length} de {relatedTotal}. Use Produtos para filtrar a categoria completa.</p> : null}
         </div>
-      ) : null}
+        )}
+      />
     </section>
   )
 }

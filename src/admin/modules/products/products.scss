@@ -45,11 +45,16 @@
 .esmera-product-context-inspector__header h2 { margin: 4px 0 3px; font-size: var(--esmera-font-subtitle); font-weight: var(--esmera-weight-semibold); letter-spacing: -.02em; }
 .esmera-product-context-inspector__header p { margin: 0; color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); }
 
-.esmera-product-cell { min-width: 180px; }
-.esmera-product-cell a { display: block; color: var(--esmera-text); font-weight: var(--esmera-weight-semibold); text-decoration: none; }
+.esmera-product-cell { min-width: 220px; display: flex; align-items: center; gap: 10px; }
+.esmera-product-cell__copy { min-width: 0; }
+.esmera-product-cell a { display: block; overflow: hidden; color: var(--esmera-text); font-weight: var(--esmera-weight-semibold); text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
 .esmera-product-cell a:hover { color: var(--esmera-primary); }
 .esmera-product-cell small { display: block; margin-top: 4px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
+.esmera-product-list-thumb { width: 52px; height: 52px; flex: 0 0 auto; overflow: hidden; border-radius: var(--esmera-control-radius); background: var(--esmera-surface-selected); display: grid; place-items: center; color: var(--esmera-text-muted); }
+.esmera-product-list-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--esmera-motion-slow) var(--esmera-ease); }
 .esmera-products-workspace .esmera-data-table tr.is-selected td { background: var(--esmera-surface-selected); }
+.esmera-products-workspace .esmera-data-table tr.is-checked td { background: var(--esmera-primary-soft); }
+.esmera-products-workspace .esmera-data-table tr.is-checked td:first-child { box-shadow: inset 3px 0 0 var(--esmera-selection-bar); }
 
 .esmera-product-state,
 .esmera-product-readiness { display: inline-flex; align-items: center; gap: 7px; color: var(--esmera-text-secondary); font-size: var(--esmera-font-meta); white-space: nowrap; }
@@ -63,8 +68,11 @@
 .esmera-products-pagination .is-disabled { opacity: .42; pointer-events: none; }
 
 .esmera-products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--esmera-space-4); }
-.esmera-product-tile { min-width: 0; overflow: hidden; border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-panel-radius); background: var(--esmera-surface-panel); transition: border-color var(--esmera-motion-fast) var(--esmera-ease), box-shadow var(--esmera-motion-fast) var(--esmera-ease); }
+.esmera-product-tile { position: relative; min-width: 0; overflow: hidden; border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-panel-radius); background: var(--esmera-surface-panel); transition: border-color var(--esmera-motion-fast) var(--esmera-ease), box-shadow var(--esmera-motion-fast) var(--esmera-ease); }
 .esmera-product-tile.is-selected { border-color: var(--esmera-primary); box-shadow: inset 2px 0 0 var(--esmera-selection-bar); }
+.esmera-product-tile.is-checked { border-color: var(--esmera-primary); background: var(--esmera-primary-soft); box-shadow: inset 2px 0 0 var(--esmera-selection-bar); }
+.esmera-product-tile__select { position: absolute; top: 8px; left: 8px; z-index: 1; display: inline-flex; padding: 5px; border-radius: var(--esmera-radius-round); background: var(--esmera-surface-panel); box-shadow: var(--esmera-shadow-min); }
+.esmera-product-tile__select input { margin: 0; }
 .esmera-product-tile__media { aspect-ratio: 4 / 5; display: grid; place-items: center; overflow: hidden; background: var(--esmera-surface-selected); color: var(--esmera-text-muted); text-decoration: none; }
 .esmera-product-tile__media img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--esmera-motion-slow) var(--esmera-ease); }
 .esmera-product-tile__media:hover img { transform: scale(1.015); }
@@ -74,6 +82,21 @@
 .esmera-product-tile__body small { display: block; margin-top: 4px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 .esmera-product-tile__meta { display: flex; justify-content: space-between; gap: 12px; padding: 0 14px 12px; color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); }
 .esmera-product-tile > .esmera-button { width: calc(100% - 28px); margin: 0 14px 14px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .esmera-product-tile:hover { box-shadow: var(--esmera-shadow-min); }
+  .esmera-product-tile__select,
+  .esmera-product-tile__inspect { opacity: 0; transition: opacity var(--esmera-motion-fast) var(--esmera-ease); }
+  .esmera-product-tile:hover .esmera-product-tile__select,
+  .esmera-product-tile:focus-within .esmera-product-tile__select,
+  .esmera-product-tile.is-checked .esmera-product-tile__select,
+  .esmera-product-tile:hover .esmera-product-tile__inspect,
+  .esmera-product-tile:focus-within .esmera-product-tile__inspect { opacity: 1; }
+  .esmera-products-workspace .esmera-data-table tbody tr .esmera-product-row-action { opacity: 0; transition: opacity var(--esmera-motion-fast) var(--esmera-ease); }
+  .esmera-products-workspace .esmera-data-table tbody tr:hover .esmera-product-row-action,
+  .esmera-products-workspace .esmera-data-table tbody tr:focus-within .esmera-product-row-action { opacity: 1; }
+  .esmera-products-workspace .esmera-data-table tbody tr:hover .esmera-product-list-thumb img { transform: scale(1.015); }
+}
 
 .esmera-product-inspector { display: grid; gap: var(--esmera-space-5); }
 .esmera-product-inspector__media { overflow: hidden; border: 1px solid var(--esmera-line-subtle); border-radius: var(--esmera-panel-radius); background: var(--esmera-surface-raised); }
@@ -97,6 +120,12 @@
 .esmera-product-readiness-list strong { font-size: var(--esmera-font-body); }
 .esmera-product-readiness-list ul,
 .esmera-product-issues { margin: 8px 0 0; padding-left: 18px; color: var(--esmera-text-secondary); font-size: var(--esmera-font-meta); line-height: var(--esmera-line-body); }
+.esmera-products-bulk-result { margin: var(--esmera-space-4) 0; padding: var(--esmera-space-4); border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-radius-8); background: var(--esmera-surface); }
+.esmera-products-bulk-result__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--esmera-space-3); }
+.esmera-products-bulk-result__list { margin: var(--esmera-space-3) 0 0; padding: 0; list-style: none; display: grid; gap: var(--esmera-space-3); }
+.esmera-products-bulk-result__list > li { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--esmera-space-3); padding: var(--esmera-space-3); border-left: 2px solid var(--esmera-warning); background: var(--esmera-surface-hover); }
+.esmera-products-bulk-result__list p { margin: 4px 0 0; color: var(--esmera-text-secondary); font-size: var(--esmera-font-meta); line-height: var(--esmera-line-body); }
+.esmera-products-bulk-result__status { display: block; margin-top: 2px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 .esmera-products-bulk-category { min-width: 190px; display: grid; grid-template-columns: auto minmax(120px, 1fr); align-items: center; gap: 7px; }
 .esmera-products-bulk-category span { color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 .esmera-products-bulk-category .esmera-input { min-height: var(--esmera-control-compact); }
@@ -117,9 +146,12 @@
 .esmera-product-draft-form { padding: var(--esmera-space-5); border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-panel-radius); background: var(--esmera-surface-panel); }
 .esmera-product-draft-form__status { display: flex; align-items: center; justify-content: space-between; gap: var(--esmera-space-3); margin-bottom: var(--esmera-space-4); padding-bottom: var(--esmera-space-3); border-bottom: 1px solid var(--esmera-line-subtle); }
 .esmera-product-draft-form__status strong { font-size: var(--esmera-font-section); }
-.esmera-product-draft-form__status span { color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); }
+.esmera-product-draft-form__status span,
+.esmera-product-draft-form__revision { color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); }
 .esmera-product-draft-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--esmera-space-3); }
 .esmera-product-draft-form__hint { margin: var(--esmera-space-4) 0; color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); line-height: var(--esmera-line-body); }
+.esmera-product-draft-form__save-feedback,
+.esmera-product-publication-feedback { min-height: 24px; }
 
 .esmera-product-options { display: grid; gap: var(--esmera-space-4); }
 .esmera-product-options strong { display: block; margin-bottom: 8px; font-size: var(--esmera-font-body); }
@@ -172,6 +204,10 @@
   .esmera-product-media-item { grid-template-columns: 34px 64px minmax(0, 1fr) auto; }
   .esmera-product-media-item > .esmera-status { display: none; }
   .esmera-product-media-thumb { width: 64px; }
+  .esmera-products-workspace .esmera-data-table th:nth-child(4), .esmera-products-workspace .esmera-data-table td:nth-child(4),
+  .esmera-products-workspace .esmera-data-table th:nth-child(5), .esmera-products-workspace .esmera-data-table td:nth-child(5),
+  .esmera-products-workspace .esmera-data-table th:nth-child(7), .esmera-products-workspace .esmera-data-table td:nth-child(7),
+  .esmera-products-workspace .esmera-data-table th:nth-child(8), .esmera-products-workspace .esmera-data-table td:nth-child(8) { display: none; }
 }
 
 @container esmera-workspace (max-width: 560px) {
@@ -193,9 +229,14 @@
   .esmera-product-media-thumb { width: 52px; }
   .esmera-product-media-move { grid-column: 2 / -1; }
   .esmera-product-media-move-button { width: 100%; flex: 1; }
+  .esmera-products-workspace .esmera-data-table th:nth-child(3), .esmera-products-workspace .esmera-data-table td:nth-child(3) { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .esmera-product-tile,
-  .esmera-product-tile__media img { transition: none; }
+  .esmera-product-tile__media img,
+  .esmera-product-list-thumb img { transition: none; }
+  .esmera-product-tile__select,
+  .esmera-product-tile__inspect,
+  .esmera-products-workspace .esmera-data-table .esmera-product-row-action { transition: none; opacity: 1; }
 }

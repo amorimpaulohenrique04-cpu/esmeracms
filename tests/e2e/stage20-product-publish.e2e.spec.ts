@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { fetchProductUpdatedAt } from '../helpers/createDraftEntities'
 import { login } from '../helpers/login'
 import { cleanupTestUser, seedTestUser, testUser } from '../helpers/seedUser'
 
@@ -91,13 +92,19 @@ test.describe('Stage 20 product publication', () => {
     await expect(page.getByRole('heading', { name: title })).toBeVisible()
     await expect(page.getByText('Pronto para publicar')).toBeVisible()
 
+    // Caminho coordenado: items[] com token de concorrência por produto.
+    // O caminho direto antigo (ids[]) foi removido no PR-03.
+    const expectedUpdatedAt = await fetchProductUpdatedAt(page, productId as string | number)
     const publishProduct = await page.request.post('http://localhost:3000/api/admin-products', {
-      data: { action: 'publish', ids: [productId] },
+      data: { action: 'publish', items: [{ id: productId, expectedUpdatedAt }] },
     })
-    const published = await publishProduct.json() as { updated?: number; errors?: unknown[] }
+    const published = await publishProduct.json() as {
+      result?: { meta?: { requested?: number; published?: number; results?: Array<{ status?: string; message?: string }> } }
+    }
     expect(publishProduct.ok(), JSON.stringify(published)).toBeTruthy()
-    expect(published.updated).toBe(1)
-    expect(published.errors || []).toHaveLength(0)
+    expect(published.result?.meta?.published, JSON.stringify(published)).toBe(1)
+    expect(published.result?.meta?.requested).toBe(1)
+    expect(published.result?.meta?.results?.[0].status).toBe('published')
 
     const storedResponse = await page.request.get(`http://localhost:3000/api/products/${productId}?draft=true&depth=0`)
     expect(storedResponse.ok(), await storedResponse.text()).toBeTruthy()

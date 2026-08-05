@@ -11,6 +11,7 @@ import {
   TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
+import { createDocumentRevision } from '../../../server/publication/revision'
 import { CategoriesMasterList } from './CategoriesMasterList'
 import { CategoryDetailView } from './CategoryDetailView'
 import {
@@ -73,15 +74,19 @@ function hierarchyDepth(category: CategoryParent, byId: Map<string, CategoryPare
 }
 
 async function selectedDetail(props: AdminViewServerProps, categoryId: string) {
-  return await props.initPageResult.req.payload.findByID({
+  // depth: 2 matches admin-categories/route.ts's readCurrent/saveDraft/readDraft —
+  // createDocumentRevision() hashes the resolved relationship shape, so a
+  // mismatched depth here would make every first save 409 with a false conflict.
+  const category = await props.initPageResult.req.payload.findByID({
     collection: 'categories',
     id: categoryId,
-    depth: 1,
+    depth: 2,
     draft: true,
     overrideAccess: false,
     user: props.initPageResult.req.user,
     req: props.initPageResult.req,
   }) as unknown as CategoryDetail
+  return { ...category, revision: createDocumentRevision(category) }
 }
 
 export async function CategoriesView(props: AdminViewServerProps) {

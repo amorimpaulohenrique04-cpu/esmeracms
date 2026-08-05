@@ -21,7 +21,7 @@ type HeaderUser = {
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false
-  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]'))
 }
 
 function isVisibleControl(element: HTMLElement) {
@@ -88,6 +88,7 @@ export function AppHeader() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
       const key = event.key.toLowerCase()
 
       if ((event.metaKey || event.ctrlKey) && key === 'k') {

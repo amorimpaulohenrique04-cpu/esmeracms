@@ -1,8 +1,9 @@
-import { APIError, ValidationError, type CollectionConfig, type Where } from 'payload'
+import { ValidationError, type CollectionConfig, type Where } from 'payload'
 
 import { activeCategoriesOrAuthenticated, siteEditors } from '../access/roles'
 import { getCategoryHierarchyIssues } from '../businessRules/categories/hierarchy'
 import { seoField, slugify } from '../fields/common'
+import { publicationMetadataFields } from '../server/publication/publicationMetadataFields'
 
 export const Categories: CollectionConfig = {
   slug: 'categories',
@@ -39,7 +40,15 @@ export const Categories: CollectionConfig = {
         const parent = data.parent !== undefined ? data.parent : originalDoc?.parent
         const hierarchyIssues = await getCategoryHierarchyIssues(req, id, parent)
         if (hierarchyIssues.length) {
-          throw new APIError(hierarchyIssues.join(' '), 400)
+          // Antes: `APIError(hierarchyIssues.join(' '), 400)` — uma string sem
+          // path nem código. Agora segue o mesmo caminho de qualquer erro de
+          // campo, com `path: 'parent'` preservado até a UI.
+          throw new ValidationError({
+            collection: 'categories',
+            id,
+            req,
+            errors: hierarchyIssues.map((issue) => ({ path: issue.path, message: issue.message })),
+          })
         }
 
         const nextStatus = data.status ?? originalDoc?.status
@@ -159,5 +168,6 @@ export const Categories: CollectionConfig = {
         },
       ],
     },
+    ...publicationMetadataFields(),
   ],
 }

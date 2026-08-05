@@ -1,3 +1,7 @@
+import type { PublicationIssue } from '../../../issues/types'
+
+export type { PublicationIssue }
+
 export type ProductMedia = {
   id: string | number
   _status?: string | null
@@ -72,7 +76,9 @@ export type ProductListItem = {
   availability?: string | null
   _status?: string | null
   publicationReady?: boolean | null
-  publicationIssues?: Array<{ message?: string | null }> | null
+  // Contrato compartilhado: a lista chega pronta do assessment do servidor, com
+  // code, severity, path, tab, label, anchor, suggestion e source preservados.
+  publicationIssues?: PublicationIssue[] | null
   categories?: Array<ProductCategory | string | number> | null
   gallery?: ProductGalleryItem[] | null
   priceMode?: string | null
@@ -81,6 +87,7 @@ export type ProductListItem = {
 }
 
 export type ProductDetail = ProductListItem & {
+  revision?: string | null
   material?: string | null
   description?: unknown
   edition?: string | null

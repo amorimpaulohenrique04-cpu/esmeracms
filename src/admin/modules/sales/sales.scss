@@ -26,6 +26,7 @@
   gap: var(--esmera-space-3);
 }
 .esmera-sales-feedback { margin-bottom: var(--esmera-space-4); }
+.esmera-nums { font-variant-numeric: tabular-nums; }
 
 .esmera-pipeline {
   display: grid;
@@ -50,7 +51,8 @@
 }
 .esmera-pipeline-column.is-drop-target {
   border-color: var(--esmera-primary);
-  background: var(--esmera-surface-selected);
+  background: var(--esmera-primary-soft);
+  box-shadow: var(--esmera-focus-ring);
 }
 
 .esmera-pipeline-head {
@@ -89,10 +91,14 @@
   border: 1px solid var(--esmera-line-default);
   border-radius: var(--esmera-panel-radius);
   background: var(--esmera-surface-panel);
-  transition: opacity var(--esmera-motion-fast) var(--esmera-ease), transform var(--esmera-motion-fast) var(--esmera-ease), border-color var(--esmera-motion-fast) var(--esmera-ease), box-shadow var(--esmera-motion-fast) var(--esmera-ease);
+  transition: transform var(--esmera-motion-fast) var(--esmera-ease), border-color var(--esmera-motion-fast) var(--esmera-ease), box-shadow var(--esmera-motion-fast) var(--esmera-ease);
 }
-.esmera-opportunity-card:hover { border-color: var(--esmera-line-strong); box-shadow: var(--esmera-shadow-min); }
-.esmera-opportunity-card.is-dragging { opacity: .52; transform: rotate(.25deg); }
+.esmera-opportunity-card:hover { border-color: var(--esmera-line-strong); }
+.esmera-opportunity-card:has([data-popup-open]) {
+  border-color: color-mix(in srgb, var(--esmera-primary) 38%, var(--esmera-line-default));
+  box-shadow: inset 2px 0 0 var(--esmera-selection-bar);
+}
+.esmera-opportunity-card.is-dragging { transform: scale(1.01); box-shadow: var(--esmera-shadow-interactive); }
 
 .esmera-opportunity-card__top,
 .esmera-opportunity-card__footer,
@@ -159,6 +165,13 @@
 .esmera-sales-table-title small { color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 .esmera-sales-row-actions { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
 .esmera-sales-row-actions .esmera-button { min-height: 30px; padding-inline: 9px; font-size: var(--esmera-font-caption); }
+tr:has([data-popup-open]) { background: var(--esmera-surface-selected); }
+
+@media (hover: hover) and (pointer: fine) {
+  .esmera-sales-row-actions .esmera-button--quiet { opacity: 0; transition: opacity var(--esmera-motion-fast) var(--esmera-ease); }
+  tr:hover .esmera-sales-row-actions .esmera-button--quiet,
+  tr:focus-within .esmera-sales-row-actions .esmera-button--quiet { opacity: 1; }
+}
 
 .esmera-sales-transactions { margin-top: var(--esmera-space-6); }
 .esmera-sales-transactions .esmera-data-section__body { min-width: 0; }
@@ -168,6 +181,7 @@
 .esmera-sales-section-heading h3 { margin: 2px 0 0; font-size: var(--esmera-font-section); }
 .esmera-sales-section-heading a { color: var(--esmera-primary); font-size: var(--esmera-font-ui-sm); font-weight: var(--esmera-weight-semibold); }
 
+.esmera-drawer:has(.esmera-sales-inspector) { transition-duration: var(--esmera-motion-panel); }
 .esmera-sales-inspector { display: grid; gap: var(--esmera-space-4); }
 .esmera-sales-inspector > section { padding-top: var(--esmera-space-3); border-top: 1px solid var(--esmera-line-subtle); }
 .esmera-sales-inspector h3 { margin: 5px 0 3px; font-size: var(--esmera-font-body); }
@@ -223,8 +237,9 @@
   .esmera-sales-list-toolbar,
   .esmera-sales-section-heading { align-items: flex-start; flex-direction: column; }
   .esmera-sales-list-toolbar .esmera-actions { width: 100%; justify-content: space-between; }
-  .esmera-pipeline { grid-template-columns: repeat(4, minmax(286px, 88vw)); }
-  .esmera-pipeline-column { min-width: 286px; }
+  .esmera-pipeline { grid-template-columns: 1fr; overflow-x: visible; scroll-snap-type: none; }
+  .esmera-pipeline-column { min-width: 0; min-height: 0; }
+  .esmera-pipeline-stack { max-height: 60vh; overflow-y: auto; }
   .esmera-sales-inspector__facts { grid-template-columns: 1fr; }
   .esmera-sales-close-dialog { width: 100vw; max-width: none; max-height: 100dvh; min-height: 100dvh; border-radius: 0; }
   .esmera-sales-close-grid { grid-template-columns: 1fr; }
@@ -236,4 +251,5 @@
 @media (prefers-reduced-motion: reduce) {
   .esmera-pipeline-column,
   .esmera-opportunity-card { transition: none; }
+  .esmera-sales-row-actions .esmera-button--quiet { transition: none; opacity: 1; }
 }

@@ -1,13 +1,15 @@
+/* Rollback: sem shake e sem deslocamento lateral. O estado é comunicado por
+   borda persistente, fundo e texto; a opacity apenas marca a troca. */
 @keyframes esmera-rollback {
-  0% { transform: translateX(0); }
-  28% { transform: translateX(-4px); }
-  58% { transform: translateX(3px); }
-  100% { transform: translateX(0); }
+  from { opacity: .72; }
+  to { opacity: 1; }
 }
 
 .esmera-context-inspector[data-rollback='true'],
 .esmera-inline-feedback.is-rollback {
-  animation: esmera-rollback var(--esmera-transition-panel, 220ms) var(--esmera-ease);
+  border-left-color: var(--esmera-danger);
+  background: var(--esmera-danger-soft);
+  animation: esmera-rollback var(--esmera-motion-fast) var(--esmera-ease-standard);
 }
 
 /* Reading and standard workspaces keep editorial limits; operational modes do not. */
@@ -28,8 +30,8 @@ body .esmera-workspace-frame.is-fluid .esmera-view {
   border: 1px solid transparent;
   pointer-events: none;
   transition:
-    border-color var(--esmera-transition-fast, 120ms) var(--esmera-ease),
-    box-shadow var(--esmera-transition-fast, 120ms) var(--esmera-ease);
+    border-color var(--esmera-motion-fast) var(--esmera-ease-standard),
+    box-shadow var(--esmera-motion-fast) var(--esmera-ease-standard);
 }
 
 .esmera-spatial-selection.is-selected::after {
@@ -69,7 +71,7 @@ body .esmera-workspace-frame.is-fluid .esmera-view {
     border-bottom: 0;
     border-left: 0;
     border-radius: var(--esmera-panel-radius) var(--esmera-panel-radius) 0 0;
-    box-shadow: var(--esmera-shadow-overlay);
+    box-shadow: var(--esmera-shadow-floating);
   }
 
   .esmera-split-workspace.has-detail::before {
@@ -77,8 +79,8 @@ body .esmera-workspace-frame.is-fluid .esmera-view {
     position: fixed;
     z-index: calc(var(--esmera-z-overlay) - 1);
     inset: 0;
-    background: var(--esmera-backdrop);
-    backdrop-filter: blur(2px);
+    background: var(--esmera-backdrop-strong);
+    backdrop-filter: blur(var(--esmera-blur-overlay));
   }
 }
 

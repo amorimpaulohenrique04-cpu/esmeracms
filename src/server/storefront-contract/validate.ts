@@ -1,4 +1,12 @@
-import type { PublicationIssue } from '../publication/types'
+import { decorateIssue } from '../../issues/build'
+import { ISSUE_CODES, storefrontInvalidDocumentCodes } from '../../issues/codes'
+import {
+  ENTITY_PATH_DOCUMENT,
+  type IssueParams,
+  type IssueSeverity,
+  type IssueSource,
+  type PublicationIssue,
+} from '../../issues/types'
 import {
   STOREFRONT_CONTRACT_VERSION,
   type StorefrontContractValidation,
@@ -7,8 +15,13 @@ import {
 
 type UnknownRecord = Record<string, unknown>
 
-type IssueInput = Omit<PublicationIssue, 'severity' | 'source'> & {
-  severity?: PublicationIssue['severity']
+type IssueInput = {
+  code: string
+  path: string
+  entity: string
+  severity?: IssueSeverity
+  source?: IssueSource
+  params?: IssueParams
 }
 
 function record(value: unknown): UnknownRecord | null {
@@ -29,12 +42,18 @@ function relationID(value: unknown): string | number | null {
   return typeof candidate === 'string' || typeof candidate === 'number' ? candidate : null
 }
 
+/**
+ * Aba, rótulo, âncora e copy vêm todos do registry e do catálogo — nada aqui é
+ * derivado do texto da mensagem nem do prefixo do path.
+ */
 function issue(input: IssueInput): PublicationIssue {
-  return {
-    ...input,
+  return decorateIssue({
+    code: input.code,
     severity: input.severity || 'blocker',
-    source: 'storefront_contract',
-  }
+    path: input.path,
+    source: input.source || 'storefront',
+    ...(input.params ? { params: input.params } : {}),
+  }, input.entity)
 }
 
 function validAbsoluteURL(value: unknown): boolean {
@@ -50,98 +69,58 @@ function validateMediaRelationship(
   value: unknown,
   path: string,
   alt: unknown,
+  entity: string,
 ): PublicationIssue[] {
   const media = relation(value)
   if (!media) {
-    return [issue({
-      id: 'storefront.media.url_missing',
-      path,
-      tab: path.startsWith('gallery') ? 'gallery' : null,
-      anchor: path.startsWith('gallery') ? 'product-gallery' : null,
-      message: 'A imagem não possui uma URL pública válida.',
-      suggestion: 'Selecione novamente a mídia e confirme que ela foi publicada.',
-    })]
+    return [issue({ code: ISSUE_CODES.storefrontMediaUrlMissing, path, entity, source: 'media' })]
   }
   if (media._status !== 'published') {
-    return [issue({
-      id: 'storefront.media.unpublished',
-      path,
-      tab: path.startsWith('gallery') ? 'gallery' : null,
-      anchor: path.startsWith('gallery') ? 'product-gallery' : null,
-      message: 'A imagem precisa ser publicada antes de ser usada no site.',
-      suggestion: 'Publique a mídia e tente publicar o conteúdo novamente.',
-    })]
+    return [issue({ code: ISSUE_CODES.storefrontMediaUnpublished, path, entity, source: 'media' })]
   }
   if (!validAbsoluteURL(media.url)) {
-    return [issue({
-      id: 'storefront.media.url_missing',
-      path,
-      tab: path.startsWith('gallery') ? 'gallery' : null,
-      anchor: path.startsWith('gallery') ? 'product-gallery' : null,
-      message: 'A imagem não possui uma URL pública válida.',
-      suggestion: 'Selecione novamente a mídia e confirme que ela foi publicada.',
-    })]
+    return [issue({ code: ISSUE_CODES.storefrontMediaUrlMissing, path, entity, source: 'media' })]
   }
   if (!text(alt || media.alt)) {
-    return [issue({
-      id: 'storefront.media.alt_missing',
-      path: `${path}.alt`,
-      tab: path.startsWith('gallery') ? 'gallery' : null,
-      anchor: path.startsWith('gallery') ? 'product-gallery' : null,
-      message: 'A imagem significativa precisa de texto alternativo.',
-      suggestion: 'Descreva em uma frase curta o que aparece na imagem.',
-    })]
+    return [issue({ code: ISSUE_CODES.storefrontMediaAltMissing, path: `${path}.alt`, entity, source: 'media' })]
   }
   return []
 }
 
 function validateProduct(data: UnknownRecord): PublicationIssue[] {
   const issues: PublicationIssue[] = []
+  const entity = 'product'
   const requiredText = [
-    ['slug', 'storefront.product.slug_missing', 'O produto precisa de um endereço válido.'],
-    ['code', 'storefront.product.code_missing', 'O produto precisa de um código único.'],
-    ['title', 'storefront.product.title_missing', 'O produto precisa de um título.'],
+    ['slug', ISSUE_CODES.storefrontProductSlugMissing],
+    ['code', ISSUE_CODES.storefrontProductCodeMissing],
+    ['title', ISSUE_CODES.storefrontProductTitleMissing],
   ] as const
 
   if (relationID(data.id) === null && typeof data.id !== 'string' && typeof data.id !== 'number') {
-    issues.push(issue({ id: 'storefront.product.id_missing', path: 'id', message: 'O produto não possui identificador público.' }))
+    issues.push(issue({ code: ISSUE_CODES.storefrontProductIdMissing, path: 'id', entity }))
   }
-  for (const [path, id, message] of requiredText) {
-    if (!text(data[path])) issues.push(issue({ id, path, tab: 'identity', anchor: `product-${path}`, message }))
+  for (const [path, code] of requiredText) {
+    if (!text(data[path])) issues.push(issue({ code, path, entity }))
   }
 
   if (data.catalogStatus !== 'active') {
-    issues.push(issue({
-      id: 'storefront.product.not_active',
-      path: 'catalogStatus',
-      tab: 'identity',
-      anchor: 'product-catalog-status',
-      message: 'A peça precisa estar ativa para aparecer no site.',
-    }))
+    issues.push(issue({ code: ISSUE_CODES.storefrontProductNotActive, path: 'catalogStatus', entity }))
   }
 
   const categories = Array.isArray(data.categories) ? data.categories : []
   if (!categories.length) {
-    issues.push(issue({
-      id: 'storefront.product.category_missing',
-      path: 'categories',
-      tab: 'identity',
-      anchor: 'product-categories',
-      message: 'Escolha ao menos uma categoria para o produto.',
-    }))
+    issues.push(issue({ code: ISSUE_CODES.storefrontProductCategoryMissing, path: 'categories', entity }))
   } else {
     categories.forEach((value, index) => {
       const category = relation(value)
       if (relationID(value) === null) {
-        issues.push(issue({ id: 'storefront.product.category_invalid', path: `categories.${index}`, message: 'Existe uma categoria inválida no produto.' }))
+        issues.push(issue({ code: ISSUE_CODES.storefrontProductCategoryInvalid, path: `categories.${index}`, entity }))
       } else if (category && (category.status === 'archive' || category._status === 'draft')) {
         issues.push(issue({
-          id: 'storefront.product.category_unpublished',
+          code: ISSUE_CODES.storefrontProductCategoryUnpublished,
           path: `categories.${index}`,
-          tab: 'identity',
-          anchor: 'product-categories',
-          message: `A categoria “${text(category.title) || 'selecionada'}” não está publicada e ativa.`,
-          suggestion: 'Publique a categoria ou selecione outra categoria ativa.',
+          entity,
+          params: { title: text(category.title) },
         }))
       }
     })
@@ -149,35 +128,29 @@ function validateProduct(data: UnknownRecord): PublicationIssue[] {
 
   const allowedAvailability = new Set(['unique', 'available', 'made_to_order', 'limited'])
   if (!allowedAvailability.has(text(data.availability))) {
-    issues.push(issue({ id: 'storefront.product.availability_invalid', path: 'availability', tab: 'commercial', anchor: 'product-availability', message: 'Defina uma disponibilidade reconhecida pelo site.' }))
+    issues.push(issue({ code: ISSUE_CODES.storefrontProductAvailabilityInvalid, path: 'availability', entity }))
   }
 
   const gallery = Array.isArray(data.gallery) ? data.gallery : []
   if (!gallery.length) {
-    issues.push(issue({ id: 'storefront.product.gallery_empty', path: 'gallery', tab: 'gallery', anchor: 'product-gallery', message: 'Adicione ao menos uma imagem ao produto.' }))
+    issues.push(issue({ code: ISSUE_CODES.storefrontProductGalleryEmpty, path: 'gallery', entity }))
   }
   let coverCount = 0
   gallery.forEach((value, index) => {
     const item = record(value)
     if (!item) {
-      issues.push(issue({ id: 'storefront.product.gallery_item_invalid', path: `gallery.${index}`, message: 'Existe um item inválido na galeria.' }))
+      issues.push(issue({ code: ISSUE_CODES.storefrontProductGalleryItemInvalid, path: `gallery.${index}`, entity }))
       return
     }
     if (item.role === 'cover') coverCount += 1
-    issues.push(...validateMediaRelationship(item.image, `gallery.${index}.image`, item.alt))
+    issues.push(...validateMediaRelationship(item.image, `gallery.${index}.image`, item.alt, entity))
   })
   if (gallery.length && coverCount !== 1) {
-    issues.push(issue({
-      id: 'storefront.product.cover_count',
-      path: 'gallery',
-      tab: 'gallery',
-      anchor: 'product-gallery',
-      message: 'Defina exatamente uma imagem como capa.',
-    }))
+    issues.push(issue({ code: ISSUE_CODES.storefrontProductCoverCount, path: 'gallery', entity }))
   }
 
   if (data.priceMode !== 'fixed' && data.priceMode !== 'inquiry') {
-    issues.push(issue({ id: 'storefront.product.price_mode_invalid', path: 'priceMode', tab: 'commercial', anchor: 'product-price-mode', message: 'Escolha preço fixo ou sob consulta.' }))
+    issues.push(issue({ code: ISSUE_CODES.storefrontProductPriceModeInvalid, path: 'priceMode', entity }))
   }
   if (data.priceMode === 'fixed') {
     const basePriceValid = typeof data.basePriceCents === 'number' && Number.isInteger(data.basePriceCents) && data.basePriceCents >= 0
@@ -187,14 +160,7 @@ function validateProduct(data: UnknownRecord): PublicationIssue[] {
       return variant?.status !== 'disabled' && variant?.priceMode === 'fixed' && typeof variant.priceCents === 'number' && Number.isInteger(variant.priceCents) && variant.priceCents >= 0
     })
     if (!basePriceValid && !variantPriceValid) {
-      issues.push(issue({
-        id: 'storefront.product.price_missing',
-        path: 'basePriceCents',
-        tab: 'commercial',
-        anchor: 'product-base-price',
-        message: 'O produto está com preço fixo, mas não possui preço utilizável.',
-        suggestion: 'Informe um preço em reais ou altere o modo para sob consulta.',
-      }))
+      issues.push(issue({ code: ISSUE_CODES.storefrontProductPriceMissing, path: 'basePriceCents', entity }))
     }
   }
   return issues
@@ -202,20 +168,22 @@ function validateProduct(data: UnknownRecord): PublicationIssue[] {
 
 function validateCategory(data: UnknownRecord): PublicationIssue[] {
   const issues: PublicationIssue[] = []
-  if (!text(data.title)) issues.push(issue({ id: 'storefront.category.title_missing', path: 'title', tab: 'content', anchor: 'category-title', message: 'A categoria precisa de um nome.' }))
-  if (!text(data.slug)) issues.push(issue({ id: 'storefront.category.slug_missing', path: 'slug', tab: 'content', anchor: 'category-slug', message: 'A categoria precisa de um endereço válido.' }))
-  if (data.status !== 'active') issues.push(issue({ id: 'storefront.category.not_active', path: 'status', tab: 'content', anchor: 'category-status', message: 'A categoria precisa estar ativa para aparecer no catálogo.' }))
+  const entity = 'category'
+  if (!text(data.title)) issues.push(issue({ code: ISSUE_CODES.storefrontCategoryTitleMissing, path: 'title', entity }))
+  if (!text(data.slug)) issues.push(issue({ code: ISSUE_CODES.storefrontCategorySlugMissing, path: 'slug', entity }))
+  if (data.status !== 'active') issues.push(issue({ code: ISSUE_CODES.storefrontCategoryNotActive, path: 'status', entity }))
 
-  if (data.image) issues.push(...validateMediaRelationship(data.image, 'image', relation(data.image)?.alt))
+  if (data.image) issues.push(...validateMediaRelationship(data.image, 'image', relation(data.image)?.alt, entity))
   const parent = relation(data.parent)
   if (parent && String(parent.id) === String(data.id)) {
-    issues.push(issue({ id: 'storefront.category.self_parent', path: 'parent', tab: 'content', anchor: 'category-parent', message: 'A categoria não pode ser principal de si mesma.' }))
+    issues.push(issue({ code: ISSUE_CODES.storefrontCategorySelfParent, path: 'parent', entity }))
   }
   return issues
 }
 
 function validateHome(data: UnknownRecord): PublicationIssue[] {
   const issues: PublicationIssue[] = []
+  const entity = 'home'
   const disabled = new Set(Array.isArray(data.disabledSections) ? data.disabledSections.map(String) : [])
   const heroSlides = Array.isArray(data.heroSlides) ? data.heroSlides : []
   if (!disabled.has('hero') && heroSlides.length > 0) {
@@ -223,8 +191,8 @@ function validateHome(data: UnknownRecord): PublicationIssue[] {
     active.forEach((value, index) => {
       const slide = record(value)
       if (!slide) return
-      issues.push(...validateMediaRelationship(slide.desktopImage, `heroSlides.${index}.desktopImage`, relation(slide.desktopImage)?.alt))
-      if (slide.mobileImage) issues.push(...validateMediaRelationship(slide.mobileImage, `heroSlides.${index}.mobileImage`, relation(slide.mobileImage)?.alt))
+      issues.push(...validateMediaRelationship(slide.desktopImage, `heroSlides.${index}.desktopImage`, relation(slide.desktopImage)?.alt, entity))
+      if (slide.mobileImage) issues.push(...validateMediaRelationship(slide.mobileImage, `heroSlides.${index}.mobileImage`, relation(slide.mobileImage)?.alt, entity))
     })
   }
 
@@ -232,7 +200,7 @@ function validateHome(data: UnknownRecord): PublicationIssue[] {
   for (const path of ctaFields) {
     const cta = record(data[path])
     if (cta?.href && !text(cta.href).startsWith('/') && !validAbsoluteURL(cta.href) && !text(cta.href).startsWith('mailto:') && !text(cta.href).startsWith('tel:')) {
-      issues.push(issue({ id: 'storefront.home.cta_invalid', path: `${path}.href`, message: 'O destino do botão não é seguro ou reconhecido.' }))
+      issues.push(issue({ code: ISSUE_CODES.storefrontHomeCtaInvalid, path: `${path}.href`, entity }))
     }
   }
   return issues
@@ -241,7 +209,11 @@ function validateHome(data: UnknownRecord): PublicationIssue[] {
 export function validateStorefrontSnapshot(kind: StorefrontKind, value: unknown): StorefrontContractValidation {
   const data = record(value)
   if (!data) {
-    const issues = [issue({ id: `storefront.${kind}.invalid_document`, message: 'O documento público não possui um formato reconhecido.' })]
+    const issues = [issue({
+      code: storefrontInvalidDocumentCodes[kind],
+      path: ENTITY_PATH_DOCUMENT,
+      entity: kind,
+    })]
     return { contractVersion: STOREFRONT_CONTRACT_VERSION, compatible: false, status: 'incompatible', issues }
   }
 
