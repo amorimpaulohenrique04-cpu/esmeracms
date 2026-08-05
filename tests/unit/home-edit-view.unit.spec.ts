@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { Home } from '../../src/globals/Home'
 
 const editViewSource = readFileSync(
-  fileURLToPath(new URL('../../src/admin/modules/home/HomeEditView.tsx', import.meta.url)),
+  path.join(process.cwd(), 'src/admin/modules/home/HomeEditView.tsx'),
   'utf8',
 )
 
