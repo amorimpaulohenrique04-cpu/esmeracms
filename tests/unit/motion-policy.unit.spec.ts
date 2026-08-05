@@ -16,6 +16,7 @@ const source = (path: string) => readFileSync(resolve(root, path), 'utf8')
 const tokens = source('src/admin/design-system/tokens.scss')
 const advanced = source('src/admin/design-system/advanced-interactions.scss')
 const reconciled = source('src/admin/design-system/reconciled-interactions.scss')
+const shell = source('src/admin/shell/shell.scss')
 const adminStateProvider = source('src/admin/state/AdminStateProvider.tsx')
 const packageJSON = source('package.json')
 
@@ -67,6 +68,34 @@ describe('Política de motion — guarda estática', () => {
       expect(sheet).not.toMatch(/transition:[^;]*var\(--esmera-motion-navigation\)/)
       expect(sheet).not.toMatch(/transition:[^;]*var\(--esmera-motion-data\)/)
     }
+    expect(shell).not.toMatch(/transition:[^;]*var\(--esmera-motion-navigation\)/)
+    expect(shell).not.toMatch(/transition:[^;]*var\(--esmera-motion-data\)/)
+  })
+
+  it('anima a command palette apenas com tokens operacionais e saída mais rápida', () => {
+    expect(shell).toContain('.esmera-command-backdrop[data-starting-style]')
+    expect(shell).toContain('.esmera-command-backdrop[data-ending-style]')
+    expect(shell).toContain('transition: opacity var(--esmera-motion-panel) var(--esmera-ease-enter)')
+    expect(shell).toContain('.esmera-command[data-starting-style]')
+    expect(shell).toContain('opacity var(--esmera-motion-panel) var(--esmera-ease-enter)')
+    expect(shell).toContain('transform var(--esmera-motion-panel) var(--esmera-ease-enter)')
+    expect(shell).toContain('transition-duration: var(--esmera-motion-fast)')
+    expect(shell).toContain('transition-timing-function: var(--esmera-ease-exit)')
+    expect(shell).toMatch(/@media \(max-width: 620px\)[\s\S]*\.esmera-command\[data-starting-style\][\s\S]*translateY\(100%\)/)
+    expect(shell).not.toMatch(/transition:[^;]*\b\d+(?:\.\d+)?m?s\b/)
+  })
+
+  it('mantém reduced motion da command palette centralizado em tokens.scss', () => {
+    for (const selector of [
+      '.esmera-command-trigger',
+      '.esmera-command-backdrop',
+      '.esmera-command',
+      '.esmera-command-search > svg',
+      '.esmera-command-result',
+      '.esmera-command-result-icon',
+      '.esmera-command-indicator.is-loading::before',
+      '.esmera-command-state.is-loading > span:first-child',
+    ]) expect(tokens).toContain(selector)
   })
 
   it('centraliza durações de loop contínuo em tokens dedicados', () => {
@@ -74,7 +103,6 @@ describe('Política de motion — guarda estática', () => {
     expect(tokens).toContain('--esmera-motion-loop-skeleton:')
     const designSystem = source('src/admin/design-system/design-system.scss')
     const states = source('src/admin/design-system/states.scss')
-    const shell = source('src/admin/shell/shell.scss')
     for (const sheet of [designSystem, states, shell]) {
       expect(sheet).not.toMatch(/animation:[^;]*\d+(\.\d+)?s linear infinite/)
     }

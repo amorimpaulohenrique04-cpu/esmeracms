@@ -194,6 +194,12 @@
   .esmera-select-popup,
   .esmera-combobox-popup,
   .esmera-tooltip-popup,
+  .esmera-command-trigger,
+  .esmera-command-backdrop,
+  .esmera-command,
+  .esmera-command-search > svg,
+  .esmera-command-result,
+  .esmera-command-result-icon,
   .esmera-spatial-selection::after,
   .esmera-state-panel,
   .esmera-inline-feedback {
@@ -214,6 +220,8 @@
   .esmera-state-panel.is-loading .esmera-state-panel__mark,
   .esmera-state-panel.is-saving .esmera-state-panel__mark,
   .esmera-button__spinner,
+  .esmera-command-indicator.is-loading::before,
+  .esmera-command-state.is-loading > span:first-child,
   .esmera-view {
     animation: none;
   }

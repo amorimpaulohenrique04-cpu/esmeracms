@@ -18,6 +18,9 @@ afterEach(cleanup)
 
 describe('F2 — estilos compartilhados do editor de Categoria', () => {
   it('entrega uma classe visual estável para links de aba e preserva o estado ativo', () => {
+    // FormShell tipa `children` como obrigatório; neste teste sem JSX ele precisa
+    // ser informado nas props para que React.createElement mantenha o contrato.
+    // eslint-disable-next-line react/no-children-prop
     render(React.createElement(FormShell, {
       title: 'Edição da categoria',
       tabs: [
@@ -45,6 +48,9 @@ describe('F2 — estilos compartilhados do editor de Categoria', () => {
   })
 
   it('renderiza obrigatório como asterisco visual com texto acessível separado', () => {
+    // FieldV2 usa render prop obrigatório; manter `children` nas props preserva a
+    // tipagem no arquivo `.ts` sem introduzir JSX apenas para o teste.
+    // eslint-disable-next-line react/no-children-prop
     const { container } = render(React.createElement(FieldV2, {
       id: 'category-title',
       label: 'Nome',
@@ -62,6 +68,7 @@ describe('F2 — estilos compartilhados do editor de Categoria', () => {
   })
 
   it('mantém Opcional como metadado separado do rótulo', () => {
+    // eslint-disable-next-line react/no-children-prop
     const { container } = render(React.createElement(FieldV2, {
       id: 'category-description',
       label: 'Descrição',
