@@ -198,12 +198,13 @@ describe('PR-10 — tokens canônicos', () => {
     expect(policy).not.toContain('visibility: hidden')
   })
 
-  it('remove a escala local de View Transitions e consome os tokens canônicos', () => {
+  it('remove View Transitions de rota e consome apenas os tokens canônicos', () => {
     expect(advanced).not.toContain('--esmera-transition-fast:')
     expect(advanced).not.toContain('--esmera-transition-panel:')
-    expect(advanced).toContain('var(--esmera-motion-fast')
     expect(advanced).toContain('var(--esmera-motion-panel')
-    expect(advanced).toContain('@view-transition')
+    expect(advanced).not.toContain('@view-transition')
+    expect(advanced).not.toMatch(/::view-transition-(old|new)\(root\)/)
+    expect(advanced).not.toContain('view-transition-name: esmera-workspace')
     expect(advanced).not.toMatch(/transition:[^;]*grid-template-columns/)
     for (const sheet of sheets) expect(sheet).not.toMatch(/var\(--esmera-transition-(fast|panel)\)/)
   })

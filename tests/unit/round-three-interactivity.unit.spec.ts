@@ -7,14 +7,17 @@ const root = process.cwd()
 const source = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
 describe('Rodada 3 — interatividade avançada', () => {
-  it('mantém View Transition API como progressive enhancement com reduced motion', () => {
+  it('não usa View Transitions para navegação de rota (fix/post-pr12-motion-stability)', () => {
     const css = source('src/admin/design-system/advanced-interactions.scss')
-    expect(css).toContain('@view-transition')
-    expect(css).toContain('navigation: auto')
-    expect(css).toContain('120ms')
+    expect(css).not.toContain('@view-transition')
+    expect(css).not.toContain('navigation: auto')
+    expect(css).not.toContain('view-transition-name: esmera-workspace')
+    expect(css).not.toMatch(/::view-transition-(old|new)\(root\)/)
     expect(css).toContain('220ms')
     expect(css).toContain('prefers-reduced-motion: reduce')
-    expect(css).toContain('navigation: none')
+
+    const provider = source('src/admin/state/AdminStateProvider.tsx')
+    expect(provider).not.toContain('startViewTransition')
   })
 
   it('não preserva módulos experimentais sem consumidor real', () => {

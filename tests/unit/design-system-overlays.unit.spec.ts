@@ -94,7 +94,7 @@ describe('PR-10 — overlays continuam no Base UI', () => {
   it('consome a escala canônica de motion nos overlays', () => {
     expect(rule('.esmera-overlay-backdrop {')).toContain('var(--esmera-motion-panel)')
     expect(rule('.esmera-dialog { transition:')).toContain('var(--esmera-motion-panel)')
-    expect(rule('.esmera-drawer { transition:')).toContain('var(--esmera-motion-navigation)')
+    expect(rule('.esmera-drawer { transition:')).toContain('var(--esmera-motion-panel)')
     expect(rule('.esmera-menu-popup,')).toContain('var(--esmera-motion-component)')
     expect(rule('.esmera-tooltip-popup {')).toContain('var(--esmera-motion-fast)')
     expect(designSystem).not.toMatch(/transition:[^;]*\d+ms/)
