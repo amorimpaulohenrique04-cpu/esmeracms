@@ -80,6 +80,10 @@ function uniqueResults(results: CommandResult[]) {
   })
 }
 
+function matchesQuery(result: CommandResult, needle: string) {
+  return `${result.label} ${result.meta || ''} ${result.group}`.toLocaleLowerCase('pt-BR').includes(needle)
+}
+
 export function CommandPalette({ open, onOpenChange, selection, currentHref }: { open: boolean; onOpenChange: (open: boolean) => void; selection: CommandSelection | null; currentHref: string }) {
   const router = useRouter()
   const { beginNavigation } = useNavigationFeedback()
@@ -88,6 +92,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   const keyboardNavigationRef = useRef(false)
   const [query, setQuery] = useState('')
   const [serverResults, setServerResults] = useState<CommandResult[]>([])
+  const [serverResultQuery, setServerResultQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -104,6 +109,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
         const response = await fetch(`/api/admin-search?q=${encodeURIComponent(currentQuery)}&context=${encodeURIComponent(currentHref)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: controller.signal })
         const body = await expectAdminResponse<SearchResponse>(response, 'Não foi possível pesquisar.')
         setServerResults(body.results || [])
+        setServerResultQuery(currentQuery)
       } catch (cause) {
         if (controller.signal.aborted) return
         setError(cause instanceof Error ? cause.message : 'Não foi possível pesquisar.')
@@ -123,9 +129,16 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   const results = useMemo(() => {
     const local = open ? localCommands(selection, currentHref) : []
     const needle = query.trim().toLocaleLowerCase('pt-BR')
-    const filteredLocal = needle ? local.filter((item) => `${item.label} ${item.meta || ''} ${item.group}`.toLocaleLowerCase('pt-BR').includes(needle)) : local
-    return uniqueResults([...filteredLocal, ...serverResults]).slice(0, 40)
-  }, [currentHref, open, query, selection, serverResults])
+    const filteredLocal = needle ? local.filter((item) => matchesQuery(item, needle)) : local
+    const previousQuery = serverResultQuery.toLocaleLowerCase('pt-BR')
+    // Durante o debounce/refetch, conserva somente resultados anteriores que
+    // ainda fazem sentido para a consulta atual. Quando a resposta dessa mesma
+    // consulta chega, mantém todos os resultados do servidor, inclusive fuzzy.
+    const visibleServerResults = needle && previousQuery !== needle
+      ? serverResults.filter((item) => matchesQuery(item, needle))
+      : serverResults
+    return uniqueResults([...filteredLocal, ...visibleServerResults]).slice(0, 40)
+  }, [currentHref, open, query, selection, serverResultQuery, serverResults])
 
   // Clamped at read time instead of resynced via effect: activeIndex can point
   // past the end right after results shrink (e.g. a fresh server response),
@@ -147,7 +160,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   const searchState: SearchState = error ? 'error' : loading && !results.length ? 'loading' : results.length ? 'results' : query.trim() ? 'empty' : 'idle'
   const stateLabel = loading && results.length ? `Atualizando · ${results.length} resultado${results.length === 1 ? '' : 's'}` : searchState === 'loading' ? 'Pesquisando registros…' : searchState === 'results' ? `${results.length} resultado${results.length === 1 ? '' : 's'}` : searchState === 'empty' ? 'Nenhum resultado' : searchState === 'error' ? 'Busca indisponível' : 'Atalhos e busca global'
 
-  const reset = () => { keyboardNavigationRef.current = false; setQuery(''); setServerResults([]); setLoading(false); setError(null); setActiveIndex(0); setRetryTick(0) }
+  const reset = () => { keyboardNavigationRef.current = false; setQuery(''); setServerResults([]); setServerResultQuery(''); setLoading(false); setError(null); setActiveIndex(0); setRetryTick(0) }
   const handleOpenChange = (nextOpen: boolean) => { if (!nextOpen) reset(); onOpenChange(nextOpen) }
   const goTo = (result: CommandResult | undefined) => { if (!result) return; handleOpenChange(false); beginNavigation(result.href); router.push(result.href) }
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
