@@ -61,6 +61,8 @@ export const adminActionStatuses = [
   'archived',
   'restored',
   'published_but_unverified',
+  'published_but_incompatible',
+  'publish_reverted',
   'requires_confirmation',
   'bulk_completed',
 ] as const

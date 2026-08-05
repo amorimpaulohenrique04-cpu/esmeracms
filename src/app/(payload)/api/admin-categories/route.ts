@@ -10,7 +10,8 @@ import { withSerializableTransaction } from '../../../../server/publication/conc
 import { createPublicPublicationMetadata } from '../../../../server/publication/publicRevision'
 import { assertExpectedDocumentRevision, createDocumentRevision } from '../../../../server/publication/revision'
 import { stampPublishedDocumentMetadata } from '../../../../server/publication/stampPublicationMetadata'
-import { RevisionConflictError, type PublicationAssessment } from '../../../../server/publication/types'
+import { probeStorefrontRevision } from '../../../../server/publication/storefrontProbe'
+import { RevisionConflictError, STOREFRONT_CONTRACT_VERSION, type PublicationAssessment } from '../../../../server/publication/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -268,6 +269,21 @@ export async function POST(request: Request) {
             user,
           })
         },
+        verify: (published, revision) => probeStorefrontRevision({
+          entity: 'category',
+          entityId: body.id as string | number,
+          expectedRevision: revision,
+          contractVersion: STOREFRONT_CONTRACT_VERSION,
+        }),
+        revertPublish: () => payload.update({
+          collection: 'categories',
+          id: body.id as string | number,
+          data: { _status: 'draft' } as never,
+          draft: false,
+          depth: 2,
+          overrideAccess: true,
+          user,
+        }),
       })
 
       return adminActionResponse(result.status, {
@@ -276,9 +292,16 @@ export async function POST(request: Request) {
         assessment: result.assessment,
         message: result.status === 'requires_confirmation'
           ? 'Revise e confirme os avisos antes de publicar.'
+          : result.status === 'publish_reverted'
+          ? 'A publicação foi revertida: a vitrine reportou incompatibilidade e a categoria voltou para rascunho.'
+          : result.status === 'published_but_incompatible'
+          ? 'Categoria publicada, mas a vitrine reportou incompatibilidade e não foi possível reverter automaticamente.'
+          : result.status === 'published_but_unverified'
+          ? 'Categoria publicada, mas a confirmação visual do site está indisponível.'
           : 'Categoria publicada.',
         meta: {
           confirmationToken: result.confirmationToken,
+          verification: result.verification,
           updatedAt: updatedAt(result.document),
         },
       })

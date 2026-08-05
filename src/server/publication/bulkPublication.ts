@@ -3,9 +3,11 @@ import type { Payload, PayloadRequest } from 'payload'
 import { coordinatePublication, type PublicationCoordinatorResult } from './coordinator'
 import { assessProductPublication } from './productAssessment'
 import { createPublicPublicationMetadata } from './publicRevision'
+import { probeStorefrontRevision } from './storefrontProbe'
 import {
   PublicationBlockedError,
   RevisionConflictError,
+  STOREFRONT_CONTRACT_VERSION,
   type BulkPublicationItemResult,
   type BulkPublicationResult,
   type PublicationIssue,
@@ -70,10 +72,25 @@ export function mapCoordinatorOutcome(
       }
     }
 
+    if (result.status === 'publish_reverted') {
+      return {
+        ...base,
+        status: 'failed',
+        message: 'A vitrine reportou incompatibilidade e a publicação foi revertida automaticamente.',
+        revision: result.revision,
+        updatedAt: documentUpdatedAt(result.document) || context.updatedAt,
+        issues: issuesOfSeverity(result.assessment?.issues, 'blocker'),
+      }
+    }
+
     return {
       ...base,
       status: 'published',
-      message: 'Produto publicado.',
+      message: result.status === 'published_but_incompatible'
+        ? 'Produto publicado, mas a vitrine reportou incompatibilidade e não foi possível reverter automaticamente.'
+        : result.status === 'published_but_unverified'
+        ? 'Produto publicado, mas a confirmação visual do site está indisponível.'
+        : 'Produto publicado.',
       revision: result.revision,
       updatedAt: documentUpdatedAt(result.document) || context.updatedAt,
     }
@@ -171,6 +188,21 @@ async function publishSingleProduct(
           user,
         })
       },
+      verify: (published, revision) => probeStorefrontRevision({
+        entity: 'product',
+        entityId: item.id,
+        expectedRevision: revision,
+        contractVersion: STOREFRONT_CONTRACT_VERSION,
+      }),
+      revertPublish: () => payload.update({
+        collection: 'products',
+        id: item.id,
+        data: { _status: 'draft' } as never,
+        draft: false,
+        depth: 2,
+        overrideAccess: true,
+        user,
+      }),
     })
 
     return mapCoordinatorOutcome({ ok: true, result }, {
