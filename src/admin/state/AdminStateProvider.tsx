@@ -1,8 +1,8 @@
 'use client'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import React, { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
 
 import { rememberAdminItem } from './continuity'
 
@@ -21,14 +21,6 @@ type StoredContext = {
   savedAt: number
 }
 
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (callback: () => void | Promise<void>) => {
-    finished: Promise<void>
-    ready: Promise<void>
-    updateCallbackDone: Promise<void>
-  }
-}
-
 function currentContextKey() {
   return `${window.location.pathname}${window.location.search}`
 }
@@ -38,35 +30,11 @@ function focusKeyFor(element: Element | null) {
   return element.dataset.esmeraContextKey || element.id || undefined
 }
 
-function prefersReducedMotion() {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
 function isVisibleElement(element: HTMLElement | null) {
   if (!element) return false
   const style = getComputedStyle(element)
   const rect = element.getBoundingClientRect()
   return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
-}
-
-export function startAdminViewTransition(callback: () => void | Promise<void>, transitionName = 'default') {
-  if (typeof document === 'undefined' || prefersReducedMotion()) {
-    void callback()
-    return null
-  }
-
-  const transitionDocument = document as ViewTransitionDocument
-  if (!transitionDocument.startViewTransition) {
-    void callback()
-    return null
-  }
-
-  document.documentElement.dataset.esmeraTransition = transitionName
-  const transition = transitionDocument.startViewTransition(callback)
-  transition.finished.finally(() => {
-    delete document.documentElement.dataset.esmeraTransition
-  })
-  return transition
 }
 
 function storeContext() {
@@ -133,9 +101,9 @@ function rememberRecentAnchor(anchor: HTMLAnchorElement) {
   }
 }
 
-function transitionEligible(event: MouseEvent, anchor: HTMLAnchorElement) {
+function isSoftNavigable(event: MouseEvent, anchor: HTMLAnchorElement) {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false
-  if (anchor.target === '_blank' || anchor.hasAttribute('download') || anchor.dataset.noViewTransition === 'true') return false
+  if (anchor.target === '_blank' || anchor.hasAttribute('download') || anchor.dataset.noSoftNav === 'true') return false
   if (anchor.getAttribute('href')?.startsWith('#')) return false
   try {
     const url = new URL(anchor.href, window.location.href)
@@ -197,11 +165,6 @@ function AdminLiveRegion() {
 
 export function AdminStateProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const routeKey = `${pathname}?${searchParams.toString()}`
-  const pendingNavigation = useRef<{ resolve: () => void; timeout: number } | null>(null)
-  const previousRouteKey = useRef(routeKey)
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
@@ -215,16 +178,6 @@ export function AdminStateProvider({ children }: { children: React.ReactNode }) 
   }))
 
   useEffect(() => {
-    if (previousRouteKey.current === routeKey) return
-    previousRouteKey.current = routeKey
-    const pending = pendingNavigation.current
-    if (!pending) return
-    window.clearTimeout(pending.timeout)
-    pending.resolve()
-    pendingNavigation.current = null
-  }, [routeKey])
-
-  useEffect(() => {
     const previousRestoration = history.scrollRestoration
     history.scrollRestoration = 'manual'
 
@@ -235,21 +188,12 @@ export function AdminStateProvider({ children }: { children: React.ReactNode }) 
       rememberEditOrigin(anchor)
       rememberRecentAnchor(anchor)
 
-      const transitionDocument = document as ViewTransitionDocument
-      if (!transitionEligible(event, anchor) || !transitionDocument.startViewTransition || prefersReducedMotion()) return
+      if (!isSoftNavigable(event, anchor)) return
 
       const url = new URL(anchor.href, window.location.href)
       const destination = `${url.pathname}${url.search}${url.hash}`
       event.preventDefault()
-
-      startAdminViewTransition(() => new Promise<void>((resolve) => {
-        const timeout = window.setTimeout(() => {
-          if (pendingNavigation.current?.resolve === resolve) pendingNavigation.current = null
-          resolve()
-        }, 1_200)
-        pendingNavigation.current = { resolve, timeout }
-        router.push(destination)
-      }), anchor.dataset.esmeraTransition || 'navigation')
+      router.push(destination)
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -279,8 +223,6 @@ export function AdminStateProvider({ children }: { children: React.ReactNode }) 
       document.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('pagehide', onPageHide)
       window.removeEventListener('popstate', onPopState)
-      if (pendingNavigation.current) window.clearTimeout(pendingNavigation.current.timeout)
-      pendingNavigation.current = null
     }
   }, [router])
 

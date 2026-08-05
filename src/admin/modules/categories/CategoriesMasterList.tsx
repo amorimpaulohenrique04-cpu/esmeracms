@@ -71,7 +71,7 @@ function SortableCategory({
       <button ref={sortable.handleRef} type="button" className="esmera-category-drag" aria-label={`Reordenar ${title}`} disabled={disabled}>
         <span aria-hidden="true">⋮⋮</span>
       </button>
-      <Link className="esmera-category-row__main" href={categoryHref(filters, category.id)} data-esmera-transition="inspector" data-esmera-recent-label={title} data-esmera-recent-meta={`Categoria · /${category.slug || 'sem-slug'}`}>
+      <Link className="esmera-category-row__main" href={categoryHref(filters, category.id)} data-esmera-recent-label={title} data-esmera-recent-meta={`Categoria · /${category.slug || 'sem-slug'}`}>
         <span className="esmera-category-thumb">{image ? <img src={image} alt={alt} /> : <span aria-hidden="true">◇</span>}</span>
         <span className="esmera-category-row__copy"><strong>{title}</strong><small>/{category.slug || 'sem-slug'}{category.depth > 0 ? ` · nível ${category.depth + 1}` : ''}</small></span>
       </Link>

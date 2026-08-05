@@ -1,59 +1,13 @@
-@view-transition {
-  navigation: auto;
-}
+/* View Transitions de rota foram removidas por completo: causavam snapshots
+   simultâneos da rota antiga e da nova (mistura visual, sensação de
+   travamento). Ver .agents/skills/esmera-motion-system/SKILL.md para a
+   política vigente. Sem escala local: qualquer entrada aqui consome a escala
+   canônica de tokens.scss. */
 
-/* Sem escala local: os aliases --esmera-transition-* foram removidos e as View
-   Transitions consomem a escala canônica de tokens.scss. Os fallbacks repetem
-   exatamente o valor canônico (fast = 120ms, panel = 220ms). */
-
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: var(--esmera-motion-fast, 120ms);
-  animation-timing-function: var(--esmera-ease-enter);
-}
-
-::view-transition-old(esmera-workspace) {
-  animation: esmera-workspace-out var(--esmera-motion-fast, 120ms) var(--esmera-ease-exit) both;
-}
-
-::view-transition-new(esmera-workspace) {
-  animation: esmera-workspace-in var(--esmera-motion-fast, 120ms) var(--esmera-ease-enter) both;
-}
-
-::view-transition-old(esmera-inspector),
-::view-transition-new(esmera-inspector) {
-  animation-duration: var(--esmera-motion-panel, 220ms);
-  animation-timing-function: var(--esmera-ease-enter);
-}
-
-.esmera-workspace-frame {
-  view-transition-name: esmera-workspace;
-}
-
-.esmera-context-inspector,
-.esmera-product-context-inspector,
-.esmera-customer-detail,
-.esmera-report-drawer {
-  view-transition-name: esmera-inspector;
-}
-
-/* grid-template-columns não é animado: layout estrutural muda de uma vez. */
+/* grid-template-columns não é animado: layout estrutural muda de uma vez.
+   Apenas o painel de detalhe entra localmente com opacity/translate. */
 .esmera-split-workspace__detail {
   animation: esmera-inspector-enter var(--esmera-motion-panel, 220ms) var(--esmera-ease-enter) both;
-}
-
-[data-transition-origin='selected'] {
-  view-transition-name: esmera-selected-record;
-}
-
-@keyframes esmera-workspace-in {
-  from { opacity: .72; transform: translateY(3px); }
-  to { opacity: 1; transform: none; }
-}
-
-@keyframes esmera-workspace-out {
-  from { opacity: 1; transform: none; }
-  to { opacity: .84; transform: translateY(-2px); }
 }
 
 @keyframes esmera-inspector-enter {
@@ -73,17 +27,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  @view-transition { navigation: none; }
-
-  ::view-transition-old(root),
-  ::view-transition-new(root),
-  ::view-transition-old(esmera-workspace),
-  ::view-transition-new(esmera-workspace),
-  ::view-transition-old(esmera-inspector),
-  ::view-transition-new(esmera-inspector) {
-    animation: none !important;
-  }
-
   .esmera-split-workspace,
   .esmera-split-workspace__detail {
     animation: none !important;
