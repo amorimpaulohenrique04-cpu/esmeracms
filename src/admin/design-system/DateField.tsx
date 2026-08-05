@@ -3,8 +3,6 @@
 import { Popover } from '@base-ui/react/popover'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 
-import './DateField.scss'
-
 const REPORTS_TIME_ZONE = 'America/Recife'
 const DATE_VALUE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
@@ -104,6 +102,8 @@ function capitalize(value: string) {
 export function DateField({ label, value, onChange, required = false }: DateFieldProps) {
   const generatedID = useId().replace(/:/g, '')
   const labelID = `esmera-datefield-${generatedID}-label`
+  const valueID = `esmera-datefield-${generatedID}-value`
+  const requiredID = `esmera-datefield-${generatedID}-required`
   const monthLabelID = `esmera-datefield-${generatedID}-month`
   const today = useMemo(() => getTodayInReportsTimeZone(), [])
   const selectedDate = parseDateValue(value)
@@ -191,14 +191,15 @@ export function DateField({ label, value, onChange, required = false }: DateFiel
         {label}
         {required ? <span className="esmera-datefield-required" aria-hidden="true"> *</span> : null}
       </span>
+      {required ? <span className="esmera-sr-only" id={requiredID}>Campo obrigatório</span> : null}
       <Popover.Root open={open} onOpenChange={handleOpenChange}>
         <Popover.Trigger
           type="button"
           className="esmera-input esmera-datefield-trigger"
-          aria-labelledby={labelID}
-          aria-required={required || undefined}
+          aria-labelledby={`${labelID} ${valueID}`}
+          aria-describedby={required ? requiredID : undefined}
         >
-          <span>{selectedDate ? dateDisplayFormatter.format(selectedDate) : 'dd/mm/aaaa'}</span>
+          <span id={valueID}>{selectedDate ? dateDisplayFormatter.format(selectedDate) : 'dd/mm/aaaa'}</span>
           <svg className="esmera-datefield-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
             <rect x="3.5" y="5.5" width="17" height="15" rx="2" />
             <path d="M8 3.5v4M16 3.5v4M3.5 10h17" />
