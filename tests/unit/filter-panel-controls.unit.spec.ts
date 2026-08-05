@@ -49,6 +49,23 @@ describe('FilterPanel advanced filters', () => {
     expect(details.open).toBe(true)
   })
 
+  it('marks active filters without forcing the advanced panel open', () => {
+    const { container } = render(
+      React.createElement(FilterPanel, {
+        primary: React.createElement('input', { 'aria-label': 'Buscar' }),
+        advanced: React.createElement('button', null, 'Aplicar recorte'),
+        advancedActive: true,
+      }),
+    )
+    const details = container.querySelector<HTMLDetailsElement>('.esmera-filter-panel__advanced')
+
+    expect(details).not.toBeNull()
+    if (!details) throw new Error('Advanced filter details was not rendered')
+
+    expect(details.open).toBe(false)
+    expect(screen.getByText('Mais filtros · ativos')).toBeTruthy()
+  })
+
   it('keeps browser-only hooks behind a dedicated client boundary', () => {
     const primitives = readFileSync(
       resolve(process.cwd(), 'src/admin/design-system/Primitives.tsx'),
@@ -63,6 +80,7 @@ describe('FilterPanel advanced filters', () => {
     expect(primitives).not.toContain('React.useEffect')
     expect(advanced.startsWith("'use client'")).toBe(true)
     expect(advanced).toContain("document.addEventListener('pointerdown'")
+    expect(advanced).not.toContain('open={active')
   })
 })
 

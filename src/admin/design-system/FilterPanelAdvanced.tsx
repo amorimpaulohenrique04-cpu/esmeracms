@@ -27,7 +27,7 @@ export function FilterPanelAdvanced({
   }, [])
 
   return (
-    <details ref={detailsRef} className="esmera-filter-panel__advanced" open={active || undefined}>
+    <details ref={detailsRef} className="esmera-filter-panel__advanced">
       <summary>{label}{active ? ' · ativos' : ''}</summary>
       <div className="esmera-filter-panel__advanced-panel">{children}</div>
     </details>
