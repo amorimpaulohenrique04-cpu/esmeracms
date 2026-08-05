@@ -192,6 +192,20 @@ body {
   box-sizing: border-box;
 }
 
+/*
+ * At the 768px tablet breakpoint the four fixed pipeline tracks contributed
+ * their intrinsic width to the document before the internal scroller could
+ * contain them. Inline-size containment makes the viewport-sized scroller the
+ * sizing boundary while preserving horizontal access to every stage.
+ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .esmera-pipeline {
+    inline-size: calc(100vw - 40px);
+    max-inline-size: calc(100vw - 40px);
+    contain: inline-size;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto !important;
