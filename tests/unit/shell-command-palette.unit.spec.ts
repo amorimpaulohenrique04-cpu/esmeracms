@@ -3,7 +3,7 @@
  * em erro e navegação por teclado.
  *
  * Arquivo em `.ts` com `React.createElement`: o `include` do vitest.config.mts
- * coleta apenas `tests/unit/**\/*.unit.spec.ts`, e a config está fora do
+ * coleta apenas `tests/unit/**/*.unit.spec.ts`, e a config está fora do
  * escopo deste PR.
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -11,9 +11,14 @@ import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const push = vi.fn()
+const navigationFeedback = vi.hoisted(() => ({ beginNavigation: vi.fn() }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
+}))
+
+vi.mock('../../src/admin/navigation/NavigationFeedbackProvider', () => ({
+  useNavigationFeedback: () => navigationFeedback,
 }))
 
 const { CommandPalette } = await import('../../src/admin/shell/CommandPalette')
@@ -50,6 +55,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.useRealTimers()
   push.mockClear()
+  navigationFeedback.beginNavigation.mockClear()
 })
 
 describe('PR-11 — CommandPalette: base e foco', () => {
@@ -198,8 +204,51 @@ describe('PR-11 — CommandPalette: navegação por teclado', () => {
 
     act(() => { fireEvent.keyDown(input, { key: 'ArrowDown' }) })
     act(() => { fireEvent.keyDown(input, { key: 'Enter' }) })
+    expect(navigationFeedback.beginNavigation).toHaveBeenCalledWith('/x2')
     expect(push).toHaveBeenCalledWith('/x2')
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('Home/End pulam para os extremos e mantêm o item ativo visível', async () => {
+    vi.useFakeTimers()
+    const { fetchMock, calls } = deferredFetch()
+    vi.stubGlobal('fetch', fetchMock)
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
+
+    try {
+      render(React.createElement(CommandPalette, { open: true, onOpenChange: vi.fn(), currentHref: '/admin', selection: null }))
+      const input = await openInput(calls)
+
+      act(() => { fireEvent.change(input, { target: { value: 'anel' } }) })
+      act(() => { vi.advanceTimersByTime(140) })
+      await act(async () => {
+        calls[1].resolve({
+          results: [
+            { id: 'r1', group: 'Produtos', label: 'Anel Solar', href: '/x1' },
+            { id: 'r2', group: 'Produtos', label: 'Anel Lunar', href: '/x2' },
+            { id: 'r3', group: 'Produtos', label: 'Anel Estelar', href: '/x3' },
+          ],
+        })
+      })
+
+      act(() => { fireEvent.keyDown(input, { key: 'End' }) })
+      let options = screen.getAllByRole('option')
+      expect(options[2].getAttribute('aria-selected')).toBe('true')
+      expect(input.getAttribute('aria-activedescendant')).toBe(options[2].id)
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' }))
+
+      scrollIntoView.mockClear()
+      act(() => { fireEvent.keyDown(input, { key: 'Home' }) })
+      options = screen.getAllByRole('option')
+      expect(options[0].getAttribute('aria-selected')).toBe('true')
+      expect(input.getAttribute('aria-activedescendant')).toBe(options[0].id)
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' }))
+    } finally {
+      if (originalScrollIntoView) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
+      else delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView
+    }
   })
 
   it('ajusta o activeIndex e o aria-activedescendant quando a lista de resultados diminui', async () => {
