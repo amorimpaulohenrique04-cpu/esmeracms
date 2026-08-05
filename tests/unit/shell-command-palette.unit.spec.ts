@@ -3,7 +3,7 @@
  * em erro e navegação por teclado.
  *
  * Arquivo em `.ts` com `React.createElement`: o `include` do vitest.config.mts
- * coleta apenas `tests/unit/**/*.unit.spec.ts`, e a config está fora do
+ * coleta apenas `tests/unit/**\/*.unit.spec.ts`, e a config está fora do
  * escopo deste PR.
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
