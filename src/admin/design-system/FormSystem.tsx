@@ -53,7 +53,7 @@ export function FormShell({
             <a
               key={tab.id}
               href={tab.href}
-              className={tab.id === activeTab ? 'is-active' : ''}
+              className={`esmera-form-shell__tab${tab.id === activeTab ? ' is-active' : ''}`}
               aria-current={tab.id === activeTab ? 'page' : undefined}
               onClick={(event) => { event.preventDefault(); onTabChange?.(tab.id) }}
             >
@@ -64,7 +64,7 @@ export function FormShell({
             <button
               key={tab.id}
               type="button"
-              className={tab.id === activeTab ? 'is-active' : ''}
+              className={`esmera-form-shell__tab${tab.id === activeTab ? ' is-active' : ''}`}
               aria-current={tab.id === activeTab ? 'page' : undefined}
               onClick={() => onTabChange?.(tab.id)}
             >
