@@ -15,7 +15,8 @@ import { InlineFeedback, MetricStripItem } from '../../src/admin/design-system/P
 afterEach(cleanup)
 
 function button(props: React.ComponentProps<typeof Button> = {}) {
-  render(React.createElement(Button, { children: 'Publicar', ...props }))
+  const { children = 'Publicar', ...rest } = props
+  render(React.createElement(Button, rest, children))
   return screen.getByRole('button')
 }
 
@@ -68,7 +69,7 @@ describe('PR-10 — Button assíncrono', () => {
   })
 
   it('não aplica a API busy ao ButtonLink', () => {
-    render(React.createElement(ButtonLink, { href: '/admin', children: 'Abrir' }))
+    render(React.createElement(ButtonLink, { href: '/admin' }, 'Abrir'))
     const link = screen.getByRole('link')
     expect(link.getAttribute('aria-busy')).toBeNull()
     expect(link.querySelector('.esmera-button__spinner')).toBeNull()
@@ -129,6 +130,10 @@ describe('PR-10 — política de alert e status', () => {
   })
 
   it('InlineFeedback suporta os três modos', () => {
+    // Arquivo .ts sem JSX: InlineFeedback exige `children` no tipo das props, e
+    // o overload de createElement com filho à parte não tipa contra props com
+    // `children` obrigatório. `children` via props é a forma correta aqui.
+    /* eslint-disable react/no-children-prop */
     const { unmount } = render(React.createElement(InlineFeedback, { announcement: 'none', children: 'silencioso' }))
     expect(screen.queryByRole('status')).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
@@ -139,6 +144,7 @@ describe('PR-10 — política de alert e status', () => {
     polite.unmount()
 
     render(React.createElement(InlineFeedback, { announcement: 'assertive', children: 'urgente' }))
+    /* eslint-enable react/no-children-prop */
     expect(screen.getByRole('alert').getAttribute('aria-live')).toBe('assertive')
   })
 })

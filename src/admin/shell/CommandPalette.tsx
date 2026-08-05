@@ -124,9 +124,10 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
     return uniqueResults([...filteredLocal, ...serverResults]).slice(0, 40)
   }, [currentHref, open, query, selection, serverResults])
 
-  useEffect(() => {
-    setActiveIndex((index) => (results.length ? Math.min(index, results.length - 1) : 0))
-  }, [results.length])
+  // Clamped at read time instead of resynced via effect: activeIndex can point
+  // past the end right after results shrink (e.g. a fresh server response),
+  // and this is the only thing that needs to know about that.
+  const safeActiveIndex = results.length ? Math.min(activeIndex, results.length - 1) : 0
 
   const grouped = useMemo(() => {
     const order = ['Seleção atual', 'Recentes', 'Filtros salvos', 'Ações contextuais', 'Ações', 'Seções de Relatórios', 'Produtos', 'Categorias', 'Clientes', 'Oportunidades', 'Leads', 'Vendas']
@@ -144,7 +145,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') { event.preventDefault(); setActiveIndex((index) => results.length ? (index + 1) % results.length : 0) }
     else if (event.key === 'ArrowUp') { event.preventDefault(); setActiveIndex((index) => results.length ? (index - 1 + results.length) % results.length : 0) }
-    else if (event.key === 'Enter') { event.preventDefault(); goTo(results[activeIndex]) }
+    else if (event.key === 'Enter') { event.preventDefault(); goTo(results[safeActiveIndex]) }
   }
 
   return (
@@ -156,7 +157,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
             <Dialog.Title className="esmera-command-sr-title">Buscar no Esméra CMS</Dialog.Title>
             <div className="esmera-command-search">
               <ShellIcon name="search" /><label className="esmera-command-label" htmlFor={inputId}>Buscar no CMS</label>
-              <input ref={inputRef} id={inputId} value={query} onChange={(event) => { setQuery(event.target.value); setActiveIndex(0) }} onKeyDown={onKeyDown} placeholder="Registro, ação, filtro salvo ou seção…" autoComplete="off" aria-controls={`${inputId}-results`} aria-activedescendant={results[activeIndex] ? `${inputId}-result-${activeIndex}` : undefined} />
+              <input ref={inputRef} id={inputId} value={query} onChange={(event) => { setQuery(event.target.value); setActiveIndex(0) }} onKeyDown={onKeyDown} placeholder="Registro, ação, filtro salvo ou seção…" autoComplete="off" aria-controls={`${inputId}-results`} aria-activedescendant={results[safeActiveIndex] ? `${inputId}-result-${safeActiveIndex}` : undefined} />
               <span className={`esmera-command-indicator is-${searchState}`} role="status" aria-live="polite">{stateLabel}</span>
               <Dialog.Close className="esmera-command-close" aria-label="Fechar busca">Esc</Dialog.Close>
             </div>
@@ -165,7 +166,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
               {error ? <div className="esmera-command-state esmera-command-state--error" role="alert"><strong>Não foi possível pesquisar</strong><span>{error}</span><button type="button" className="esmera-command-retry" onClick={() => setRetryTick((tick) => tick + 1)}>Tentar novamente</button></div> : null}
               {!loading && !error && !results.length && query.trim() ? <div className="esmera-command-state"><strong>Nenhum resultado</strong><span>Tente nome, código, cliente, venda, filtro salvo ou uma ação diferente.</span></div> : null}
               {!loading && !error && !results.length && !query.trim() ? <div className="esmera-command-state"><strong>Busca global</strong><span>Digite para localizar registros ou use os atalhos, recentes e recortes salvos.</span></div> : null}
-              {grouped.map(([group, items]) => <section className="esmera-command-group" key={group} aria-label={group}><div className="esmera-command-group-label">{group}</div>{items.map((result) => { const index = results.indexOf(result); return <button type="button" role="option" aria-selected={activeIndex === index} className={`esmera-command-result${activeIndex === index ? ' is-active' : ''}${result.local ? ' is-local' : ''}`} id={`${inputId}-result-${index}`} key={result.id} onMouseEnter={() => setActiveIndex(index)} onClick={() => goTo(result)}><span className="esmera-command-result-icon"><ShellIcon name={result.icon || 'arrow'} /></span><span className="esmera-command-result-copy"><strong>{result.label}</strong>{result.meta ? <small>{result.meta}</small> : null}</span><ShellIcon name="arrow" className="esmera-command-arrow" /></button> })}</section>)}
+              {grouped.map(([group, items]) => <section className="esmera-command-group" key={group} aria-label={group}><div className="esmera-command-group-label">{group}</div>{items.map((result) => { const index = results.indexOf(result); return <button type="button" role="option" aria-selected={safeActiveIndex === index} className={`esmera-command-result${safeActiveIndex === index ? ' is-active' : ''}${result.local ? ' is-local' : ''}`} id={`${inputId}-result-${index}`} key={result.id} onMouseEnter={() => setActiveIndex(index)} onClick={() => goTo(result)}><span className="esmera-command-result-icon"><ShellIcon name={result.icon || 'arrow'} /></span><span className="esmera-command-result-copy"><strong>{result.label}</strong>{result.meta ? <small>{result.meta}</small> : null}</span><ShellIcon name="arrow" className="esmera-command-arrow" /></button> })}</section>)}
             </div>
             <div className="esmera-command-footer"><span>↑↓ navegar</span><span>Enter abrir</span><span>Esc fechar</span><span>N criar</span></div>
           </Dialog.Popup>

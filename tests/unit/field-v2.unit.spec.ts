@@ -18,6 +18,10 @@ function input(control: FieldControlProps) {
 }
 
 function fieldElement(props: Partial<FieldProps> = {}) {
+  // Arquivo .ts sem JSX: FieldV2 exige `children` no tipo das props, e o
+  // overload de createElement com filho à parte não tipa contra props com
+  // `children` obrigatório. `children` via props é a forma correta aqui.
+  // eslint-disable-next-line react/no-children-prop
   return React.createElement(FieldV2, { label: 'Título', ...props, children: input })
 }
 

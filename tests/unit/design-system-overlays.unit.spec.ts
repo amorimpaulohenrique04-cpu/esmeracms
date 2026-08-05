@@ -32,8 +32,8 @@ afterEach(cleanup)
 
 describe('PR-10 — overlays continuam no Base UI', () => {
   it('importa os primitives do Base UI instalado', () => {
-    for (const module of ['dialog', 'drawer', 'menu', 'popover', 'tooltip']) {
-      expect(overlays).toContain(`@base-ui/react/${module}`)
+    for (const moduleName of ['dialog', 'drawer', 'menu', 'popover', 'tooltip']) {
+      expect(overlays).toContain(`@base-ui/react/${moduleName}`)
     }
     expect(overlays).toContain('Dialog.Portal')
     expect(overlays).toContain('Drawer.Portal')
@@ -55,6 +55,11 @@ describe('PR-10 — overlays continuam no Base UI', () => {
   })
 
   it('preserva as classes públicas controladas pelo projeto', () => {
+    // Arquivo .ts sem JSX: os componentes abaixo exigem `children` no tipo das
+    // props, e o overload de createElement que aceita filhos como argumento à
+    // parte não tipa contra props com `children` obrigatório. `children` via
+    // props é a forma correta aqui — só o eslint-plugin-react não sabe disso.
+    /* eslint-disable react/no-children-prop */
     const triggers: Array<[React.ReactElement, string[]]> = [
       [React.createElement(DialogPanel, { trigger: 'Abrir', title: 'Título', children: 'corpo' }), ['esmera-button']],
       [React.createElement(DrawerPanel, { trigger: 'Abrir', title: 'Título', children: 'corpo' }), ['esmera-button']],
@@ -69,6 +74,7 @@ describe('PR-10 — overlays continuam no Base UI', () => {
     }
 
     render(React.createElement(TooltipHint, { content: 'dica', children: 'alvo' }))
+    /* eslint-enable react/no-children-prop */
     expect(screen.getByText('alvo')).toBeTruthy()
 
     for (const className of ['esmera-overlay-backdrop', 'esmera-dialog', 'esmera-drawer', 'esmera-menu-popup', 'esmera-popover-popup', 'esmera-tooltip-popup']) {
