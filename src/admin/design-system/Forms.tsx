@@ -97,7 +97,12 @@ export function FieldV2({
     >
       <div className="esmera-field-v2__label-row">
         <label className="esmera-field-label" htmlFor={fieldID}>{label}</label>
-        {required ? <span className="esmera-field-v2__required">Obrigatório</span> : null}
+        {required ? (
+          <>
+            <span className="esmera-field-v2__required" aria-hidden="true">*</span>
+            <span className="esmera-sr-only">Obrigatório</span>
+          </>
+        ) : null}
         {optional ? <span className="esmera-field-v2__optional">Opcional</span> : null}
       </div>
       {description ? <p className="esmera-field-v2__description" id={descriptionID}>{description}</p> : null}

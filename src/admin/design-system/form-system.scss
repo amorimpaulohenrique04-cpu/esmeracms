@@ -1,0 +1,165 @@
+@use './tokens';
+
+/*
+ * FormSystem is shared by Products and Categories. Keep the visual contract
+ * here so module styles only handle layout that is specific to their screen.
+ */
+.esmera-form-shell,
+.esmera-form-shell__header,
+.esmera-form-shell__body,
+.esmera-form-shell__content,
+.esmera-form-shell__aside {
+  min-width: 0;
+}
+
+.esmera-form-shell__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--esmera-space-4);
+}
+
+.esmera-form-shell__header > div:first-child {
+  min-width: 0;
+}
+
+.esmera-form-shell__header h2 {
+  margin: 0;
+  color: var(--esmera-text);
+  font-size: var(--esmera-font-section);
+  font-weight: var(--esmera-weight-semibold);
+  line-height: 1.25;
+}
+
+.esmera-form-shell__header p {
+  max-width: 72ch;
+  margin: 6px 0 0;
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-ui-sm);
+  line-height: var(--esmera-line-body);
+}
+
+.esmera-form-shell__header-actions {
+  flex: 0 0 auto;
+}
+
+.esmera-form-shell__tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  max-width: 100%;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--esmera-line-default);
+  scrollbar-width: thin;
+}
+
+.esmera-form-shell__tab {
+  position: relative;
+  min-height: var(--esmera-control-standard);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: var(--esmera-space-2);
+  padding: 0 var(--esmera-space-4);
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  background: transparent;
+  color: var(--esmera-text-muted);
+  font-family: var(--esmera-font-sans);
+  font-size: var(--esmera-font-ui-sm);
+  font-weight: var(--esmera-weight-medium);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--esmera-motion-fast) var(--esmera-ease-standard),
+    color var(--esmera-motion-fast) var(--esmera-ease-standard);
+}
+
+.esmera-form-shell__tab:hover {
+  background: var(--esmera-surface-hover);
+  color: var(--esmera-text);
+  text-decoration: none;
+}
+
+.esmera-form-shell__tab.is-active {
+  color: var(--esmera-text);
+  font-weight: var(--esmera-weight-semibold);
+}
+
+.esmera-form-shell__tab.is-active::after {
+  content: '';
+  position: absolute;
+  right: var(--esmera-space-3);
+  bottom: 0;
+  left: var(--esmera-space-3);
+  height: 2px;
+  background: var(--esmera-selection-bar);
+}
+
+.esmera-form-shell__tab small {
+  min-width: 20px;
+  min-height: 20px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border: 1px solid var(--esmera-line-default);
+  border-radius: 999px;
+  background: var(--esmera-surface-raised);
+  color: var(--esmera-text-secondary);
+  font-size: var(--esmera-font-meta);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.esmera-field-v2__label-row {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+}
+
+.esmera-field-v2__required {
+  color: var(--esmera-danger);
+  font-size: var(--esmera-font-body);
+  font-weight: var(--esmera-weight-semibold);
+  line-height: 1;
+}
+
+.esmera-field-v2__optional {
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-meta);
+  font-weight: var(--esmera-weight-medium);
+  line-height: 1.3;
+}
+
+.esmera-field-v2__description {
+  margin: 0;
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-meta);
+  line-height: var(--esmera-line-body);
+}
+
+.esmera-field-v2__control {
+  min-width: 0;
+}
+
+@media (max-width: 700px) {
+  .esmera-form-shell__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .esmera-form-shell__header-actions {
+    width: 100%;
+  }
+
+  .esmera-form-shell__tab {
+    min-height: 44px;
+    padding-inline: var(--esmera-space-3);
+  }
+}
