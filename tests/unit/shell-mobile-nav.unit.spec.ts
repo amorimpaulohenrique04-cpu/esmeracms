@@ -12,10 +12,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 let pathname = '/admin'
 const push = vi.fn()
+const navigationFeedback = vi.hoisted(() => ({ beginNavigation: vi.fn() }))
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useRouter: () => ({ push }),
+}))
+
+vi.mock('../../src/admin/navigation/NavigationFeedbackProvider', () => ({
+  useNavigationFeedback: () => navigationFeedback,
 }))
 
 const { GlobalCreateMenu } = await import('../../src/admin/shell/GlobalCreateMenu')
@@ -26,6 +31,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   pathname = '/admin'
   push.mockClear()
+  navigationFeedback.beginNavigation.mockClear()
 })
 
 describe('PR-11 — GlobalCreateMenu', () => {
@@ -81,6 +87,7 @@ describe('PR-11 — GlobalCreateMenu', () => {
     const productItem = items.find((item) => (item.textContent || '').includes('Novo produto'))
     expect(productItem).not.toBeUndefined()
     fireEvent.click(productItem as HTMLElement)
+    expect(navigationFeedback.beginNavigation).toHaveBeenCalledWith('/admin/collections/products/create')
     expect(push).toHaveBeenCalledWith('/admin/collections/products/create')
   })
 
