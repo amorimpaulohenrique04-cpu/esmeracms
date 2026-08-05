@@ -48,6 +48,22 @@ describe('FilterPanel advanced filters', () => {
 
     expect(details.open).toBe(true)
   })
+
+  it('keeps browser-only hooks behind a dedicated client boundary', () => {
+    const primitives = readFileSync(
+      resolve(process.cwd(), 'src/admin/design-system/Primitives.tsx'),
+      'utf8',
+    )
+    const advanced = readFileSync(
+      resolve(process.cwd(), 'src/admin/design-system/FilterPanelAdvanced.tsx'),
+      'utf8',
+    )
+
+    expect(primitives).not.toContain('React.useRef')
+    expect(primitives).not.toContain('React.useEffect')
+    expect(advanced.startsWith("'use client'")).toBe(true)
+    expect(advanced).toContain("document.addEventListener('pointerdown'")
+  })
 })
 
 describe('shared filter-control styles', () => {
