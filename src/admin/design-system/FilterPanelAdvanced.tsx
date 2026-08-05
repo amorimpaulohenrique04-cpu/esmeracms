@@ -30,9 +30,7 @@ export function FilterPanelAdvanced({
     <details
       ref={detailsRef}
       className="esmera-filter-panel__advanced"
-      onSubmitCapture={() => {
-        if (detailsRef.current) detailsRef.current.open = false
-      }}
+      open={active || undefined}
     >
       <summary>{label}{active ? ' · ativos' : ''}</summary>
       <div className="esmera-filter-panel__advanced-panel">{children}</div>
