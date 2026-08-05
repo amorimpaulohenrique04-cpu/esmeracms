@@ -26,6 +26,7 @@ import { AppHeader as AppHeader_14067a8e97406dd23e52ff39f2eca23f } from '../../.
 import { EsmeraIcon as EsmeraIcon_1121b289be69ddf34efb4c0f74982a55 } from '../../../admin/components/Brand'
 import { EsmeraLogo as EsmeraLogo_1121b289be69ddf34efb4c0f74982a55 } from '../../../admin/components/Brand'
 import { AdminStateProvider as AdminStateProvider_6815bae28a246dc593ff81d6af8f0b22 } from '../../../admin/state/AdminStateProvider'
+import { NavigationFeedbackProvider as NavigationFeedbackProvider_04f5d588d988fb899aeb65baba32e936 } from '../../../admin/navigation/NavigationFeedbackProvider'
 import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
 import { default as default_df9bfd4c8b859f0430960e06df6114f0 } from '../../../admin/modules/dashboard/DashboardView'
 import { ProductsView as ProductsView_6d795fd1198cd1546060ea6772677cf9 } from '../../../admin/modules/products/ProductsView'
@@ -71,6 +72,7 @@ export const importMap = {
   "/admin/components/Brand#EsmeraIcon": EsmeraIcon_1121b289be69ddf34efb4c0f74982a55,
   "/admin/components/Brand#EsmeraLogo": EsmeraLogo_1121b289be69ddf34efb4c0f74982a55,
   "/admin/state/AdminStateProvider#AdminStateProvider": AdminStateProvider_6815bae28a246dc593ff81d6af8f0b22,
+  "/admin/navigation/NavigationFeedbackProvider#NavigationFeedbackProvider": NavigationFeedbackProvider_04f5d588d988fb899aeb65baba32e936,
   "@payloadcms/storage-s3/client#S3ClientUploadHandler": S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24,
   "/admin/modules/dashboard/DashboardView#default": default_df9bfd4c8b859f0430960e06df6114f0,
   "/admin/modules/products/ProductsView#ProductsView": ProductsView_6d795fd1198cd1546060ea6772677cf9,
