@@ -9,6 +9,14 @@ export type FormTab = {
   id: string
   label: string
   issues?: number
+  /**
+   * URL real da aba (opcional). Quando presente, a aba vira um link de
+   * verdade — navegável, com role="link", e deep-linkável — em vez de um
+   * <button> puramente client-side. O clique ainda troca a aba na hora via
+   * onTabChange (preventDefault); o href existe para semântica/navegação
+   * real, não para forçar um reload por clique.
+   */
+  href?: string
 }
 
 export function FormShell({
@@ -41,7 +49,18 @@ export function FormShell({
       </header>
       {tabs.length ? (
         <nav className="esmera-form-shell__tabs" aria-label={`Seções de ${title}`}>
-          {tabs.map((tab) => (
+          {tabs.map((tab) => tab.href ? (
+            <a
+              key={tab.id}
+              href={tab.href}
+              className={tab.id === activeTab ? 'is-active' : ''}
+              aria-current={tab.id === activeTab ? 'page' : undefined}
+              onClick={(event) => { event.preventDefault(); onTabChange?.(tab.id) }}
+            >
+              <span>{tab.label}</span>
+              {tab.issues ? <small aria-label={`${tab.issues} pendências`}>{tab.issues}</small> : null}
+            </a>
+          ) : (
             <button
               key={tab.id}
               type="button"

@@ -60,6 +60,7 @@ export function CategoryDetailView({ category, tab, filters, categories, media, 
         categories={categories}
         media={media}
         termSuggestions={termSuggestions}
+        filters={filters}
         initialTab={editorTabs[tab]}
         initialRevision={category.revision ?? null}
         initialUpdatedAt={category.updatedAt ?? null}

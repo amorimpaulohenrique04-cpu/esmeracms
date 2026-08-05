@@ -97,6 +97,7 @@ function renderEditor(relatedSection?: React.ReactNode) {
     categories: [],
     media: [],
     termSuggestions: [],
+    filters: { q: '', status: 'active' },
     initialRevision: 'rev-3',
     initialUpdatedAt: '2026-02-01T09:00:00.000Z',
     relatedSection: relatedSection ?? React.createElement('p', null, '4 produtos relacionados'),
@@ -140,7 +141,9 @@ describe('CategoryDetailEditor — FormSystem', () => {
 
   it('mantém exatamente as três abas', () => {
     renderEditor()
-    expect(within(tabNav()).getAllByRole('button').map((button) => button.textContent)).toEqual([
+    // As abas viraram links reais (href para /admin/categories?...&tab=...) em
+    // vez de botões client-only, para deep-link e navegação de verdade.
+    expect(within(tabNav()).getAllByRole('link').map((link) => link.textContent)).toEqual([
       'Geral', 'Mídia & SEO', 'Produtos relacionados',
     ])
   })
@@ -298,7 +301,7 @@ describe('CategoryDetailEditor — FormSystem', () => {
   it('produtos relacionados permanecem derivados e fora da mutation', async () => {
     const { rerender } = renderEditor()
 
-    fireEvent.click(within(tabNav()).getByRole('button', { name: 'Produtos relacionados' }))
+    fireEvent.click(within(tabNav()).getByRole('link', { name: 'Produtos relacionados' }))
     expect(screen.getByText('4 produtos relacionados')).toBeTruthy()
     // A consulta derivada não marca o formulário como sujo.
     expect(within(actionBar()).getByText('Rascunho sincronizado')).toBeTruthy()
@@ -308,6 +311,7 @@ describe('CategoryDetailEditor — FormSystem', () => {
       categories: [],
       media: [],
       termSuggestions: [],
+      filters: { q: '', status: 'active' },
       initialRevision: 'rev-3',
       initialUpdatedAt: '2026-02-01T09:00:00.000Z',
       relatedSection: React.createElement('p', null, '5 produtos relacionados'),
@@ -315,7 +319,7 @@ describe('CategoryDetailEditor — FormSystem', () => {
     expect(screen.getByText('5 produtos relacionados')).toBeTruthy()
     expect(within(actionBar()).getByText('Rascunho sincronizado')).toBeTruthy()
 
-    fireEvent.click(within(tabNav()).getByRole('button', { name: 'Geral' }))
+    fireEvent.click(within(tabNav()).getByRole('link', { name: 'Geral' }))
     fireEvent.change(screen.getByLabelText('Nome'), { target: { value: 'Anéis autorais' } })
     fireEvent.click(within(actionBar()).getByRole('button', { name: 'Salvar rascunho' }))
     await waitFor(() => expect(bodies).toHaveLength(1))

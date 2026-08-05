@@ -5,10 +5,9 @@ import { login } from '../helpers/login'
 import { cleanupTestUser, seedTestUser, testUser } from '../helpers/seedUser'
 
 // Estes testes documentam FLOW-01 e FLOW-05 do plano de implementação
-// (docs/cms-implementation-plan.md) — bugs P0 confirmados que NÃO são corrigidos
-// nesta passada (ficam para a Fase 2 e a Fase 3). Usam `test.fail()` do Playwright
-// (falha ao passar, passa ao falhar): quando a fase correspondente for implementada,
-// troque `test.fail(...)` por `test(...)` normal.
+// (docs/cms-implementation-plan.md) — bugs P0 confirmados na Fase 0. Ambos já
+// foram corrigidos (FLOW-01 na PR-03, FLOW-05 na PR-05) e rodam como testes
+// normais agora.
 
 test.describe('Publication integrity — bulk bypass and unwired verify (FLOW-01, FLOW-05)', () => {
   test.beforeAll(async () => {
@@ -47,7 +46,11 @@ test.describe('Publication integrity — bulk bypass and unwired verify (FLOW-01
     expect(storedBody._status).toBe('draft')
   })
 
-  test.fail(
+  // FLOW-05 corrigido na PR-05: probeStorefrontRevision agora é passado como
+  // verify ao coordinator (ver src/server/publication/coordinator.ts e o
+  // wiring em admin-products/route.ts), então verification nunca fica not_run
+  // para produto/categoria.
+  test(
     'save-and-publish returns a verification with expected/observed revision instead of not_run (FLOW-05, fixed in Fase 3)',
     async ({ page }) => {
       test.setTimeout(60_000)

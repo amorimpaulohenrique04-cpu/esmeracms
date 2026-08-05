@@ -71,20 +71,25 @@
   .template-default { grid-template-columns: var(--esmera-rail-width) minmax(0, 1fr) !important; }
   .template-default__nav-toggler-wrapper { display: none !important; }
 
+  // Largura real (não clip-path): getBoundingClientRect() ignora clip-path, então
+  // um rail "recolhido" via clip mediria 260px em vez de 72px, e a área
+  // clipada-mas-ainda-presente no box seguiria capturando pointer/hover por
+  // cima do workspace. A coluna do grid é `var(--esmera-rail-width)` (fixa,
+  // não deriva do conteúdo), então o workspace nunca se move nos dois estados.
   .esmera-nav {
     position: relative;
     z-index: var(--esmera-z-popover);
-    width: var(--esmera-sidebar-width);
+    width: var(--esmera-rail-width);
     padding: 14px 8px 12px;
-    overflow: visible;
-    clip-path: inset(0 calc(var(--esmera-sidebar-width) - var(--esmera-rail-width)) 0 0);
-    transition: clip-path var(--esmera-motion-fast) var(--esmera-ease-exit);
+    overflow: hidden;
+    transition: width var(--esmera-motion-fast) var(--esmera-ease-exit);
   }
   .esmera-nav[data-peek='open'] {
+    width: var(--esmera-sidebar-width);
     padding: 14px 12px 12px;
-    clip-path: inset(0 0 0 0);
+    overflow: visible;
     box-shadow: var(--esmera-shadow-floating);
-    transition: clip-path var(--esmera-motion-fast) var(--esmera-ease-enter);
+    transition: width var(--esmera-motion-fast) var(--esmera-ease-enter);
   }
 
   .esmera-nav-brand { justify-content: center; padding: 2px 0 20px; }

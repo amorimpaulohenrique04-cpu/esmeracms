@@ -24,6 +24,8 @@ import {
   type CategoryDetail,
   type CategoryMedia,
   type CategoryParent,
+  type CategoryTab,
+  type CategoryWorkspaceFilters,
 } from './types'
 
 type TermItem = { id: string; value: string; creatable?: string }
@@ -66,6 +68,7 @@ type Props = {
   categories: CategoryParent[]
   media: CategoryMedia[]
   termSuggestions: string[]
+  filters: CategoryWorkspaceFilters
   initialTab?: CategoryEditorTab
   initialRevision?: string | null
   initialUpdatedAt?: string | null
@@ -78,11 +81,20 @@ type Props = {
 
 // Os dois primeiros ids são os do registry editorial de categoria; `related` é
 // a consulta derivada, que não tem — nem pode ter — campo no registry.
-const editorTabs: FormTab[] = [
+const editorTabs: Array<FormTab & { id: CategoryEditorTab }> = [
   { id: 'content', label: 'Geral' },
   { id: 'media', label: 'Mídia & SEO' },
   { id: 'related', label: 'Produtos relacionados' },
 ]
+
+// Inverso do mapeamento em CategoryDetailView.tsx (CategoryTab -> CategoryEditorTab):
+// as abas precisam de um href real (`?tab=...`) para navegação/deep-link,
+// além da troca instantânea no cliente.
+const routeTabByEditorTab: Record<CategoryEditorTab, CategoryTab> = {
+  content: 'general',
+  media: 'media',
+  related: 'products',
+}
 
 // A aba "Mídia & SEO" hospeda dois grupos do registry (`media` e `seo`) e a
 // aba "Geral" hospeda `content` e `advanced`. Nenhum id novo é inventado.
@@ -111,6 +123,7 @@ export function CategoryDetailEditor({
   categories,
   media,
   termSuggestions,
+  filters,
   initialTab = 'content',
   initialRevision,
   initialUpdatedAt,
@@ -305,8 +318,18 @@ export function CategoryDetailEditor({
     if (host) setActiveTab(host)
   }
 
+  function tabHref(tabId: CategoryEditorTab) {
+    const params = new URLSearchParams()
+    params.set('status', filters.status)
+    if (filters.q) params.set('q', filters.q)
+    params.set('category', String(category.id))
+    params.set('tab', routeTabByEditorTab[tabId])
+    return `/admin/categories?${params.toString()}`
+  }
+
   const tabs = editorTabs.map((tab) => ({
     ...tab,
+    href: tabHref(tab.id),
     issues: fieldErrors.filter((issue) => issue.tab && tabHost[issue.tab] === tab.id).length || undefined,
   }))
 

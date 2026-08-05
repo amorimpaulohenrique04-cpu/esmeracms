@@ -281,10 +281,17 @@ export async function POST(request: Request) {
 
     try {
       const result = await publishProductsInBulk(payload, user, body.items)
+      // Nenhum item publicado e há bloqueio/falha de negócio: o lote inteiro
+      // reprovou por readiness, não por payload malformado — 422, espelhando
+      // o mesmo critério do handler legado de mutação em lote (linha ~383).
+      // Payload/contrato inválido já foi rejeitado acima (400); revision_conflict
+      // isolado por item continua 200 (o cliente decide o retry pelo status
+      // de cada resultado).
+      const allBlockedOrFailed = result.published === 0 && (result.blocked > 0 || result.failed > 0)
       return adminActionResponse('bulk_completed', {
         message: `${result.published} de ${result.requested} produto(s) publicados.`,
         meta: result as unknown as Record<string, unknown>,
-      })
+      }, allBlockedOrFailed ? httpStatusByCode.publication_blocked : 200)
     } catch (error) {
       return adminErrorResponse(error, {
         entity: 'product',
