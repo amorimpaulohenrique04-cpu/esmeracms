@@ -250,7 +250,7 @@ export async function POST(request: Request) {
         assess: (document) => assessCategoryWithHierarchy(payload, user, document as unknown as Record<string, unknown>),
         publish: (snapshot) => {
           const publicSnapshot = {
-            ...(snapshot as Record<string, unknown>),
+            ...(snapshot as unknown as Record<string, unknown>),
             _status: 'published',
           }
           const metadata = createPublicPublicationMetadata('category', publicSnapshot)
