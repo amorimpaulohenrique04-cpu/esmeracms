@@ -141,12 +141,27 @@ export function FilterPanel({
   advancedActive?: boolean
   className?: string
 }) {
+  const advancedRef = React.useRef<HTMLDetailsElement>(null)
+
+  React.useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const details = advancedRef.current
+      const target = event.target
+
+      if (!details?.open || !(target instanceof Node) || details.contains(target)) return
+      details.open = false
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
   return (
     <section className={classes('esmera-filter-panel', className)} aria-label="Filtros">
       <div className="esmera-filter-panel__primary">{primary}</div>
       {actions ? <div className="esmera-filter-panel__actions">{actions}</div> : null}
       {advanced ? (
-        <details className="esmera-filter-panel__advanced" open={advancedActive || undefined}>
+        <details ref={advancedRef} className="esmera-filter-panel__advanced" open={advancedActive || undefined}>
           <summary>{advancedLabel}{advancedActive ? ' · ativos' : ''}</summary>
           <div className="esmera-filter-panel__advanced-panel">{advanced}</div>
         </details>
