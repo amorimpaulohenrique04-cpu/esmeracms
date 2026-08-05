@@ -43,6 +43,8 @@
 .esmera-state-panel.is-destructive-error .esmera-state-panel__mark,
 .esmera-state-panel.is-rollback .esmera-state-panel__mark { border-color: var(--esmera-danger); background: var(--esmera-danger); }
 .esmera-state-panel.is-saved .esmera-state-panel__mark { border-color: var(--esmera-success); background: var(--esmera-success); }
+/* Rollback comunica por borda persistente e fundo, nunca por deslocamento lateral. */
+.esmera-state-panel.is-rollback { border-color: var(--esmera-danger); background: var(--esmera-danger-soft); }
 
 @keyframes esmera-state-spin { to { transform: rotate(360deg); } }
 
@@ -51,7 +53,4 @@
   .esmera-state-panel__action { grid-column: 2; justify-self: start; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .esmera-state-panel.is-loading .esmera-state-panel__mark,
-  .esmera-state-panel.is-saving .esmera-state-panel__mark { animation: none; }
-}
+/* Reduced motion: política compartilhada em design-system/tokens.scss. */
