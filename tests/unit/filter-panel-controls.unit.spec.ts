@@ -99,4 +99,18 @@ describe('shared filter-control styles', () => {
     expect(styles).toContain('align-items: end')
     expect(customStyles).toContain("@use '../../admin/design-system/filter-controls';")
   })
+
+  it('does not override the native hidden state of a closed details panel', () => {
+    const styles = readFileSync(
+      resolve(process.cwd(), 'src/admin/design-system/filter-controls.scss'),
+      'utf8',
+    )
+
+    expect(styles).toContain(
+      '.esmera-filter-panel__advanced[open] .esmera-filter-panel__advanced-panel',
+    )
+    expect(styles).not.toContain(
+      '\n.esmera-filter-panel__advanced-panel {\n  display: grid;',
+    )
+  })
 })

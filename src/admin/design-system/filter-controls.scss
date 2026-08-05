@@ -41,7 +41,9 @@ select.esmera-input:disabled {
   color: var(--esmera-text);
 }
 
-.esmera-filter-panel__advanced-panel {
+/* Only override display while <details> is open. A bare author-level display
+   would defeat the browser's native details:not([open]) hiding rule. */
+.esmera-filter-panel__advanced[open] .esmera-filter-panel__advanced-panel {
   display: grid;
   gap: var(--esmera-space-3);
   box-sizing: border-box;
