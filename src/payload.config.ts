@@ -76,6 +76,7 @@ export default buildConfig({
       header: ['/admin/shell/AppHeader#AppHeader'],
       providers: [
         '/admin/state/AdminStateProvider#AdminStateProvider',
+        '/admin/design-system/DismissibleDetailsProvider#DismissibleDetailsProvider',
         '/admin/navigation/NavigationFeedbackProvider#NavigationFeedbackProvider',
       ],
       graphics: {
