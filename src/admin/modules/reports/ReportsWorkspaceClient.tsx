@@ -12,7 +12,7 @@ import type {
   ReportingDrilldownKind,
   ReportingSnapshot,
 } from '../../../server/reporting'
-import { DataTable, EmptyState } from '../../design-system'
+import { DataTable, DateField, EmptyState } from '../../design-system'
 import { commercialEvolutionOption, type EvolutionMode } from './charts'
 import { EChart } from './EChart'
 
@@ -192,8 +192,8 @@ function FilterBar({ draft, setDraft, users, products, categories, onApply, onCl
     <form className="esmera-report-filters" onSubmit={(event) => { event.preventDefault(); onApply() }}>
       <div className="esmera-report-filter-primary">
         <div className="esmera-report-filter-period">
-          <label><span>De</span><input className="esmera-input" type="date" required value={draft.from} onChange={(event) => setDraft((current) => ({ ...current, from: event.target.value }))} /></label>
-          <label><span>Até</span><input className="esmera-input" type="date" required value={draft.to} onChange={(event) => setDraft((current) => ({ ...current, to: event.target.value }))} /></label>
+          <DateField label="De" required value={draft.from} onChange={(from) => setDraft((current) => ({ ...current, from }))} />
+          <DateField label="Até" required value={draft.to} onChange={(to) => setDraft((current) => ({ ...current, to }))} />
           <label><span>Comparar com</span><select className="esmera-input" value={draft.compareWith} onChange={(event) => setDraft((current) => ({ ...current, compareWith: event.target.value as DraftFilters['compareWith'] }))}><option value="">Sem comparação</option><option value="previous_period">Período anterior</option><option value="previous_year">Mesmo período no ano anterior</option></select></label>
         </div>
         <button className="esmera-button esmera-button--primary" type="submit">Aplicar período</button>
