@@ -120,13 +120,6 @@ export function DateField({ label, value, onChange, required = false }: DateFiel
   }, [visibleMonth])
 
   useEffect(() => {
-    if (open) return
-    const nextDate = parseDateValue(value) || today
-    setVisibleMonth(startOfMonth(nextDate))
-    setFocusedValue(formatDateValue(nextDate))
-  }, [open, today, value])
-
-  useEffect(() => {
     if (!open) return
     const frame = window.requestAnimationFrame(() => dayRefs.current.get(focusedValue)?.focus())
     return () => window.cancelAnimationFrame(frame)
