@@ -3,6 +3,8 @@
 import { Popover } from '@base-ui/react/popover'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 
+import './DateField.scss'
+
 const REPORTS_TIME_ZONE = 'America/Recife'
 const DATE_VALUE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
