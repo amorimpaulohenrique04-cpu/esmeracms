@@ -34,7 +34,8 @@ describe('Home custom edit view registration', () => {
 
   it('reutiliza o DefaultEditView e o formulário oficial do Payload', () => {
     expect(editViewSource).toContain('DefaultEditView')
-    expect(editViewSource).toContain('Description={HomeEditorialOverview}')
+    // O slot `Description` é ReactNode: precisa receber o elemento, não a referência.
+    expect(editViewSource).toContain('Description={<HomeEditorialOverview />}')
     expect(editViewSource).not.toContain('fetch(')
   })
 

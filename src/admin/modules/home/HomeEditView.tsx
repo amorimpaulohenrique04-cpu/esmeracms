@@ -88,5 +88,8 @@ export function HomeEditorialOverview() {
 }
 
 export function HomeEditView(props: DocumentViewClientProps) {
-  return <DefaultEditView {...props} Description={HomeEditorialOverview} />
+  // `Description` é um slot ReactNode: passar a referência do componente fazia o
+  // React descartar o painel em runtime. O elemento renderiza na posição do slot,
+  // dentro dos providers de formulário que `useFormFields` e `useDocumentInfo` exigem.
+  return <DefaultEditView {...props} Description={<HomeEditorialOverview />} />
 }
