@@ -233,6 +233,10 @@ describe('PR-11 — CommandPalette: navegação por teclado', () => {
         })
       })
 
+      // A busca já foi resolvida; as asserções de efeito usam timers reais para
+      // que waitFor não dependa do relógio falso usado apenas no debounce.
+      vi.useRealTimers()
+
       act(() => { fireEvent.keyDown(input, { key: 'End' }) })
       let options = screen.getAllByRole('option')
       expect(options[2].getAttribute('aria-selected')).toBe('true')
