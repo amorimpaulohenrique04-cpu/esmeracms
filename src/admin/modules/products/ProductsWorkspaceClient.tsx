@@ -314,7 +314,17 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
       header: 'Produto',
       cell: ({ row }) => {
         const product = row.original
-        return <div className="esmera-product-cell"><Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link><small>{product.code || 'Sem código'} · {product.slug || 'sem-slug'}</small></div>
+        const cover = coverItem(product.gallery)
+        const coverURL = imageURL(cover)
+        return (
+          <div className="esmera-product-cell">
+            <span className="esmera-product-list-thumb">{coverURL ? <img src={coverURL} alt="" /> : null}</span>
+            <div className="esmera-product-cell__copy">
+              <Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link>
+              <small>{product.code || 'Sem código'} · {product.slug || 'sem-slug'}</small>
+            </div>
+          </div>
+        )
       },
     },
     { accessorKey: 'availability', header: 'Disponibilidade', cell: ({ getValue }) => availabilityLabels[String(getValue() || '')] || '—' },
@@ -326,7 +336,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     {
       id: 'inspect',
       header: '',
-      cell: ({ row }) => <Button type="button" onClick={(event) => openInspector(row.original.id, event.currentTarget)}>Inspecionar</Button>,
+      cell: ({ row }) => <Button className="esmera-product-row-action" type="button" onClick={(event) => openInspector(row.original.id, event.currentTarget)}>Inspecionar</Button>,
     },
   ], [filters])
 
@@ -598,18 +608,32 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     ) : filters.view === 'list' ? (
       <DataTable label="Produtos do catálogo">
         <thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead>
-        <tbody>{table.getRowModel().rows.map((row) => <tr key={row.id} className={String(row.original.id) === selectedProductId ? 'is-selected' : ''}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody>
+        <tbody>{table.getRowModel().rows.map((row) => {
+          const rowClass = [
+            String(row.original.id) === selectedProductId ? 'is-selected' : '',
+            row.getIsSelected() ? 'is-checked' : '',
+          ].filter(Boolean).join(' ')
+          return <tr key={row.id} className={rowClass}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>
+        })}</tbody>
       </DataTable>
     ) : (
       <div className="esmera-products-grid">
         {products.map((product) => {
           const cover = coverItem(product.gallery)
           const coverURL = imageURL(cover)
-          return <article className={`esmera-product-tile${String(product.id) === selectedProductId ? ' is-selected' : ''}`} key={String(product.id)}>
+          const row = table.getRow(String(product.id))
+          const checked = row.getIsSelected()
+          const tileClass = [
+            'esmera-product-tile',
+            String(product.id) === selectedProductId ? 'is-selected' : '',
+            checked ? 'is-checked' : '',
+          ].filter(Boolean).join(' ')
+          return <article className={tileClass} key={String(product.id)}>
+            <span className="esmera-product-tile__select"><input aria-label={`Selecionar ${product.title || 'produto'}`} type="checkbox" checked={checked} onChange={row.getToggleSelectedHandler()} /></span>
             <Link className="esmera-product-tile__media" href={productHref(filters, product.id)}>{coverURL ? <img src={coverURL} alt={cover?.alt || product.title || ''} /> : <span>Sem imagem</span>}</Link>
             <div className="esmera-product-tile__body"><div><Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link><small>{product.code || 'Sem código'}</small></div><Readiness product={product} /></div>
             <div className="esmera-product-tile__meta"><span>{availabilityLabels[product.availability || ''] || '—'}</span><span>{product.priceMode === 'fixed' ? money(product.basePriceCents) : 'Sob consulta'}</span></div>
-            <Button type="button" onClick={(event) => openInspector(product.id, event.currentTarget)}>Inspecionar</Button>
+            <Button className="esmera-product-tile__inspect" type="button" onClick={(event) => openInspector(product.id, event.currentTarget)}>Inspecionar</Button>
           </article>
         })}
       </div>
