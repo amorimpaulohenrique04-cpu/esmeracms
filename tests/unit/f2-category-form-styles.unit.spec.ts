@@ -77,7 +77,7 @@ describe('F2 — estilos compartilhados do editor de Categoria', () => {
     expect(screen.getByLabelText('Descrição')).toBeTruthy()
   })
 
-  it('carrega a base do Design System e o contrato visual do FormSystem no Admin', () => {
+  it('carrega o contrato global do FormSystem no Admin', () => {
     const entrypoint = readFileSync(resolve(repositoryRoot, 'src/app/(payload)/custom.scss'), 'utf8')
     const styles = readFileSync(resolve(repositoryRoot, 'src/admin/design-system/form-system.scss'), 'utf8')
 
@@ -91,5 +91,31 @@ describe('F2 — estilos compartilhados do editor de Categoria', () => {
     expect(styles).toContain('.esmera-field-v2__label-row')
     expect(styles).toContain('.esmera-field-v2__required')
     expect(styles).toContain('color: var(--esmera-danger)')
+  })
+
+  it('trata o FormShell de Categoria como editor embutido sem cabeçalho duplicado', () => {
+    const styles = readFileSync(resolve(repositoryRoot, 'src/admin/design-system/form-system.scss'), 'utf8')
+
+    expect(styles).toMatch(/\.esmera-category-detail\s+\.esmera-form-shell__header\s*\{[^}]*display:\s*none/s)
+    expect(styles).toMatch(/\.esmera-category-detail\s+\.esmera-form-shell__content\s*\{[^}]*padding:/s)
+    expect(styles).toMatch(/\.esmera-category-detail\s+\.esmera-form-shell__tabs\s*\{[^}]*padding-inline:/s)
+  })
+
+  it('estrutura a ActionBar como rodapé compartilhado do formulário', () => {
+    const styles = readFileSync(resolve(repositoryRoot, 'src/admin/design-system/form-system.scss'), 'utf8')
+
+    expect(styles).toMatch(/\.esmera-action-bar\s*\{[^}]*display:\s*flex/s)
+    expect(styles).toMatch(/\.esmera-action-bar\s*\{[^}]*border-top:/s)
+    expect(styles).toMatch(/\.esmera-action-bar__actions\s*\{[^}]*justify-content:\s*flex-end/s)
+    expect(styles).toContain('@container category-detail (max-width: 480px)')
+  })
+
+  it('faz o formulário reagir à largura do painel e preserva Produtos', () => {
+    const styles = readFileSync(resolve(repositoryRoot, 'src/admin/design-system/form-system.scss'), 'utf8')
+
+    expect(styles).toContain('container-name: category-detail')
+    expect(styles).toContain('@container category-detail (max-width: 680px)')
+    expect(styles).toMatch(/@container category-detail \(max-width: 680px\)[\s\S]*\.esmera-category-form\s*\{[^}]*grid-template-columns:\s*1fr/s)
+    expect(styles).toContain('.esmera-product-document-full > .esmera-form-shell')
   })
 })
