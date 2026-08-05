@@ -1,6 +1,7 @@
 import React from 'react'
 
 import { type Announcement, announcementProps } from './Feedback'
+import { FilterPanelAdvanced } from './FilterPanelAdvanced'
 
 export type Density = 'compact' | 'standard'
 export type FeedbackTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info'
@@ -146,10 +147,9 @@ export function FilterPanel({
       <div className="esmera-filter-panel__primary">{primary}</div>
       {actions ? <div className="esmera-filter-panel__actions">{actions}</div> : null}
       {advanced ? (
-        <details className="esmera-filter-panel__advanced" open={advancedActive || undefined}>
-          <summary>{advancedLabel}{advancedActive ? ' · ativos' : ''}</summary>
-          <div className="esmera-filter-panel__advanced-panel">{advanced}</div>
-        </details>
+        <FilterPanelAdvanced label={advancedLabel} active={advancedActive}>
+          {advanced}
+        </FilterPanelAdvanced>
       ) : null}
     </section>
   )

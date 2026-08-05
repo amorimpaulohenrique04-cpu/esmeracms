@@ -1,0 +1,50 @@
+/* Shared filter-control normalization. Loaded after the base design system so
+   native browser chrome cannot change the visual height of select controls. */
+select.esmera-input {
+  height: var(--esmera-control-standard);
+  min-height: var(--esmera-control-standard);
+  padding-right: 38px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentcolor 50%),
+    linear-gradient(135deg, currentcolor 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) 50%,
+    calc(100% - 12px) 50%;
+  background-repeat: no-repeat;
+  background-size: 5px 5px, 5px 5px;
+  cursor: pointer;
+}
+
+select.esmera-input:disabled {
+  cursor: not-allowed;
+}
+
+/* Products uses a grid override for the primary controls. Keep its controls on
+   the same baseline as the shared filter-panel actions. */
+.esmera-products-filter-panel .esmera-filter-panel__primary {
+  align-items: end;
+}
+
+.esmera-filter-panel__advanced summary {
+  transition:
+    color var(--esmera-motion-fast) var(--esmera-ease-standard),
+    border-color var(--esmera-motion-fast) var(--esmera-ease-standard),
+    background-color var(--esmera-motion-fast) var(--esmera-ease-standard);
+}
+
+.esmera-filter-panel__advanced summary:hover,
+.esmera-filter-panel__advanced[open] summary {
+  border-color: var(--esmera-line-strong);
+  background: var(--esmera-surface-hover);
+  color: var(--esmera-text);
+}
+
+/* Only override display while <details> is open. A bare author-level display
+   would defeat the browser's native details:not([open]) hiding rule. */
+.esmera-filter-panel__advanced[open] .esmera-filter-panel__advanced-panel {
+  display: grid;
+  gap: var(--esmera-space-3);
+  box-sizing: border-box;
+}
