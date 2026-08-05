@@ -273,8 +273,8 @@ describe('Esméra access and data contract', () => {
         { sku: 'SKU-1', status: 'enabled', priceMode: 'inherit', selection: [{ option: 'cor', value: 'azul' }] },
       ],
     })
-    expect(variantIssues.some((issue) => issue.includes('repetido'))).toBe(true)
-    expect(variantIssues.some((issue) => issue.includes('inexistente'))).toBe(true)
+    expect(variantIssues.some((issue) => issue.message.includes('repetido'))).toBe(true)
+    expect(variantIssues.some((issue) => issue.message.includes('inexistente'))).toBe(true)
   })
 
   it('persists readiness and enforces globally unique variant SKUs', async () => {

@@ -13,12 +13,11 @@ describe('canonicalizeForRevision — shared fixture parity (backend/frontend mu
 })
 
 describe('FLOW-03 — readiness issues are unstructured strings reconstructed by fragile matching', () => {
-  // Fase 4 (fora de escopo aqui) deve trocar getProductReadiness() para retornar
-  // PublicationIssue[] diretamente. Até lá, productAssessment.ts adivinha path/tab
-  // por prefixo/substring da mensagem em português (issueMap em productAssessment.ts).
-  // Este teste falha de propósito: quando a Fase 4 corrigir a origem, troque
-  // `test.fails` por `test` normal.
-  test.fails('an unmapped readiness message gets routed to a real field location, not the generic checklist bucket', () => {
+  // Fase 4/PR-06 trocou getProductReadiness() para retornar PublicationIssue[]
+  // estruturadas (src/issues/*): path/tab/label agora vêm do registry, não de
+  // adivinhação por prefixo/substring da mensagem. Gap fechado — test.fails
+  // trocado por test normal conforme instruído abaixo.
+  test('an unmapped readiness message gets routed to a real field location, not the generic checklist bucket', () => {
     // "Status de catálogo inválido." (readiness.ts:153) doesn't match any prefix/substring
     // rule in productAssessment.ts's issueMap — it silently falls into the generic
     // 'publicationIssues' bucket (tab: 'review') instead of pointing at catalogStatus.
@@ -58,6 +57,6 @@ describe('FLOW-03 — readiness issues are unstructured strings reconstructed by
       variants: [],
     })
     const issue = first.issues.find((entry) => entry.message === 'Status de catálogo inválido.')
-    expect(issue?.id).toBe('product.catalog_status_invalid')
+    expect(issue?.code).toBe('product.catalog_status_invalid')
   })
 })

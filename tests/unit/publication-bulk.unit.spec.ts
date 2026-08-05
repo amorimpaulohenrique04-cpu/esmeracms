@@ -17,14 +17,14 @@ const DRAFT_UPDATED_AT = '2026-08-04T10:00:05.000Z'
 
 function issue(overrides: Partial<PublicationIssue> = {}): PublicationIssue {
   return {
-    id: 'product.gallery_invalid',
+    code: 'product.gallery.media_invalid',
     severity: 'blocker',
     path: 'gallery',
     tab: 'media',
+    label: 'Galeria',
     anchor: 'product-gallery',
     message: 'Adicione imagens válidas.',
-    suggestion: null,
-    source: 'business_rule',
+    source: 'readiness',
     ...overrides,
   }
 }
@@ -77,7 +77,7 @@ describe('mapCoordinatorOutcome — mapeamento coordenador → item do lote', ()
   })
 
   it('mapeia bloqueio preservando as issues blocker e devolvendo o updatedAt novo', () => {
-    const blockers = [issue(), issue({ id: 'product.title_missing', severity: 'warning' })]
+    const blockers = [issue(), issue({ code: 'product.title.missing', severity: 'warning' })]
     const result = mapCoordinatorOutcome({
       ok: false,
       error: new PublicationBlockedError(assessment(blockers)),
@@ -85,7 +85,7 @@ describe('mapCoordinatorOutcome — mapeamento coordenador → item do lote', ()
 
     expect(result.status).toBe('blocked')
     expect(result.issues).toHaveLength(1)
-    expect(result.issues?.[0].id).toBe('product.gallery_invalid')
+    expect(result.issues?.[0].code).toBe('product.gallery.media_invalid')
     // PublicationBlockedError é lançado depois do saveDraft do coordenador:
     // sem o updatedAt novo, corrigir e tentar de novo daria revision_conflict.
     expect(result.updatedAt).toBe(DRAFT_UPDATED_AT)
@@ -121,7 +121,7 @@ describe('handshake de confirmação de warnings em duas etapas', () => {
   // documento. Reenviar o updatedAt original da lista faria o coordenador
   // lançar RevisionConflictError antes mesmo de olhar o confirmationToken.
   it('devolve token, revisão e um updatedAt posterior ao primeiro saveDraft', () => {
-    const warning = issue({ id: 'product.price_review', severity: 'warning', message: 'Revise o preço.' })
+    const warning = issue({ code: 'product.base_price.missing', severity: 'warning', message: 'Revise o preço.' })
 
     const result = mapCoordinatorOutcome({
       ok: true,
@@ -137,7 +137,7 @@ describe('handshake de confirmação de warnings em duas etapas', () => {
     expect(result.status).toBe('warning_requires_confirmation')
     expect(result.confirmationToken).toBe('token-123')
     expect(result.revision).toBe('rev-abc')
-    expect(result.issues?.map((entry) => entry.id)).toEqual(['product.price_review'])
+    expect(result.issues?.map((entry) => entry.code)).toEqual(['product.base_price.missing'])
 
     expect(result.updatedAt).toBe(DRAFT_UPDATED_AT)
     expect(result.updatedAt).not.toBe(LIST_UPDATED_AT)

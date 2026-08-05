@@ -33,12 +33,15 @@ function assessmentFor(revision: string, issues: PublicationIssue[] = []): Publi
   }
 }
 
-function warningIssue(id: string): PublicationIssue {
+function warningIssue(code: string): PublicationIssue {
   return {
-    id,
+    code,
     severity: 'warning',
+    path: 'basePriceCents',
+    tab: 'pricing',
+    label: 'Preço',
     message: 'Revise antes de publicar.',
-    source: 'business_rule',
+    source: 'readiness',
   }
 }
 
