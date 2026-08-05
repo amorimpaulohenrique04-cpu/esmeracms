@@ -50,45 +50,29 @@ describe('FilterPanel advanced filters', () => {
     expect(details.open).toBe(true)
   })
 
-  it('closes the advanced panel after its form is submitted', () => {
+  it('shows active filters open until an outside interaction dismisses them', () => {
     const { container } = render(
-      React.createElement(FilterPanel, {
-        primary: React.createElement('input', { 'aria-label': 'Buscar' }),
-        advanced: React.createElement(
-          'form',
-          null,
-          React.createElement('button', { type: 'submit' }, 'Aplicar recorte'),
-        ),
-      }),
-    )
-    const details = container.querySelector<HTMLDetailsElement>('.esmera-filter-panel__advanced')
-    const form = container.querySelector('form')
-
-    expect(details).not.toBeNull()
-    expect(form).not.toBeNull()
-    if (!details || !form) throw new Error('Advanced filter form was not rendered')
-
-    details.open = true
-    fireEvent.submit(form)
-
-    expect(details.open).toBe(false)
-  })
-
-  it('marks active filters without forcing the advanced panel open', () => {
-    const { container } = render(
-      React.createElement(FilterPanel, {
-        primary: React.createElement('input', { 'aria-label': 'Buscar' }),
-        advanced: React.createElement('button', null, 'Aplicar recorte'),
-        advancedActive: true,
-      }),
+      React.createElement(
+        'div',
+        null,
+        React.createElement(FilterPanel, {
+          primary: React.createElement('input', { 'aria-label': 'Buscar' }),
+          advanced: React.createElement('button', null, 'Aplicar recorte'),
+          advancedActive: true,
+        }),
+        React.createElement('button', null, 'Fora do filtro ativo'),
+      ),
     )
     const details = container.querySelector<HTMLDetailsElement>('.esmera-filter-panel__advanced')
 
     expect(details).not.toBeNull()
     if (!details) throw new Error('Advanced filter details was not rendered')
 
-    expect(details.open).toBe(false)
+    expect(details.open).toBe(true)
     expect(screen.getByText('Mais filtros · ativos')).toBeTruthy()
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Fora do filtro ativo' }))
+    expect(details.open).toBe(false)
   })
 
   it('keeps browser-only hooks behind a dedicated client boundary', () => {
@@ -105,8 +89,8 @@ describe('FilterPanel advanced filters', () => {
     expect(primitives).not.toContain('React.useEffect')
     expect(advanced.startsWith("'use client'")).toBe(true)
     expect(advanced).toContain("document.addEventListener('pointerdown'")
-    expect(advanced).toContain('onSubmitCapture')
-    expect(advanced).not.toContain('open={active')
+    expect(advanced).toContain('open={active || undefined}')
+    expect(advanced).not.toContain('onSubmitCapture')
   })
 })
 
@@ -124,6 +108,7 @@ describe('legacy report advanced filters', () => {
             { className: 'esmera-report-filter-advanced', open: true },
             React.createElement('summary', null, 'Dimensões e ações · filtros ativos'),
             React.createElement('button', { type: 'submit' }, 'Aplicar recorte'),
+            React.createElement('button', { type: 'button' }, 'Compartilhar'),
           ),
         ),
         React.createElement('button', null, 'Fora do relatório'),
@@ -131,30 +116,28 @@ describe('legacy report advanced filters', () => {
     )
   }
 
-  it('starts closed even when the legacy report marks active filters as open', () => {
+  it('preserves active report actions until the user clicks outside', () => {
     const { container } = renderLegacyDetails()
     const details = container.querySelector<HTMLDetailsElement>('.esmera-report-filter-advanced')
 
     expect(details).not.toBeNull()
     if (!details) throw new Error('Legacy report details was not rendered')
-    expect(details.open).toBe(false)
+
+    expect(details.open).toBe(true)
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Aplicar recorte' }))
+    expect(details.open).toBe(true)
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Compartilhar' }))
+    expect(details.open).toBe(true)
   })
 
-  it('closes on outside pointer down and on form submit', () => {
+  it('closes the legacy report panel on outside pointer down', () => {
     const { container } = renderLegacyDetails()
     const details = container.querySelector<HTMLDetailsElement>('.esmera-report-filter-advanced')
-    const form = container.querySelector('form')
 
     expect(details).not.toBeNull()
-    expect(form).not.toBeNull()
-    if (!details || !form) throw new Error('Legacy report details form was not rendered')
+    if (!details) throw new Error('Legacy report details was not rendered')
 
-    details.open = true
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Fora do relatório' }))
-    expect(details.open).toBe(false)
-
-    details.open = true
-    fireEvent.submit(form)
     expect(details.open).toBe(false)
   })
 
