@@ -66,7 +66,7 @@
   border-top-color: transparent;
   border-radius: 50%;
   opacity: .75;
-  animation: esmera-button-spin .7s linear infinite;
+  animation: esmera-button-spin var(--esmera-motion-loop-spinner) linear infinite;
 }
 @keyframes esmera-button-spin { to { transform: rotate(360deg); } }
 
@@ -185,7 +185,7 @@
 .esmera-error-state { border: 1px solid color-mix(in srgb, var(--esmera-danger) 28%, var(--esmera-line-default)); border-radius: var(--esmera-panel-radius); background: var(--esmera-danger-soft); }
 .esmera-error-state p { margin: 0 0 5px; }
 
-.esmera-skeleton { display: block; border-radius: var(--esmera-radius-6); background: linear-gradient(90deg, var(--esmera-surface-selected) 25%, var(--esmera-surface-raised) 50%, var(--esmera-surface-selected) 75%); background-size: 200% 100%; animation: esmera-skeleton 1.2s linear infinite; }
+.esmera-skeleton { display: block; border-radius: var(--esmera-radius-6); background: linear-gradient(90deg, var(--esmera-surface-selected) 25%, var(--esmera-surface-raised) 50%, var(--esmera-surface-selected) 75%); background-size: 200% 100%; animation: esmera-skeleton var(--esmera-motion-loop-skeleton) linear infinite; }
 @keyframes esmera-skeleton { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
 .esmera-filter-bar,
@@ -236,8 +236,8 @@
 .esmera-dialog[data-ending-style] { opacity: 0; transform: translateY(6px); }
 .esmera-dialog[data-ending-style] { transition-duration: var(--esmera-motion-fast); transition-timing-function: var(--esmera-ease-exit); }
 
-/* Drawer usa a duração de navegação; a largura nunca é animada. */
-.esmera-drawer { transition: transform var(--esmera-motion-navigation) var(--esmera-ease-enter); }
+/* Drawer usa o teto operacional de 220ms; a largura nunca é animada. */
+.esmera-drawer { transition: transform var(--esmera-motion-panel) var(--esmera-ease-enter); }
 .esmera-drawer[data-starting-style],
 .esmera-drawer[data-ending-style] { transform: translateX(100%); }
 .esmera-drawer[data-ending-style] { transition-duration: var(--esmera-motion-fast); transition-timing-function: var(--esmera-ease-exit); }
@@ -387,7 +387,7 @@
 .esmera-inline-feedback.is-warning { border-left-color: var(--esmera-warning); }
 .esmera-inline-feedback.is-danger { border-left-color: var(--esmera-danger); }
 .esmera-inline-feedback.is-info { border-left-color: var(--esmera-info); }
-.esmera-inline-feedback.is-busy::before { content: ''; width: 10px; height: 10px; border: 1px solid var(--esmera-line-strong); border-top-color: var(--esmera-primary); border-radius: 50%; animation: esmera-feedback-spin .7s linear infinite; }
+.esmera-inline-feedback.is-busy::before { content: ''; width: 10px; height: 10px; border: 1px solid var(--esmera-line-strong); border-top-color: var(--esmera-primary); border-radius: 50%; animation: esmera-feedback-spin var(--esmera-motion-loop-spinner) linear infinite; }
 @keyframes esmera-feedback-spin { to { transform: rotate(360deg); } }
 
 .esmera-section-nav { display: flex; align-items: center; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--esmera-line-default); scrollbar-width: thin; }

@@ -29,7 +29,7 @@
 .esmera-state-panel.is-saving .esmera-state-panel__mark {
   border-color: var(--esmera-line-strong);
   border-top-color: var(--esmera-primary);
-  animation: esmera-state-spin .7s linear infinite;
+  animation: esmera-state-spin var(--esmera-motion-loop-spinner) linear infinite;
 }
 .esmera-state-panel.is-empty-result,
 .esmera-state-panel.is-empty-system { background: var(--esmera-surface-raised); }

@@ -12,11 +12,11 @@ describe('Reconciliação da PR #20', () => {
     const continuity = source('src/admin/state/continuity.ts')
     const styles = source('src/admin/design-system/reconciled-interactions.scss')
 
-    expect(provider).toContain('startAdminViewTransition')
+    expect(provider).not.toContain('startAdminViewTransition')
     expect(provider).toContain('ADMIN_SELECTION_EVENT')
     expect(provider).toContain('rememberRecentAnchor')
     expect(provider).toContain("event.key !== 'Escape'")
-    expect(provider).toContain('prefersReducedMotion')
+    expect(provider).toContain('isSoftNavigable')
     expect(continuity).toContain('localStorage')
     expect(styles).toContain('.esmera-spatial-selection')
     expect(styles).toContain('@media (prefers-reduced-motion: reduce)')

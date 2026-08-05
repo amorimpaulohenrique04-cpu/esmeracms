@@ -111,7 +111,7 @@
 .esmera-command-search input { width: 100%; height: 44px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--esmera-text); font: var(--esmera-weight-medium) 15px/1.2 var(--esmera-font-sans); }
 .esmera-command-search input::placeholder { color: var(--esmera-text-subtle); }
 .esmera-command-indicator { max-width: 150px; overflow: hidden; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); text-overflow: ellipsis; white-space: nowrap; }
-.esmera-command-indicator.is-loading::before { content: ''; width: 8px; height: 8px; display: inline-block; margin-right: 6px; border: 1px solid var(--esmera-line-strong); border-top-color: var(--esmera-primary); border-radius: 50%; animation: esmera-command-spin .7s linear infinite; }
+.esmera-command-indicator.is-loading::before { content: ''; width: 8px; height: 8px; display: inline-block; margin-right: 6px; border: 1px solid var(--esmera-line-strong); border-top-color: var(--esmera-primary); border-radius: 50%; animation: esmera-command-spin var(--esmera-motion-loop-spinner) linear infinite; }
 .esmera-command-indicator.is-error { color: var(--esmera-danger); }
 .esmera-command-indicator.is-results { color: var(--esmera-primary); }
 @keyframes esmera-command-spin { to { transform: rotate(360deg); } }
@@ -120,7 +120,7 @@
 .esmera-command-state { min-height: 132px; display: grid; align-content: center; justify-items: center; gap: 5px; padding: 24px 16px; color: var(--esmera-text-muted); font-size: var(--esmera-font-ui-sm); text-align: center; }
 .esmera-command-state strong { color: var(--esmera-text); font-size: var(--esmera-font-body); }
 .esmera-command-state span { max-width: 48ch; }
-.esmera-command-state.is-loading > span:first-child { width: 16px; height: 16px; border: 1px solid var(--esmera-line-strong); border-top-color: var(--esmera-primary); border-radius: 50%; animation: esmera-command-spin .7s linear infinite; }
+.esmera-command-state.is-loading > span:first-child { width: 16px; height: 16px; border: 1px solid var(--esmera-line-strong); border-top-color: var(--esmera-primary); border-radius: 50%; animation: esmera-command-spin var(--esmera-motion-loop-spinner) linear infinite; }
 .esmera-command-state--error strong,
 .esmera-command-state--error { color: var(--esmera-danger); }
 .esmera-command-retry { min-height: 34px; padding: 0 14px; border: 1px solid var(--esmera-line-strong); border-radius: var(--esmera-control-radius); background: var(--esmera-surface-panel); color: var(--esmera-text); font-family: var(--esmera-font-sans); font-size: var(--esmera-font-caption); font-weight: var(--esmera-weight-semibold); cursor: pointer; }
