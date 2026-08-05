@@ -185,6 +185,41 @@ export function DateField({ label, value, onChange, required = false }: DateFiel
     focusDate(nextDate)
   }
 
+  function renderDay(date: Date) {
+    const dateValue = formatDateValue(date)
+    const isSelected = selectedDate ? sameDay(date, selectedDate) : false
+    const isToday = sameDay(date, today)
+    const isOutside = date.getMonth() !== visibleMonth.getMonth()
+    const className = [
+      'esmera-datepicker-day',
+      isSelected ? 'is-selected' : '',
+      isToday ? 'is-today' : '',
+      isOutside ? 'is-outside' : '',
+    ].filter(Boolean).join(' ')
+
+    return (
+      <button
+        key={dateValue}
+        ref={(node) => {
+          if (node) dayRefs.current.set(dateValue, node)
+          else dayRefs.current.delete(dateValue)
+        }}
+        className={className}
+        type="button"
+        role="gridcell"
+        tabIndex={focusedValue === dateValue ? 0 : -1}
+        aria-label={capitalize(dayLabelFormatter.format(date))}
+        aria-selected={isSelected}
+        aria-current={isToday ? 'date' : undefined}
+        onClick={() => selectDate(date)}
+        onFocus={() => setFocusedValue(dateValue)}
+        onKeyDown={(event) => handleDayKeyDown(event, date)}
+      >
+        {date.getDate()}
+      </button>
+    )
+  }
+
   return (
     <div className="esmera-field esmera-datefield">
       <span className="esmera-field-label" id={labelID}>
@@ -222,39 +257,9 @@ export function DateField({ label, value, onChange, required = false }: DateFiel
                 {weekdayLabels.map((weekday) => <span key={weekday}>{weekday}</span>)}
               </div>
               <div className="esmera-datepicker-grid" role="grid" aria-labelledby={monthLabelID}>
-                {calendarDays.map((date) => {
-                  const dateValue = formatDateValue(date)
-                  const isSelected = selectedDate ? sameDay(date, selectedDate) : false
-                  const isToday = sameDay(date, today)
-                  const isOutside = date.getMonth() !== visibleMonth.getMonth()
-                  const className = [
-                    'esmera-datepicker-day',
-                    isSelected ? 'is-selected' : '',
-                    isToday ? 'is-today' : '',
-                    isOutside ? 'is-outside' : '',
-                  ].filter(Boolean).join(' ')
-
-                  return (
-                    <button
-                      key={dateValue}
-                      ref={(node) => {
-                        if (node) dayRefs.current.set(dateValue, node)
-                        else dayRefs.current.delete(dateValue)
-                      }}
-                      className={className}
-                      type="button"
-                      role="gridcell"
-                      tabIndex={focusedValue === dateValue ? 0 : -1}
-                      aria-label={capitalize(dayLabelFormatter.format(date))}
-                      aria-selected={isSelected}
-                      aria-current={isToday ? 'date' : undefined}
-                      onClick={() => selectDate(date)}
-                      onFocus={() => setFocusedValue(dateValue)}
-                      onKeyDown={(event) => handleDayKeyDown(event, date)}
-                    >
-                      {date.getDate()}
-                    </button>
-                  )
+                {Array.from({ length: 6 }, (_, rowIndex) => {
+                  const row = calendarDays.slice(rowIndex * 7, rowIndex * 7 + 7)
+                  return <div className="esmera-datepicker-row" role="row" key={formatDateValue(row[0])}>{row.map(renderDay)}</div>
                 })}
               </div>
             </Popover.Popup>
