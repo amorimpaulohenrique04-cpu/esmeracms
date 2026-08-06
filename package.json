@@ -9,6 +9,7 @@
     "analyze:dead-code": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/analyze-dead-code.ts",
     "backfill:publication-revisions": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-publication-revisions.ts",
     "backfill:publication-revisions:dry-run": "pnpm backfill:publication-revisions --dry-run",
+    "prebuild": "pnpm generate:types && pnpm generate:importmap",
     "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build",
     "ci:production": "pnpm validate:production && pnpm migrate && pnpm build",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
