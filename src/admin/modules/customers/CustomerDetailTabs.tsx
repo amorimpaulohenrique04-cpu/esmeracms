@@ -25,16 +25,9 @@ export function CustomerDetailTabs({
   tabs: TabItem[]
   children: React.ReactNode
 }) {
-  const [pending, setPending] = useState(false)
+  const [pendingTab, setPendingTab] = useState<CustomerTab | null>(null)
   const safetyTimerRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    setPending(false)
-    if (safetyTimerRef.current !== null) {
-      window.clearTimeout(safetyTimerRef.current)
-      safetyTimerRef.current = null
-    }
-  }, [activeTab])
+  const pending = pendingTab !== null && pendingTab !== activeTab
 
   useEffect(() => () => {
     if (safetyTimerRef.current !== null) window.clearTimeout(safetyTimerRef.current)
@@ -42,11 +35,11 @@ export function CustomerDetailTabs({
 
   const beginLocalNavigation = (event: React.MouseEvent<HTMLAnchorElement>, tab: CustomerTab) => {
     if (tab === activeTab || isModifiedClick(event)) return
-    setPending(true)
+    setPendingTab(tab)
     if (safetyTimerRef.current !== null) window.clearTimeout(safetyTimerRef.current)
     safetyTimerRef.current = window.setTimeout(() => {
       safetyTimerRef.current = null
-      setPending(false)
+      setPendingTab(null)
     }, PENDING_SAFETY_MS)
   }
 
