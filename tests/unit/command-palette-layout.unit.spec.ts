@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -38,6 +41,7 @@ describe('Command Palette — composição desktop e tablet', () => {
     render(React.createElement(CommandPalette, { open: true, onOpenChange: vi.fn(), selection: null, currentHref: '/admin' }))
 
     await waitFor(() => expect(screen.getByText('Ações rápidas')).not.toBeNull())
+    await screen.findByText('Novo produto')
     expect(screen.getByRole('button', { name: 'Tudo' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: 'Registros' })).not.toBeNull()
     expect(screen.getByRole('button', { name: 'Ações' })).not.toBeNull()
@@ -46,7 +50,6 @@ describe('Command Palette — composição desktop e tablet', () => {
     expect(screen.getByRole('button', { name: 'Configurações' })).not.toBeNull()
     expect(screen.getByText('Recentes')).not.toBeNull()
     expect(screen.getByText('Produtos')).not.toBeNull()
-    expect(screen.getByText('Novo produto')).not.toBeNull()
     expect(screen.getByText('Seções de Relatórios')).not.toBeNull()
   })
 
@@ -62,5 +65,15 @@ describe('Command Palette — composição desktop e tablet', () => {
 
     await waitFor(() => expect(screen.queryByText('Produtos recentes para limpar')).toBeNull())
     expect(screen.getByTestId('esmera-command-palette')).not.toBeNull()
+  })
+
+  it('desconta padding superior, padding inferior e margem de segurança em notebooks', () => {
+    const customStyles = readFileSync(resolve(process.cwd(), 'src/app/(payload)/custom.scss'), 'utf8')
+    const expectedMaxHeight = 'calc(100dvh - min(10vh, 88px) - 18px - 48px)'
+
+    expect(customStyles).toContain('@media (min-width: 1024px) and (max-height: 960px)')
+    expect(customStyles).toContain(`height: min(770px, ${expectedMaxHeight});`)
+    expect(customStyles).toContain(`max-height: ${expectedMaxHeight};`)
+    expect(customStyles).not.toContain('padding: min(8vh, 72px) 18px 32px;')
   })
 })
