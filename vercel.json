@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "mkdir -p public && printf 'ok' > public/index.html",
+  "buildCommand": "pnpm test:int tests/unit/pr12-dashboard-visual.unit.spec.ts tests/unit/shell-mobile-nav.unit.spec.ts tests/unit/shell-rail.unit.spec.ts && mkdir -p public && printf 'targeted tests passed' > public/index.html",
   "outputDirectory": "public"
 }
