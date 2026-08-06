@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -62,5 +65,14 @@ describe('Command Palette — composição desktop e tablet', () => {
 
     await waitFor(() => expect(screen.queryByText('Produtos recentes para limpar')).toBeNull())
     expect(screen.getByTestId('esmera-command-palette')).not.toBeNull()
+  })
+
+  it('preserva respiro inferior em notebooks sem alterar tablet ou mobile', () => {
+    const customStyles = readFileSync(resolve(process.cwd(), 'src/app/(payload)/custom.scss'), 'utf8')
+
+    expect(customStyles).toContain('@media (min-width: 1024px) and (max-height: 960px)')
+    expect(customStyles).toContain('padding: min(8vh, 72px) 18px 32px;')
+    expect(customStyles).toContain('height: min(770px, calc(100dvh - min(8vh, 72px) - 32px));')
+    expect(customStyles).toContain('max-height: calc(100dvh - min(8vh, 72px) - 32px);')
   })
 })
