@@ -1,0 +1,7 @@
+.esmera-leads-hydration { display: grid; gap: 16px; }
+.esmera-data-table tbody tr.is-selected { background: var(--esmera-surface-selected); }
+.esmera-data-table tbody tr:hover { background: var(--esmera-surface-hover); }
+.esmera-leads-facts { display: grid; gap: 10px; margin: 0 0 12px; }
+.esmera-leads-facts div { display: flex; justify-content: space-between; gap: 10px; }
+.esmera-leads-facts dt { color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
+.esmera-leads-facts dd { margin: 0; font-size: var(--esmera-font-ui-sm); }

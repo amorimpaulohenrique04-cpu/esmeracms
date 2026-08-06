@@ -437,5 +437,16 @@
   .esmera-segmented-control__item { flex: 1; }
 }
 
+.esmera-funnel-stepper { margin: 0 0 var(--esmera-space-4); }
+.esmera-funnel-stepper ol { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.esmera-funnel-stepper li { display: flex; align-items: center; }
+.esmera-funnel-stepper li:not(:last-child)::after { content: ''; width: 18px; height: 1px; margin: 0 4px; background: var(--esmera-line-default); }
+.esmera-funnel-stepper a { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 6px; border-radius: 999px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); font-weight: var(--esmera-weight-semibold); text-decoration: none; }
+.esmera-funnel-stepper a:hover { background: var(--esmera-surface-hover); color: var(--esmera-text); }
+.esmera-funnel-stepper__index { width: 18px; height: 18px; flex: 0 0 auto; display: inline-grid; place-items: center; border-radius: 50%; background: var(--esmera-surface-hover); color: var(--esmera-text-muted); font-size: 10px; }
+.esmera-funnel-stepper li.is-current a { background: var(--esmera-primary-soft); color: var(--esmera-text); }
+.esmera-funnel-stepper li.is-current .esmera-funnel-stepper__index { background: var(--esmera-selection-bar); color: var(--esmera-on-primary); }
+.esmera-funnel-stepper li.is-done .esmera-funnel-stepper__index { background: var(--esmera-success, var(--esmera-selection-bar)); color: var(--esmera-on-primary); }
+
 /* A política de prefers-reduced-motion é compartilhada e vive em tokens.scss,
    importado por todos os entry points do admin. Não duplicar aqui. */

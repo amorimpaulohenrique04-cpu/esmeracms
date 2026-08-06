@@ -77,7 +77,7 @@ function taskContext(task: DashboardTask) {
   const opportunity = related(task, 'opportunities')
   if (opportunity?.id) {
     const query = opportunity.code || String(opportunity.id)
-    return { href: `/admin/sales?view=list&q=${encodeURIComponent(query)}`, label: 'Abrir oportunidade' }
+    return { href: `/admin/opportunities?view=list&q=${encodeURIComponent(query)}`, label: 'Abrir oportunidade' }
   }
 
   const occurrence = related(task, 'occurrences')
@@ -93,7 +93,10 @@ function taskContext(task: DashboardTask) {
   if (customer?.id) return { href: `/admin/customers?customer=${customer.id}&tab=overview`, label: 'Abrir cliente' }
 
   const sale = related(task, 'sales')
-  if (sale?.id) return { href: `/admin/collections/sales/${sale.id}`, label: 'Abrir venda' }
+  if (sale?.id) {
+    const query = sale.number || String(sale.id)
+    return { href: `/admin/sales?q=${encodeURIComponent(query)}`, label: 'Abrir venda' }
+  }
 
   const lead = related(task, 'leads')
   if (lead?.id) return { href: `/admin/collections/leads/${lead.id}`, label: 'Abrir lead' }
@@ -173,13 +176,13 @@ export default async function DashboardView(props: AdminViewServerProps) {
               label="Oportunidades abertas"
               value={reporting.openOpportunities}
               meta="Novo, curadoria, proposta e negociação"
-              href="/admin/sales?view=pipeline"
+              href="/admin/opportunities?view=pipeline"
             />
             <MetricStripItem
               label="Vendas no mês"
               value={reporting.sales.validSales}
               meta={`${money(reporting.sales.revenueCents)} em receita válida`}
-              href="/admin/collections/sales"
+              href="/admin/sales"
               tone="success"
             />
             <MetricStripItem
@@ -207,7 +210,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
               eyebrow="Comercial"
               title="Pipeline compacto"
               description="Estado atual das Opportunities abertas. Cada etapa leva aos registros correspondentes em Vendas."
-              action={<Link className="esmera-dashboard-text-link" href="/admin/sales?view=pipeline">Ver pipeline completo</Link>}
+              action={<Link className="esmera-dashboard-text-link" href="/admin/opportunities?view=pipeline">Ver pipeline completo</Link>}
             >
               <div className="esmera-dashboard-panel-body">
                 <ol className="esmera-dashboard-pipeline__list">
@@ -216,7 +219,7 @@ export default async function DashboardView(props: AdminViewServerProps) {
                     return (
                       <li key={stage}>
                         <Link
-                          href={`/admin/sales?view=list&stage=${stage}`}
+                          href={`/admin/opportunities?view=list&stage=${stage}`}
                           className="esmera-dashboard-pipeline__stage"
                           aria-label={`${opportunityStageLabels[stage]}: ${volume} oportunidades. Abrir Vendas filtradas.`}
                         >

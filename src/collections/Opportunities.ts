@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { admins, commercialUsers } from '../access/roles'
+import { acquisitionChannelOptions } from '../businessRules/shared/acquisitionChannels'
 import {
   opportunityLossReasonLabels,
   opportunityLossReasons,
@@ -64,15 +65,7 @@ export const Opportunities: CollectionConfig = {
               required: true,
               defaultValue: 'other',
               index: true,
-              options: [
-                { label: 'Instagram', value: 'instagram' },
-                { label: 'Indicação', value: 'referral' },
-                { label: 'Site', value: 'site' },
-                { label: 'Arquiteto', value: 'architect' },
-                { label: 'Orgânico', value: 'organic' },
-                { label: 'WhatsApp', value: 'whatsapp' },
-                { label: 'Outro', value: 'other' },
-              ],
+              options: acquisitionChannelOptions,
             },
             {
               name: 'stage',

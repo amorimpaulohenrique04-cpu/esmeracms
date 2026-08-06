@@ -1,19 +1,10 @@
 import type { CollectionConfig } from 'payload'
 
 import { adminField, admins, commercialUsers } from '../access/roles'
+import { acquisitionChannelOptions } from '../businessRules/shared/acquisitionChannels'
 import { businessUserRelationship } from '../fields/userRelationship'
 import { applyCustomerPrivacyRules } from '../hooks/customers/applyCustomerPrivacyRules'
 import { normalizeCustomer } from '../hooks/customers/normalizeCustomer'
-
-export const customerOriginOptions = [
-  { label: 'Instagram', value: 'instagram' },
-  { label: 'Indicação', value: 'referral' },
-  { label: 'Site', value: 'site' },
-  { label: 'Arquiteto', value: 'architect' },
-  { label: 'Orgânico', value: 'organic' },
-  { label: 'WhatsApp', value: 'whatsapp' },
-  { label: 'Outro', value: 'other' },
-] as const
 
 export const Customers: CollectionConfig = {
   slug: 'customers',
@@ -82,7 +73,7 @@ export const Customers: CollectionConfig = {
               type: 'select',
               label: 'Origem',
               index: true,
-              options: [...customerOriginOptions],
+              options: acquisitionChannelOptions,
             },
             businessUserRelationship('owner', 'Responsável'),
             { name: 'sourceLead', type: 'relationship', relationTo: 'leads', label: 'Lead de origem' },

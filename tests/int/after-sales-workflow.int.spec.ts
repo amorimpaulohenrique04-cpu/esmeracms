@@ -3,6 +3,7 @@ import { getPayload, type Payload } from 'payload'
 
 import config from '@/payload.config'
 import {
+  createAfterSalesCase,
   createAfterSalesOccurrence,
   createAfterSalesShipment,
   createAfterSalesTask,
@@ -240,5 +241,79 @@ describe('Stage 10 after-sales operational workflow', () => {
     expect(activities.docs.some((activity) => activity.eventType === 'followup.completed')).toBe(true)
     expect(activities.docs.some((activity) => activity.eventType === 'shipment.delivered')).toBe(true)
     expect(activities.docs.some((activity) => activity.eventType === 'occurrence.resolved')).toBe(true)
+  }, 60_000)
+
+  it('registers a manual after-sales case for a sale without requiring the customer field from the client', async () => {
+    const customer = await payload.create({
+      collection: 'customers',
+      overrideAccess: true,
+      data: { name: `Cliente Registro ${stamp}`, email: `registro-${stamp}@example.com` },
+    })
+    created.customers.push(customer.id)
+
+    const product = await payload.create({
+      collection: 'products',
+      overrideAccess: true,
+      draft: true,
+      data: {
+        title: `Objeto Registro ${stamp}`,
+        code: `REG-${stamp}`.toUpperCase(),
+        slug: `objeto-registro-${stamp}`,
+        catalogStatus: 'active',
+        availability: 'available',
+        priceMode: 'fixed',
+        basePriceCents: 92_000,
+        _status: 'draft',
+      },
+    })
+    created.products.push(product.id)
+
+    const opportunity = await payload.create({
+      collection: 'opportunities',
+      overrideAccess: true,
+      user: commercialUser,
+      draft: true,
+      data: {
+        customer: customer.id,
+        source: 'whatsapp',
+        stage: 'negotiation',
+        owner: commercialUser.id,
+        interestedProducts: [product.id],
+        estimatedValueCents: 92_000,
+        nextAction: `Confirmar registro ${stamp}`,
+      },
+    })
+    created.opportunities.push(opportunity.id)
+
+    const won = await winOpportunity(payload, commercialUser, {
+      id: opportunity.id,
+      channel: 'whatsapp',
+      items: [{ product: product.id, quantity: 1 }],
+      expectedDeliveryAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+      deliveryMode: 'carrier',
+      deliveryNotes: `Entrega registro ${stamp}`,
+    })
+    created.sales.push(won.sale.id)
+
+    // Only saleId is supplied here — the client never sends a customer, mirroring
+    // the "Registrar acompanhamento" popup. The customer must be derived server-side.
+    const first = await createAfterSalesCase(payload, commercialUser, {
+      saleId: won.sale.id,
+      summary: `Cliente ligou perguntando pela entrega ${stamp}`,
+    })
+    created.afterSales.push(first.afterSales.id)
+    expect(first.afterSales.caseNumber).toMatch(/^POS-/)
+    const derivedCustomer = typeof first.afterSales.customer === 'object' ? first.afterSales.customer?.id : first.afterSales.customer
+    expect(String(derivedCustomer)).toBe(String(customer.id))
+
+    const second = await createAfterSalesCase(payload, commercialUser, { saleId: won.sale.id })
+    expect(String(second.afterSales.id)).toBe(String(first.afterSales.id))
+
+    const cases = await payload.count({
+      collection: 'after-sales',
+      overrideAccess: true,
+      where: { sale: { equals: won.sale.id } },
+    })
+    expect(cases.totalDocs).toBe(1)
   }, 60_000)
 })

@@ -14,15 +14,54 @@ import {
 } from '../../../businessRules/afterSales/model'
 import { Button } from '../../design-system'
 import { FilterPanelAdvanced } from '../../design-system/FilterPanelAdvanced'
-import type { AfterSalesCase, AfterSalesFilters, UserRef } from './types'
+import type { AfterSalesCase, AfterSalesFilters, SaleOption, UserRef } from './types'
 import { relationLabel } from './workspace'
+
+type OperateFn = (body: Record<string, unknown>) => Promise<Record<string, unknown> | undefined>
+
+function RegisterCaseDialog({ sales, busy, onCreate, onCaseCreated }: {
+  sales: SaleOption[]
+  busy: boolean
+  onCreate: OperateFn
+  onCaseCreated: (caseId: string | number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [saleId, setSaleId] = useState('')
+  const [summary, setSummary] = useState('')
+
+  return <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Trigger className="esmera-button">Registrar acompanhamento</Dialog.Trigger>
+    <Dialog.Portal>
+      <Dialog.Backdrop className="esmera-overlay-backdrop" />
+      <Dialog.Viewport className="esmera-dialog-viewport">
+        <Dialog.Popup className="esmera-dialog esmera-after-sales-dialog">
+          <div className="esmera-overlay-header"><div><Dialog.Title>Registrar acompanhamento</Dialog.Title><Dialog.Description>Escolha a venda. O caso de pós-venda é criado automaticamente.</Dialog.Description></div><Dialog.Close className="esmera-icon-button" aria-label="Fechar">×</Dialog.Close></div>
+          <form className="esmera-overlay-body esmera-after-sales-form" onSubmit={(event) => {
+            event.preventDefault()
+            void onCreate({ action: 'create-case', saleId, summary: summary || null }).then((result) => {
+              setOpen(false)
+              setSaleId('')
+              setSummary('')
+              const created = result?.afterSales as { id?: string | number } | undefined
+              if (created?.id !== undefined) onCaseCreated(created.id)
+            })
+          }}>
+            <label><span>Venda</span><select className="esmera-input" required value={saleId} onChange={(event) => setSaleId(event.target.value)}><option value="">Selecione</option>{sales.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.number || item.id} · {relationLabel(item.customer, 'Cliente')}</option>)}</select></label>
+            <label><span>Contexto (opcional)</span><textarea className="esmera-input" rows={3} value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="Ex.: cliente ligou perguntando sobre a entrega" /></label>
+            <div className="esmera-actions"><Dialog.Close className="esmera-button" type="button">Cancelar</Dialog.Close><Button type="submit" disabled={busy || !sales.length}>{busy ? 'Registrando…' : 'Registrar'}</Button></div>
+          </form>
+        </Dialog.Popup>
+      </Dialog.Viewport>
+    </Dialog.Portal>
+  </Dialog.Root>
+}
 
 function FollowUpDialog({ cases, users, selectedCaseId, busy, onCreate }: {
   cases: AfterSalesCase[]
   users: UserRef[]
   selectedCaseId: string | number | null
   busy: boolean
-  onCreate: (body: Record<string, unknown>) => Promise<void>
+  onCreate: OperateFn
 }) {
   const [open, setOpen] = useState(false)
   const [caseId, setCaseId] = useState(String(selectedCaseId || cases[0]?.id || ''))
@@ -66,13 +105,15 @@ function FollowUpDialog({ cases, users, selectedCaseId, busy, onCreate }: {
   </Dialog.Root>
 }
 
-export function AfterSalesFilterBar({ cases, users, filters, selectedCaseId, busy, onCreate }: {
+export function AfterSalesFilterBar({ cases, sales, users, filters, selectedCaseId, busy, onCreate, onCaseCreated }: {
   cases: AfterSalesCase[]
+  sales: SaleOption[]
   users: UserRef[]
   filters: AfterSalesFilters
   selectedCaseId: string | number | null
   busy: boolean
-  onCreate: (body: Record<string, unknown>) => Promise<void>
+  onCreate: OperateFn
+  onCaseCreated: (caseId: string | number) => void
 }) {
   const hasAdvancedFilters = Boolean(filters.priority || filters.type)
 
@@ -85,6 +126,7 @@ export function AfterSalesFilterBar({ cases, users, filters, selectedCaseId, bus
           <label><span>Status</span><select className="esmera-input" name="status" defaultValue={filters.status}><option value="open">Abertos</option><option value="done">Concluídos</option><option value="all">Todos</option></select></label>
           <label><span>Responsável</span><select className="esmera-input" name="owner" defaultValue={filters.owner}><option value="">Todos</option>{users.map((user) => <option key={String(user.id)} value={String(user.id)}>{user.name || user.email || user.id}</option>)}</select></label>
           <Button type="submit">Aplicar</Button>
+          <RegisterCaseDialog sales={sales} busy={busy} onCreate={onCreate} onCaseCreated={onCaseCreated} />
           <FollowUpDialog key={String(selectedCaseId || 'none')} cases={cases} users={users} selectedCaseId={selectedCaseId} busy={busy} onCreate={onCreate} />
         </div>
         <FilterPanelAdvanced label="Mais filtros" active={hasAdvancedFilters}>

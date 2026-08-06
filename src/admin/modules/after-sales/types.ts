@@ -105,6 +105,12 @@ export type ActivityRecord = {
   relatedTo?: PolyRelation[] | null
 }
 
+export type SaleOption = {
+  id: string | number
+  number?: string | null
+  customer?: Relation<CustomerRef>
+}
+
 export type QueueFocus = 'all' | 'today' | 'overdue' | 'occurrences' | 'deliveries'
 
 export type AfterSalesFilters = {

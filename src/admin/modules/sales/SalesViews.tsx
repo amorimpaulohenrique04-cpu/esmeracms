@@ -5,7 +5,7 @@ import type { AdminViewServerProps, Where } from 'payload'
 
 import { openOpportunityStages, opportunityStages } from '../../../businessRules/opportunities/stages'
 import { eligibleSaleStatuses } from '../../../collections/Sales'
-import { SegmentedControl, SegmentedControlLink } from '../../design-system'
+import { FunnelStepper, SegmentedControl, SegmentedControlLink } from '../../design-system'
 import {
   AccessDenied,
   ensureUser,
@@ -127,9 +127,9 @@ function ViewSwitch({ filters }: { filters: SalesWorkspaceFilters }) {
   }
   list.set('view', 'list')
   pipeline.set('view', 'pipeline')
-  return <SegmentedControl className="esmera-sales-switch" label="Visualização de vendas">
-    <SegmentedControlLink selected={filters.view === 'list'} href={`/admin/sales?${list.toString()}`}>Lista</SegmentedControlLink>
-    <SegmentedControlLink selected={filters.view === 'pipeline'} href={`/admin/sales?${pipeline.toString()}`}>Pipeline</SegmentedControlLink>
+  return <SegmentedControl className="esmera-sales-switch" label="Visualização de oportunidades">
+    <SegmentedControlLink selected={filters.view === 'list'} href={`/admin/opportunities?${list.toString()}`}>Lista</SegmentedControlLink>
+    <SegmentedControlLink selected={filters.view === 'pipeline'} href={`/admin/opportunities?${pipeline.toString()}`}>Pipeline</SegmentedControlLink>
   </SegmentedControl>
 }
 
@@ -187,12 +187,13 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
     return <ViewFrame props={props} width="fluid">
       <PageHeader
         className="esmera-sales-command-bar"
-        eyebrow="Comercial"
-        title="Vendas"
-        subtitle="Lista e Pipeline usam o mesmo domínio de Opportunities. Ganhos criam Sales transacionais; Leads permanecem restritos à aquisição e qualificação."
-        actions={<><TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink><SaleCreateDialog products={productsResult.docs} /><TechnicalLink href="/admin/collections/sales">Vendas confirmadas</TechnicalLink></>}
+        eyebrow="Passo 2 do funil"
+        title="Oportunidades"
+        subtitle="Negociações em andamento, da qualificação ao fechamento. Ganhar uma oportunidade cria a Venda automaticamente."
+        actions={<><TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink><SaleCreateDialog products={productsResult.docs} /><Link className="esmera-button" href="/admin/sales">Vendas confirmadas</Link></>}
         context={<ViewSwitch filters={filters} />}
       />
+      <FunnelStepper current={2} />
       <SalesWorkspaceClient
         opportunities={opportunityResult.docs}
         activities={activitiesResult.docs}
@@ -205,10 +206,10 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
       />
     </ViewFrame>
   } catch (error) {
-    return <ViewFrame props={props} width="fluid"><PageHeader title="Vendas" subtitle="Comercial" /><QueryError title="Não foi possível consultar o workspace de Vendas" error={error} /></ViewFrame>
+    return <ViewFrame props={props} width="fluid"><PageHeader title="Oportunidades" subtitle="Comercial" /><QueryError title="Não foi possível consultar o workspace de Oportunidades" error={error} /></ViewFrame>
   }
 }
 
 export function PipelineRedirect() {
-  redirect('/admin/sales?view=pipeline')
+  redirect('/admin/opportunities?view=pipeline')
 }

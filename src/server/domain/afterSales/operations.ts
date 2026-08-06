@@ -29,6 +29,16 @@ type CaseDocument = {
   owner?: unknown
 }
 
+type SaleDocument = {
+  id: string | number
+  customer?: unknown
+}
+
+export type CreateCaseInput = {
+  saleId: string | number
+  summary?: string | null
+}
+
 export type CreateTaskInput = {
   caseId: string | number
   title: string
@@ -79,6 +89,41 @@ function relatedTo(caseDoc: CaseDocument) {
     sale !== null ? { relationTo: 'sales' as const, value: sale } : null,
     customer !== null ? { relationTo: 'customers' as const, value: customer } : null,
   ].filter(Boolean)
+}
+
+export async function createAfterSalesCase(payload: Payload, user: WorkflowUser, input: CreateCaseInput) {
+  const sale = await payload.findByID({
+    collection: 'sales',
+    id: input.saleId,
+    depth: 0,
+    overrideAccess: false,
+    user: userOption(user),
+  }) as unknown as SaleDocument
+
+  const customerId = relationshipID(sale.customer)
+  if (customerId === null) throw new Error('A venda selecionada não tem um cliente vinculado.')
+
+  const existing = await payload.find({
+    collection: 'after-sales',
+    where: { sale: { equals: input.saleId } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: false,
+    user: userOption(user),
+  })
+  if (existing.docs.length) return { afterSales: existing.docs[0] }
+
+  const afterSales = await payload.create({
+    collection: 'after-sales',
+    overrideAccess: false,
+    user: userOption(user),
+    data: {
+      sale: input.saleId,
+      customer: customerId,
+      summary: input.summary?.trim() || null,
+    } as never,
+  })
+  return { afterSales }
 }
 
 export async function createAfterSalesTask(payload: Payload, user: WorkflowUser, input: CreateTaskInput) {

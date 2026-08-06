@@ -154,6 +154,7 @@ export function AppHeader() {
         onOpenChange={setCommandOpen}
         selection={selection}
         currentHref={`${pathname}${search ? `?${search}` : ''}`}
+        role={role}
       />
       <MobileNav
         open={mobileNavOpen}

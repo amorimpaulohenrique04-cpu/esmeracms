@@ -4,6 +4,7 @@ import { Dialog } from '@base-ui/react/dialog'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 
+import type { EsmeraRole } from '../../access/roles'
 import { useNavigationFeedback } from '../navigation/NavigationFeedbackProvider'
 import { expectAdminResponse } from '../state/asyncState'
 import { clearRecentAdminItems, recentAdminItems, savedAdminViews } from '../state/continuity'
@@ -66,13 +67,13 @@ function relativeVisitTime(visitedAt: number) {
   return `há ${days} d`
 }
 
-function localCommands(selection: CommandSelection | null, currentHref: string): CommandResult[] {
+function localCommands(selection: CommandSelection | null, currentHref: string, role: EsmeraRole | null): CommandResult[] {
   const results: CommandResult[] = []
 
   if (selection?.href) {
     results.push({ id: `selection-open:${selection.kind}:${selection.id}`, group: 'Seleção atual', label: `Abrir ${selection.label || selection.kind}`, meta: 'Continuar no registro em foco', href: selection.href, icon: 'arrow', local: true })
-    const technical = technicalHref(selection)
-    if (technical && technical !== selection.href) results.push({ id: `selection-edit:${selection.kind}:${selection.id}`, group: 'Seleção atual', label: 'Editar no Admin técnico', meta: selection.label || `${selection.kind} ${selection.id}`, href: technical, icon: 'database', local: true })
+    const technical = role === 'admin' ? technicalHref(selection) : null
+    if (technical && technical !== selection.href) results.push({ id: `selection-edit:${selection.kind}:${selection.id}`, group: 'Seleção atual', label: 'Editar em Configurações avançadas', meta: selection.label || `${selection.kind} ${selection.id}`, href: technical, icon: 'database', local: true })
   }
 
   for (const item of recentAdminItems()) {
@@ -127,25 +128,25 @@ function isQuickAction(result: CommandResult) {
 
 function quickActionPriority(result: CommandResult) {
   const label = result.label.toLocaleLowerCase('pt-BR')
-  if (label.includes('novo produto')) return 0
-  if (label.includes('novo cliente')) return 1
-  if (label.includes('nova oportunidade')) return 2
-  if (label.includes('importar')) return 3
-  if (label.includes('pedido')) return 4
+  if (label.includes('novo lead')) return 0
+  if (label.includes('nova oportunidade')) return 1
+  if (label.includes('novo cliente')) return 2
+  if (label.includes('novo produto')) return 3
+  if (label.includes('importar')) return 4
   return 10
 }
 
 function resultShortcut(result: CommandResult) {
   const label = result.label.toLocaleLowerCase('pt-BR')
-  if (label.includes('produto')) return 'N'
-  if (label.includes('cliente')) return 'C'
+  if (label.includes('lead')) return 'L'
   if (label.includes('oportunidade')) return 'O'
+  if (label.includes('cliente')) return 'C'
+  if (label.includes('produto')) return 'N'
   if (label.includes('importar')) return 'I'
-  if (label.includes('pedido')) return 'P'
   return result.label.trim().slice(0, 1).toLocaleUpperCase('pt-BR')
 }
 
-export function CommandPalette({ open, onOpenChange, selection, currentHref }: { open: boolean; onOpenChange: (open: boolean) => void; selection: CommandSelection | null; currentHref: string }) {
+export function CommandPalette({ open, onOpenChange, selection, currentHref, role = null }: { open: boolean; onOpenChange: (open: boolean) => void; selection: CommandSelection | null; currentHref: string; role?: EsmeraRole | null }) {
   const router = useRouter()
   const { beginNavigation } = useNavigationFeedback()
   const inputId = useId()
@@ -211,7 +212,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
 
   const results = useMemo(() => {
     void continuityVersion
-    const local = localCommands(selection, currentHref)
+    const local = localCommands(selection, currentHref, role)
     const needle = query.trim().toLocaleLowerCase('pt-BR')
     const filteredLocal = needle ? local.filter((item) => matchesQuery(item, needle)) : local
     const previousQuery = serverResultQuery.toLocaleLowerCase('pt-BR')
@@ -222,7 +223,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
       ? serverResults.filter((item) => matchesQuery(item, needle))
       : serverResults
     return uniqueResults([...filteredLocal, ...visibleServerResults]).slice(0, 40)
-  }, [continuityVersion, currentHref, query, selection, serverResultQuery, serverResults])
+  }, [continuityVersion, currentHref, query, role, selection, serverResultQuery, serverResults])
 
   const recentResults = useMemo(() => results.filter((result) => result.group === 'Recentes').slice(0, 5), [results])
   const quickActions = useMemo(() => {
@@ -250,7 +251,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   }, [activeResultId, navigableResults.length, open, safeActiveIndex])
 
   const grouped = useMemo(() => {
-    const order = ['Seleção atual', 'Recentes', 'Filtros salvos', 'Nesta tela', 'Ações contextuais', 'Ações', 'Criar', 'Navegação', 'Seções de Relatórios', 'Produtos', 'Produtos recentes', 'Categorias', 'Categorias recentes', 'Clientes', 'Clientes recentes', 'Oportunidades', 'Leads', 'Leads recentes', 'Vendas', 'Vendas recentes']
+    const order = ['Seleção atual', 'Recentes', 'Filtros salvos', 'Nesta tela', 'Ações contextuais', 'Ações', 'Criar', 'Navegação', 'Leads', 'Leads recentes', 'Oportunidades', 'Vendas', 'Vendas recentes', 'Clientes', 'Clientes recentes', 'Produtos', 'Produtos recentes', 'Categorias', 'Categorias recentes', 'Seções de Relatórios']
     const groups = new Map<string, CommandResult[]>()
     for (const result of navigableResults) groups.set(result.group, [...(groups.get(result.group) || []), result])
     return Array.from(groups.entries()).sort(([left], [right]) => (order.indexOf(left) === -1 ? 999 : order.indexOf(left)) - (order.indexOf(right) === -1 ? 999 : order.indexOf(right)))

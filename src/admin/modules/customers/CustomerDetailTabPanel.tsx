@@ -202,7 +202,7 @@ export async function CustomerDetailTabPanel({
                     <td><Status tone={statusTone(sale.status)}>{saleStatusLabels[sale.status || ''] || sale.status || '—'}</Status></td>
                     <td>{money(sale.totalCents)}</td>
                     <td>{shortDate(sale.confirmedAt || sale.updatedAt)}</td>
-                    <td><Link href={`/admin/sales?view=list&sale=${sale.id}`}>Abrir</Link></td>
+                    <td><Link href={`/admin/sales?q=${encodeURIComponent(sale.number || String(sale.id))}`}>Abrir</Link></td>
                   </tr>
                 ))}
               </tbody>
@@ -227,7 +227,7 @@ export async function CustomerDetailTabPanel({
                     <td><Status tone={statusTone(item.status)}>{item.status || '—'}</Status></td>
                     <td>{item.priority || '—'}</td>
                     <td>{shortDate(item.deliveredAt || item.expectedDeliveryAt)}</td>
-                    <td><Link href={`/admin/collections/after-sales/${item.id}`}>Abrir</Link></td>
+                    <td><Link href={`/admin/after-sales?case=${item.id}`}>Abrir</Link></td>
                   </tr>
                 ))}
               </tbody>

@@ -102,8 +102,16 @@ export default buildConfig({
           Component: '/admin/modules/privacy/PrivacyView#PrivacyView',
           path: '/privacy',
         },
-        sales: {
+        leads: {
+          Component: '/admin/modules/leads/LeadsView#LeadsView',
+          path: '/leads',
+        },
+        opportunities: {
           Component: '/admin/modules/sales/SalesViews#SalesWorkspace',
+          path: '/opportunities',
+        },
+        sales: {
+          Component: '/admin/modules/sales/SalesConfirmedView#SalesConfirmedView',
           path: '/sales',
         },
         pipelineRedirect: {

@@ -77,7 +77,7 @@ export const recordOccurrenceActivity: CollectionAfterChangeHook = async ({ doc,
     context: { skipAfterSalesActivity: true },
     data: {
       eventType: resolved ? 'occurrence.resolved' : operation === 'create' ? 'occurrence.opened' : 'occurrence.status_changed',
-      kind: 'follow_up',
+      kind: 'occurrence',
       occurredAt: new Date().toISOString(),
       summary: resolved ? 'Ocorrência resolvida' : operation === 'create' ? 'Ocorrência aberta' : `Status da ocorrência atualizado para ${status || 'não informado'}`,
       details: resolved ? doc.resolution : doc.description,

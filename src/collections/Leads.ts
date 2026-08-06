@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { commercialUsers } from '../access/roles'
+import { acquisitionChannelOptions } from '../businessRules/shared/acquisitionChannels'
 import { businessUserRelationship } from '../fields/userRelationship'
 
 const phoneValidation = (value: unknown, { siblingData }: { siblingData?: { email?: string } }) => {
@@ -49,15 +50,7 @@ export const Leads: CollectionConfig = {
               type: 'select',
               label: 'Origem',
               required: true,
-              options: [
-                { label: 'Instagram', value: 'instagram' },
-                { label: 'Indicação', value: 'referral' },
-                { label: 'Site', value: 'site' },
-                { label: 'Arquiteto', value: 'architect' },
-                { label: 'Orgânico', value: 'organic' },
-                { label: 'WhatsApp', value: 'whatsapp' },
-                { label: 'Outro', value: 'other' },
-              ],
+              options: acquisitionChannelOptions,
             },
             businessUserRelationship('owner', 'Responsável pela qualificação'),
             {

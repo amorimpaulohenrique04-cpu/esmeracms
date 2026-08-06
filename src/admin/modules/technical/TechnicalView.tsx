@@ -24,7 +24,7 @@ export async function TechnicalView(props: AdminViewServerProps) {
   const business = role === 'admin' || role === 'commercial'
   const measurements = role === 'admin' ? performanceSnapshot() : []
 
-  if (!user) return <AccessDenied props={props} area="técnica" />
+  if (!user || role !== 'admin') return <AccessDenied props={props} area="técnica" />
 
   const siteEntries = [
     ['Produtos', '/admin/collections/products', 'Campos completos, drafts, versões e histórico do catálogo.'],
@@ -39,11 +39,11 @@ export async function TechnicalView(props: AdminViewServerProps) {
   ]
 
   const businessEntries = [
-    ['Leads', '/admin/collections/leads', 'Aquisição, qualificação e consentimento inicial.'],
+    ['Leads', '/admin/leads', 'Aquisição, qualificação e consentimento inicial.'],
     ['Clientes', '/admin/collections/customers', 'Contato, preferências, relacionamento e privacidade.'],
     ['Privacidade', '/admin/privacy', 'Consentimento, portabilidade, solicitações, retenção e anonimização.'],
-    ['Oportunidades', '/admin/collections/opportunities', 'Pipeline comercial, valores, próxima ação e fechamento.'],
-    ['Vendas', '/admin/collections/sales', 'Itens, snapshots, valores, status e entrega.'],
+    ['Oportunidades', '/admin/opportunities', 'Pipeline comercial, valores, próxima ação e fechamento.'],
+    ['Vendas', '/admin/sales', 'Itens, snapshots, valores, status e entrega.'],
     ['Pós-venda', '/admin/collections/after-sales', 'Follow-ups, entregas e ocorrências.'],
     ['Tarefas', '/admin/collections/tasks', 'Pendências operacionais vinculadas aos registros.'],
     ['Automação de pós-venda', '/admin/globals/after-sales-automation', 'Regras D+3, D+15, D+90 e preparação de entrega usadas pela Jobs Queue.'],
@@ -72,8 +72,8 @@ export async function TechnicalView(props: AdminViewServerProps) {
     <ViewFrame props={props} width="wide" className="esmera-technical-view">
       <PageHeader
         eyebrow="Sistema"
-        title="Admin técnico"
-        subtitle="Formulários completos, drafts, versões, filas e capacidades avançadas do Payload. É a mesma fonte de dados do portal operacional."
+        title="Configurações avançadas"
+        subtitle="Formulários completos, drafts, versões, filas e capacidades avançadas do Payload. Visível apenas para administradores."
         context={<span>Papel atual: {role || 'sem papel'} · acesso técnico respeita as mesmas permissões das Collections e APIs.</span>}
       />
 

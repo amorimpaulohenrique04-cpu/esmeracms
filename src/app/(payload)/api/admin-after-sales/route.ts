@@ -15,6 +15,7 @@ import {
   type OperationalPriority,
 } from '../../../../businessRules/afterSales/model'
 import {
+  createAfterSalesCase,
   createAfterSalesOccurrence,
   createAfterSalesShipment,
   createAfterSalesTask,
@@ -27,6 +28,7 @@ import {
 export const dynamic = 'force-dynamic'
 
 type Action =
+  | 'create-case'
   | 'create-task'
   | 'update-task-status'
   | 'create-shipment'
@@ -39,6 +41,8 @@ type Body = {
   action?: Action
   id?: string | number
   caseId?: string | number
+  saleId?: string | number
+  summary?: string | null
   title?: string
   type?: string
   dueAt?: string
@@ -82,6 +86,16 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (body.action === 'create-case') {
+      if (body.saleId === undefined) {
+        return NextResponse.json({ error: 'A venda é obrigatória.' }, { status: 400 })
+      }
+      return NextResponse.json(await createAfterSalesCase(payload, user, {
+        saleId: body.saleId,
+        summary: body.summary,
+      }))
+    }
+
     if (body.action === 'create-task') {
       const taskPriority = priority(body.priority)
       if (body.caseId === undefined || !body.title || !body.dueAt || !isTaskType(body.type) || !taskPriority) {

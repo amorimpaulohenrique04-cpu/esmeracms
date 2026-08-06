@@ -11,6 +11,7 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 let pathname = '/admin'
+let search = ''
 let authUser: { role: string | null; name: string; email: string } | null = {
   role: 'admin',
   name: 'Ana Admin',
@@ -20,6 +21,7 @@ const logOut = vi.fn()
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
+  useSearchParams: () => new URLSearchParams(search),
 }))
 
 vi.mock('@payloadcms/ui', () => ({
@@ -61,6 +63,7 @@ afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
   pathname = '/admin'
+  search = ''
   authUser = { role: 'admin', name: 'Ana Admin', email: 'ana@esmera.test' }
 })
 
