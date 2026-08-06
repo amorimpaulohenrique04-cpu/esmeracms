@@ -57,9 +57,11 @@ export function CustomerDetailTabs({
           </SectionNavLink>
         ))}
       </SectionNav>
-      <div className="esmera-customer-tab-body" aria-busy={pending || undefined}>
-        {pending ? <LoadingState compact label="Carregando seção do cliente…" /> : children}
-      </div>
+      {pending ? (
+        <div className="esmera-customer-tab-loading" aria-busy="true">
+          <LoadingState compact label="Carregando seção do cliente…" />
+        </div>
+      ) : children}
     </>
   )
 }
