@@ -15,7 +15,8 @@ import {
   TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
-import { SalesWorkspaceClient } from './SalesWorkspaceClient'
+import { SaleCreateDialog, SalesWorkspaceClient } from './SalesWorkspaceClient'
+import './sale-create-dialog.scss'
 import type {
   ActivityRecord,
   OpportunityPeriod,
@@ -185,10 +186,11 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
 
     return <ViewFrame props={props} width="fluid">
       <PageHeader
+        className="esmera-sales-command-bar"
         eyebrow="Comercial"
         title="Vendas"
         subtitle="Lista e Pipeline usam o mesmo domínio de Opportunities. Ganhos criam Sales transacionais; Leads permanecem restritos à aquisição e qualificação."
-        actions={<><TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink><TechnicalLink href="/admin/collections/sales">Vendas confirmadas</TechnicalLink></>}
+        actions={<><TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink><SaleCreateDialog products={productsResult.docs} /><TechnicalLink href="/admin/collections/sales">Vendas confirmadas</TechnicalLink></>}
         context={<ViewSwitch filters={filters} />}
       />
       <SalesWorkspaceClient

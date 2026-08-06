@@ -22,12 +22,12 @@ function useOverlayContext() {
   return { open, onOpenChange }
 }
 
-export function DialogPanel({ trigger, title, description, children }: { trigger: React.ReactNode; title: string; description?: string; children: React.ReactNode }) {
+export function DialogPanel({ trigger, triggerClassName = '', title, description, children }: { trigger: React.ReactNode; triggerClassName?: string; title: string; description?: string; children: React.ReactNode }) {
   const context = useOverlayContext()
   const contextKey = `dialog-${useId()}`
   return (
     <Dialog.Root open={context.open} onOpenChange={context.onOpenChange}>
-      <Dialog.Trigger className="esmera-button" data-esmera-context-key={contextKey}>{trigger}</Dialog.Trigger>
+      <Dialog.Trigger className={`esmera-button${triggerClassName ? ` ${triggerClassName}` : ''}`} data-esmera-context-key={contextKey}>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="esmera-overlay-backdrop" />
         <Dialog.Viewport className="esmera-dialog-viewport">

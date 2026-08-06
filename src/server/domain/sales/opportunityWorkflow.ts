@@ -31,6 +31,11 @@ export type SaleWorkflowItem = {
   quantity: number
 }
 
+export type CreateSaleInput = {
+  customerID: string | number
+  items: SaleWorkflowItem[]
+}
+
 export type MoveOpportunityInput = {
   id: string | number
   toStage: OpportunityStage
@@ -209,6 +214,63 @@ export async function loseOpportunity(payload: Payload, user: WorkflowUser, inpu
       } as never,
     })
     return { opportunity: updated }
+  })
+}
+
+export async function createSale(payload: Payload, user: WorkflowUser, input: CreateSaleInput) {
+  if (input.customerID === undefined || input.customerID === null || String(input.customerID).trim() === '') {
+    throw new Error('Selecione o cliente da venda.')
+  }
+  if (!input.items.length) throw new Error('Confirme ao menos um item para criar a venda.')
+  if (input.items.some((item) => !item.product || !Number.isInteger(item.quantity) || item.quantity < 1)) {
+    throw new Error('Todos os itens precisam de produto e quantidade inteira maior que zero.')
+  }
+
+  return await withTransaction(payload, user, async (req) => {
+    const sale = await payload.create({
+      collection: 'sales',
+      overrideAccess: false,
+      user: user as never,
+      req,
+      data: {
+        number: saleNumber(),
+        customer: input.customerID,
+        channel: 'whatsapp',
+        status: 'confirmed',
+        owner: user?.id,
+        items: input.items.map((item) => ({
+          product: item.product,
+          variantSku: item.variantSku?.trim() || null,
+          unitPriceCents: typeof item.unitPriceCents === 'number' ? item.unitPriceCents : null,
+          quantity: item.quantity,
+        })),
+        discountCents: 0,
+        shippingCents: 0,
+      } as never,
+    })
+
+    await payload.create({
+      collection: 'activities',
+      overrideAccess: false,
+      user: user as never,
+      req,
+      data: {
+        eventType: 'sale.created',
+        kind: 'sale',
+        occurredAt: new Date().toISOString(),
+        summary: `Venda ${sale.number} criada manualmente`,
+        details: typeof sale.totalCents === 'number'
+          ? `Total confirmado: ${(sale.totalCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`
+          : undefined,
+        owner: user?.id,
+        relatedTo: [
+          { relationTo: 'sales', value: sale.id },
+          { relationTo: 'customers', value: input.customerID },
+        ],
+      } as never,
+    })
+
+    return { sale }
   })
 }
 

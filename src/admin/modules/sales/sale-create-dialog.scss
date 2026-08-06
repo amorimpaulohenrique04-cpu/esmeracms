@@ -1,0 +1,112 @@
+@use '../../design-system/tokens';
+
+.esmera-sales-create-form {
+  display: grid;
+  gap: var(--esmera-space-5);
+}
+
+.esmera-sales-create-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--esmera-space-4);
+}
+
+.esmera-sales-customer-field,
+.esmera-sales-customer-field > * {
+  min-width: 0;
+}
+
+.esmera-sales-customer-combobox {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.esmera-sales-customer-combobox .esmera-combobox-input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.esmera-sales-customer-combobox .esmera-combobox-trigger {
+  position: absolute;
+  right: 1px;
+  width: 38px;
+  height: calc(100% - 2px);
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--esmera-text-muted);
+  cursor: pointer;
+}
+
+.esmera-sales-customer-portal {
+  display: contents;
+}
+
+.esmera-sales-customer-popup {
+  width: var(--anchor-width);
+  max-height: 260px;
+  overflow: hidden;
+}
+
+.esmera-sales-customer-list {
+  max-height: 248px;
+  overflow: auto;
+}
+
+.esmera-sales-customer-empty {
+  padding: var(--esmera-space-3);
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-ui-sm);
+}
+
+.esmera-sales-customer-result {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.esmera-sales-customer-result strong,
+.esmera-sales-customer-result small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.esmera-sales-customer-result small {
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-meta);
+}
+
+.esmera-sales-create-actions {
+  justify-content: flex-end;
+}
+
+
+@container esmera-workspace (min-width: 701px) and (max-width: 1220px) {
+  .esmera-sales-command-bar .esmera-command-bar__main {
+    flex-wrap: wrap;
+    row-gap: var(--esmera-space-4);
+  }
+
+  .esmera-sales-command-bar .esmera-command-bar__copy {
+    flex: 1 1 520px;
+  }
+
+  .esmera-sales-command-bar .esmera-command-bar__actions {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .esmera-sales-create-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .esmera-sales-create-actions .esmera-button {
+    width: 100%;
+  }
+}

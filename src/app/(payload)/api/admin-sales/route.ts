@@ -10,6 +10,7 @@ import {
 } from '../../../../businessRules/opportunities/stages'
 import {
   bulkMoveOpportunities,
+  createSale,
   loseOpportunity,
   moveOpportunity,
   reorderOpportunityStage,
@@ -19,7 +20,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type SalesAction = 'move-stage' | 'reorder-stage' | 'bulk-stage' | 'win' | 'lose'
+type SalesAction = 'move-stage' | 'reorder-stage' | 'bulk-stage' | 'create' | 'win' | 'lose'
 
 type RequestBody = {
   action?: SalesAction
@@ -32,6 +33,7 @@ type RequestBody = {
   lossReason?: string
   lossNotes?: string | null
   channel?: string
+  customerID?: string | number
   items?: SaleWorkflowItem[]
   discountCents?: number
   shippingCents?: number
@@ -103,6 +105,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Selecione oportunidades e uma etapa de destino.' }, { status: 400 })
       }
       return NextResponse.json(await bulkMoveOpportunities(payload, user, body.ids, targetStage))
+    }
+
+    if (body.action === 'create') {
+      if (body.customerID === undefined || body.customerID === null || !Array.isArray(body.items)) {
+        return NextResponse.json({ error: 'Cliente e itens são obrigatórios.' }, { status: 400 })
+      }
+      return NextResponse.json(await createSale(payload, user, {
+        customerID: body.customerID,
+        items: body.items,
+      }))
     }
 
     if (body.action === 'lose') {

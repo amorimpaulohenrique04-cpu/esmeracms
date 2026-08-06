@@ -1,0 +1,35 @@
+@use '../../design-system/tokens';
+
+.esmera-category-dialog-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--esmera-space-4);
+}
+
+.esmera-category-dialog-form > .esmera-field:first-child,
+.esmera-category-dialog-form > .esmera-inline-feedback,
+.esmera-category-dialog-actions {
+  grid-column: 1 / -1;
+}
+
+.esmera-category-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 560px) {
+  .esmera-category-dialog-form {
+    grid-template-columns: 1fr;
+  }
+
+  .esmera-category-dialog-form > *,
+  .esmera-category-dialog-form > .esmera-field:first-child,
+  .esmera-category-dialog-form > .esmera-inline-feedback,
+  .esmera-category-dialog-actions {
+    grid-column: 1;
+  }
+
+  .esmera-category-dialog-actions .esmera-button {
+    width: 100%;
+  }
+}

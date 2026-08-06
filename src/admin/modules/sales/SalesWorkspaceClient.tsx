@@ -17,7 +17,7 @@ import {
 } from '@tanstack/react-table'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   openOpportunityStages,
@@ -30,16 +30,21 @@ import {
 } from '../../../businessRules/opportunities/stages'
 import {
   Button,
+  ComboboxPrimitive,
+  comboboxClasses,
   DataSection,
   DataTable,
+  DialogPanel,
   DrawerPanel,
   EmptyState,
+  Field,
   FilterPanel,
   InlineFeedback,
   Status,
 } from '../../design-system'
 import type {
   ActivityRecord,
+  CustomerRef,
   OpportunityRecord,
   ProductRef,
   SalesTransaction,
@@ -572,6 +577,218 @@ function WorkspaceInner(props: Props) {
       <Transactions transactions={props.transactions} />
     </>}
   </>
+}
+
+
+type CustomerSearchResponse = {
+  docs?: CustomerRef[]
+  error?: string
+}
+
+function customerSearchLabel(customer: CustomerRef) {
+  return [customer.name || 'Cliente', customer.company, customer.phone].filter(Boolean).join(' · ')
+}
+
+function effectiveProductPrice(product: ProductRef | undefined, variantSku: string) {
+  const variant = product?.variants?.find((candidate) => candidate.sku === variantSku)
+  const mode = variant?.priceMode === 'fixed' || variant?.priceMode === 'inquiry'
+    ? variant.priceMode
+    : product?.priceMode
+  const cents = variant?.priceMode === 'fixed' ? variant.priceCents : product?.basePriceCents
+  return { mode, cents }
+}
+
+export function SaleCreateDialog({ products }: { products: ProductRef[] }) {
+  const router = useRouter()
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const portalContainerRef = useRef<HTMLFormElement>(null)
+  const [customer, setCustomer] = useState<CustomerRef | null>(null)
+  const [query, setQuery] = useState('')
+  const [customers, setCustomers] = useState<CustomerRef[]>([])
+  const [searching, setSearching] = useState(false)
+  const [productID, setProductID] = useState('')
+  const [variantSku, setVariantSku] = useState('')
+  const [quantity, setQuantity] = useState(1)
+  const [unitPrice, setUnitPrice] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
+
+  useEffect(() => {
+    const term = query.trim()
+    if (term.length < 2) return
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      setSearching(true)
+      try {
+        const response = await fetch(`/api/admin-customers?q=${encodeURIComponent(term)}`, {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+        })
+        const body = await response.json() as CustomerSearchResponse
+        if (!response.ok) throw new Error(body.error || 'Não foi possível buscar clientes.')
+        setCustomers(body.docs || [])
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setCustomers([])
+          setFeedback(error instanceof Error ? error.message : 'Não foi possível buscar clientes.')
+        }
+      } finally {
+        if (!controller.signal.aborted) setSearching(false)
+      }
+    }, 280)
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [query])
+
+  const selectedProduct = products.find((product) => String(product.id) === productID)
+  const availableVariants = (selectedProduct?.variants || []).filter((variant) => variant.status !== 'disabled')
+  const price = effectiveProductPrice(selectedProduct, variantSku)
+
+  function reset() {
+    setCustomer(null)
+    setQuery('')
+    setCustomers([])
+    setProductID('')
+    setVariantSku('')
+    setQuantity(1)
+    setUnitPrice('')
+    setFeedback(null)
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!customer || !productID || busy) return
+
+    let negotiatedPrice: number | null = null
+    if (price.mode === 'inquiry') {
+      negotiatedPrice = Math.round(Number(unitPrice.replace(',', '.')) * 100)
+      if (!Number.isSafeInteger(negotiatedPrice) || negotiatedPrice < 0) {
+        setFeedback('Informe um preço negociado válido para o produto sob consulta.')
+        return
+      }
+    }
+
+    setBusy(true)
+    setFeedback(null)
+    try {
+      await postSales({
+        action: 'create',
+        customerID: customer.id,
+        items: [{
+          product: productID,
+          variantSku: variantSku || null,
+          unitPriceCents: negotiatedPrice,
+          quantity,
+        }],
+      })
+      router.refresh()
+      reset()
+      closeRef.current?.click()
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Não foi possível criar a venda.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <DialogPanel
+    trigger="Nova venda"
+    title="Nova venda"
+    description="Crie uma venda confirmada sem sair do workspace. Totais e snapshots são calculados pelo servidor."
+  >
+    <form ref={portalContainerRef} className="esmera-sales-create-form esmera-sales-close-form" onSubmit={submit}>
+      <Field className="esmera-sales-customer-field" label="Cliente">
+        <ComboboxPrimitive.Root
+          items={customers}
+          value={customer}
+          filter={null}
+          onValueChange={(value) => {
+            setCustomer(value)
+            setQuery('')
+            setCustomers(value ? [value] : [])
+            setFeedback(null)
+          }}
+          onInputValueChange={(value, { reason }) => {
+            if (reason === 'item-press') return
+            setQuery(value)
+            setFeedback(null)
+            if (reason === 'input-change' || reason === 'input-clear' || reason === 'clear-press') setCustomer(null)
+            if (value.trim().length < 2) {
+              setCustomers([])
+              setSearching(false)
+            }
+          }}
+          itemToStringLabel={customerSearchLabel}
+          isItemEqualToValue={(item, value) => String(item.id) === String(value.id)}
+        >
+          <ComboboxPrimitive.InputGroup className="esmera-sales-customer-combobox">
+            <ComboboxPrimitive.Input
+              className={`esmera-input ${comboboxClasses.input}`}
+              required
+              placeholder="Digite nome, empresa ou telefone"
+              aria-label="Buscar cliente"
+            />
+            <ComboboxPrimitive.Trigger className={comboboxClasses.trigger} aria-label="Abrir resultados">⌄</ComboboxPrimitive.Trigger>
+          </ComboboxPrimitive.InputGroup>
+          <ComboboxPrimitive.Portal container={portalContainerRef} className="esmera-sales-customer-portal">
+            <ComboboxPrimitive.Positioner className={comboboxClasses.positioner} sideOffset={4} align="start">
+              <ComboboxPrimitive.Popup className={`${comboboxClasses.popup} esmera-sales-customer-popup`} aria-busy={searching || undefined}>
+                <ComboboxPrimitive.Empty className="esmera-sales-customer-empty">
+                  {searching ? 'Buscando clientes…' : query.trim().length < 2 ? 'Digite ao menos 2 caracteres.' : 'Nenhum cliente encontrado.'}
+                </ComboboxPrimitive.Empty>
+                <ComboboxPrimitive.List className="esmera-sales-customer-list">
+                  {(item: CustomerRef) => <ComboboxPrimitive.Item key={String(item.id)} className={comboboxClasses.item} value={item}>
+                    <span className="esmera-sales-customer-result"><strong>{item.name || 'Cliente'}</strong><small>{[item.company, item.phone].filter(Boolean).join(' · ') || 'Sem identificação complementar'}</small></span>
+                  </ComboboxPrimitive.Item>}
+                </ComboboxPrimitive.List>
+              </ComboboxPrimitive.Popup>
+            </ComboboxPrimitive.Positioner>
+          </ComboboxPrimitive.Portal>
+        </ComboboxPrimitive.Root>
+      </Field>
+
+      <div className="esmera-sales-create-grid">
+        <Field label="Produto">
+          <select className="esmera-input" required value={productID} onChange={(event) => {
+            setProductID(event.target.value)
+            setVariantSku('')
+            setUnitPrice('')
+          }}>
+            <option value="">Selecione</option>
+            {products.map((product) => <option key={String(product.id)} value={String(product.id)}>{product.title || product.code || product.id}</option>)}
+          </select>
+        </Field>
+        {availableVariants.length ? <Field label="Variante">
+          <select className="esmera-input" value={variantSku} onChange={(event) => {
+            setVariantSku(event.target.value)
+            setUnitPrice('')
+          }}>
+            <option value="">Produto base</option>
+            {availableVariants.map((variant) => <option key={variant.sku || ''} value={variant.sku || ''}>{variant.sku || 'Sem SKU'}</option>)}
+          </select>
+        </Field> : null}
+        <Field label="Quantidade">
+          <input className="esmera-input" type="number" min={1} step={1} required value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value) || 1))} />
+        </Field>
+        <Field label="Preço unitário">
+          {price.mode === 'fixed'
+            ? <output className="esmera-sales-fixed-price">{money(price.cents)}</output>
+            : <input className="esmera-input" inputMode="decimal" required={Boolean(productID)} value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} placeholder="0,00" />}
+        </Field>
+      </div>
+
+      {feedback ? <InlineFeedback tone="danger">{feedback}</InlineFeedback> : null}
+      <div className="esmera-actions esmera-sales-create-actions">
+        <Dialog.Close ref={closeRef} className="esmera-button" type="button">Cancelar</Dialog.Close>
+        <Button type="submit" tone="primary" disabled={busy || !customer || !productID}>
+          {busy ? 'Criando venda…' : 'Criar venda'}
+        </Button>
+      </div>
+    </form>
+  </DialogPanel>
 }
 
 export function SalesWorkspaceClient(props: Props) {

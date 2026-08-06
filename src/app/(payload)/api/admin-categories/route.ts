@@ -18,7 +18,7 @@ import { RevisionConflictError, STOREFRONT_CONTRACT_VERSION, type PublicationAss
 
 export const dynamic = 'force-dynamic'
 
-type CategoryAction = 'save-draft' | 'save-and-publish' | 'publish' | 'unpublish' | 'reorder'
+type CategoryAction = 'create' | 'save-draft' | 'save-and-publish' | 'publish' | 'unpublish' | 'reorder'
 
 type RequestBody = {
   action?: CategoryAction
@@ -150,6 +150,35 @@ export async function POST(request: Request) {
     body = await request.json() as RequestBody
   } catch {
     return adminCodedError('invalid_request', { summary: 'Corpo da requisição inválido.' })
+  }
+
+  if (body.action === 'create') {
+    const data = categoryDraftData(body.data)
+    const title = String(data.title || '').trim()
+    if (!title) return adminInputError('Informe o nome da categoria.')
+
+    try {
+      const category = await payload.create({
+        collection: 'categories',
+        data: {
+          title,
+          parent: data.parent ?? null,
+          status: data.status || 'active',
+          _status: 'draft',
+        } as never,
+        draft: true,
+        depth: 0,
+        overrideAccess: false,
+        user,
+      })
+      return NextResponse.json({ id: category.id, created: 1 })
+    } catch (error) {
+      return adminErrorResponse(error, {
+        entity: 'category',
+        operation: 'create',
+        logger: payload.logger,
+      })
+    }
   }
 
   if (body.action === 'save-draft') {
