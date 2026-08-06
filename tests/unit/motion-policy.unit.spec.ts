@@ -17,6 +17,7 @@ const tokens = source('src/admin/design-system/tokens.scss')
 const advanced = source('src/admin/design-system/advanced-interactions.scss')
 const reconciled = source('src/admin/design-system/reconciled-interactions.scss')
 const shell = source('src/admin/shell/shell.scss')
+const nav = source('src/admin/components/nav.scss')
 const adminStateProvider = source('src/admin/state/AdminStateProvider.tsx')
 const packageJSON = source('package.json')
 
@@ -53,6 +54,16 @@ describe('Política de motion — guarda estática', () => {
     }
     const afterSales = source('src/admin/modules/after-sales/after-sales.scss')
     expect(afterSales).not.toMatch(/transition:[^;]*grid-template-columns/)
+  })
+
+  it('documenta a exceção de width do rail por hit-testing sem liberar outras propriedades de layout', () => {
+    expect(nav).toContain('getBoundingClientRect() ignora clip-path')
+    expect(nav).toContain('transition: width var(--esmera-motion-fast) var(--esmera-ease-exit)')
+    expect(nav).toContain('transition: width var(--esmera-motion-fast) var(--esmera-ease-enter)')
+    const withoutApprovedRailWidth = nav
+      .replaceAll('transition: width var(--esmera-motion-fast) var(--esmera-ease-exit);', '')
+      .replaceAll('transition: width var(--esmera-motion-fast) var(--esmera-ease-enter);', '')
+    expect(withoutApprovedRailWidth).not.toMatch(/transition:[^;]*(?:width|height|grid-template-columns)/)
   })
 
   it('não reintroduz os aliases de transição legados --esmera-transition-fast/--esmera-transition-panel', () => {

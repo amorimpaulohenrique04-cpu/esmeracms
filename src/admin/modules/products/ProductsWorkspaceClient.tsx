@@ -492,7 +492,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
       <FilterPanel
         className="esmera-products-filter-panel"
         primary={<>
-          <label className="esmera-products-search"><span>Buscar</span><input className="esmera-input" name="q" defaultValue={filters.q} placeholder="Título, código, slug ou material" /></label>
+          <label className="esmera-products-search"><span>Buscar</span><input className="esmera-input" type="search" name="q" defaultValue={filters.q} placeholder="Título, código, slug ou material" /></label>
           <label><span>Catálogo</span><select className="esmera-input" name="status" defaultValue={filters.status}><option value="all">Todos</option><option value="active">Ativos</option><option value="archived">Arquivados</option></select></label>
           <label><span>Publicação</span><select className="esmera-input" name="publication" defaultValue={filters.publication}><option value="all">Todos</option><option value="published">Publicados</option><option value="draft">Rascunhos</option><option value="ready">Prontos</option><option value="issues">Com pendências</option></select></label>
         </>}

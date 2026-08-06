@@ -10,11 +10,11 @@ import {
   findDocs,
   PageHeader,
   QueryError,
-  TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
 import { createDocumentRevision } from '../../../server/publication/revision'
 import { CategoriesMasterList } from './CategoriesMasterList'
+import { CategoryCreateDialog } from './CategoryCreateDialog'
 import { CategoryDetailView } from './CategoryDetailView'
 import { CategoryRelatedProductsPanel } from './CategoryRelatedProductsPanel'
 import {
@@ -27,6 +27,7 @@ import {
   type CategoryWorkspaceFilters,
 } from './types'
 import './categories.scss'
+import './category-create-dialog.scss'
 
 const categoryTabs: CategoryTab[] = ['general', 'media', 'products']
 
@@ -180,7 +181,7 @@ export async function CategoriesView(props: AdminViewServerProps) {
           eyebrow="Catálogo"
           title="Categorias"
           subtitle="Taxonomia operacional em master-detail. Relações com produtos são derivadas; ordem e hierarquia permanecem governadas pelo Payload."
-          actions={<TechnicalLink href="/admin/collections/categories/create" primary>Nova categoria</TechnicalLink>}
+          actions={<CategoryCreateDialog categories={allResult.docs} />}
         />
         <div className={`esmera-categories-workspace${detail ? ' has-detail' : ''}`}>
           <CategoriesMasterList categories={categories} allOrderIds={allResult.docs.map((category) => category.id)} filters={filters} selectedId={categoryId} />

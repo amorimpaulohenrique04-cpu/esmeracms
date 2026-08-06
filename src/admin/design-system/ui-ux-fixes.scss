@@ -313,6 +313,12 @@
   }
 }
 
+@container esmera-workspace (max-width: 560px) {
+  .esmera-products-search {
+    min-width: 0;
+  }
+}
+
 @media (max-width: 700px) {
   .esmera-error-summary,
   .esmera-publication-checklist > header,

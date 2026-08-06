@@ -158,6 +158,42 @@ async function transferPolymorphicRelations(payload: Payload, user: unknown, sou
   }
 }
 
+export async function GET(request: Request) {
+  const payload = await getPayload({ config })
+  const { user } = await payload.auth({ headers: request.headers })
+  if (!user) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+  if (!canManageBusiness(user)) return NextResponse.json({ error: 'Sem permissão para consultar clientes.' }, { status: 403 })
+
+  const query = new URL(request.url).searchParams.get('q')?.trim().slice(0, 80) || ''
+  if (query.length < 2) return NextResponse.json({ docs: [] })
+
+  const result = await payload.find({
+    collection: 'customers',
+    depth: 0,
+    limit: 8,
+    pagination: false,
+    overrideAccess: false,
+    user,
+    where: {
+      or: [
+        { name: { like: query } },
+        { company: { like: query } },
+        { phone: { like: query } },
+      ],
+    } as Where,
+    select: { id: true, name: true, company: true, phone: true },
+  })
+
+  return NextResponse.json({
+    docs: result.docs.map((customer) => ({
+      id: customer.id,
+      name: customer.name,
+      company: customer.company,
+      phone: customer.phone,
+    })),
+  })
+}
+
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers: request.headers })

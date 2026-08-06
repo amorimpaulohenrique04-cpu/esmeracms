@@ -78,7 +78,7 @@
   // não deriva do conteúdo), então o workspace nunca se move nos dois estados.
   .esmera-nav {
     position: relative;
-    z-index: var(--esmera-z-popover);
+    z-index: var(--esmera-z-nav-peek);
     width: var(--esmera-rail-width);
     padding: 14px 8px 12px;
     overflow: hidden;
