@@ -1,0 +1,322 @@
+/*
+ * High-confidence UI/UX corrections reported after real admin use.
+ * Kept as a late-loaded reconciliation layer so module bundles cannot win by
+ * import order while the shared rules are gradually absorbed by their owners.
+ */
+
+/* Command palette: reserve the synchronous home layout while remote actions load. */
+@media (min-width: 621px) {
+  .esmera-command-home-group--quick .esmera-command-compact-list {
+    min-height: 248px;
+  }
+}
+
+/* Product filters: native select chrome and module load order must not change geometry. */
+.esmera-products-filter-panel .esmera-input,
+.esmera-products-filter-panel .esmera-filter-panel__actions .esmera-button {
+  height: var(--esmera-control-standard);
+  min-height: var(--esmera-control-standard);
+  box-sizing: border-box;
+}
+
+.esmera-products-filter-panel .esmera-filter-panel__primary {
+  align-items: end;
+}
+
+.esmera-filter-panel__advanced-panel {
+  gap: var(--esmera-space-3);
+  padding: var(--esmera-space-4);
+  border-color: var(--esmera-line-default);
+  background: var(--esmera-surface-panel);
+  box-shadow: var(--esmera-shadow-interactive);
+}
+
+/* Product quick draft: flexible field count and full-width explanatory copy. */
+.esmera-product-draft-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.esmera-product-draft-form__hint {
+  grid-column: 1 / -1;
+}
+
+/* Complete the shared form-system states that were not covered by form-system.scss. */
+.esmera-error-summary {
+  display: grid;
+  gap: var(--esmera-space-3);
+  padding: var(--esmera-space-4);
+  border: 1px solid color-mix(in srgb, var(--esmera-danger) 42%, var(--esmera-line-default));
+  border-left: 3px solid var(--esmera-danger);
+  border-radius: var(--esmera-control-radius);
+  background: var(--esmera-danger-soft);
+  color: var(--esmera-text);
+}
+
+.esmera-error-summary:focus-visible {
+  outline: 2px solid var(--esmera-focus);
+  outline-offset: 2px;
+}
+
+.esmera-error-summary > strong {
+  font-size: var(--esmera-font-body);
+  font-weight: var(--esmera-weight-semibold);
+}
+
+.esmera-error-summary ul {
+  display: grid;
+  gap: var(--esmera-space-2);
+  margin: 0;
+  padding-left: 20px;
+}
+
+.esmera-error-summary li {
+  color: var(--esmera-text-secondary);
+}
+
+.esmera-error-summary button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.esmera-error-summary li small,
+.esmera-error-summary__trace {
+  display: block;
+  margin-top: 3px;
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-meta);
+}
+
+.esmera-publication-checklist {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-panel-radius);
+  background: var(--esmera-surface-panel);
+}
+
+.esmera-publication-checklist > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esmera-space-3);
+  padding: var(--esmera-space-4);
+  border-bottom: 1px solid var(--esmera-line-default);
+}
+
+.esmera-publication-checklist > header strong,
+.esmera-publication-checklist > header span {
+  display: block;
+}
+
+.esmera-publication-checklist > header strong {
+  font-size: var(--esmera-font-body);
+  font-weight: var(--esmera-weight-semibold);
+}
+
+.esmera-publication-checklist > header span {
+  margin-top: 3px;
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-meta);
+}
+
+.esmera-publication-checklist output {
+  min-width: 32px;
+  min-height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--esmera-line-default);
+  border-radius: 999px;
+  background: var(--esmera-surface-raised);
+  color: var(--esmera-text-secondary);
+  font-size: var(--esmera-font-ui-sm);
+  font-weight: var(--esmera-weight-semibold);
+}
+
+.esmera-publication-checklist output.has-blockers {
+  border-color: var(--esmera-danger);
+  background: var(--esmera-danger-soft);
+  color: var(--esmera-danger);
+}
+
+.esmera-publication-checklist output.is-ready {
+  border-color: var(--esmera-success);
+  background: var(--esmera-success-soft);
+  color: var(--esmera-success);
+}
+
+.esmera-publication-checklist__group {
+  padding: var(--esmera-space-4);
+  border-left: 3px solid var(--esmera-info);
+}
+
+.esmera-publication-checklist__group + .esmera-publication-checklist__group {
+  border-top: 1px solid var(--esmera-line-subtle);
+}
+
+.esmera-publication-checklist__group.is-blockers {
+  border-left-color: var(--esmera-danger);
+  background: var(--esmera-danger-soft);
+}
+
+.esmera-publication-checklist__group.is-warnings {
+  border-left-color: var(--esmera-warning);
+  background: var(--esmera-warning-soft);
+}
+
+.esmera-publication-checklist__group.is-recommendations {
+  border-left-color: var(--esmera-info);
+  background: var(--esmera-info-soft);
+}
+
+.esmera-publication-checklist__group h3 {
+  margin: 0 0 var(--esmera-space-2);
+  font-size: var(--esmera-font-ui-sm);
+  font-weight: var(--esmera-weight-semibold);
+}
+
+.esmera-publication-checklist__group ul {
+  display: grid;
+  gap: var(--esmera-space-2);
+  margin: 0;
+  padding-left: 18px;
+}
+
+.esmera-publication-checklist__group button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--esmera-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.esmera-publication-checklist__group small {
+  display: block;
+  margin-top: 3px;
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-meta);
+}
+
+/* After-sales: both actions are grid cells on the same control baseline. */
+.esmera-after-sales-toolbar {
+  align-items: stretch;
+}
+
+.esmera-after-sales-filters__primary {
+  grid-template-columns: minmax(240px, 1.6fr) minmax(128px, .72fr) minmax(150px, .85fr) auto auto;
+  align-items: end;
+}
+
+.esmera-after-sales-filters__primary > .esmera-button,
+.esmera-after-sales-filters__primary > [data-root] > .esmera-button,
+.esmera-after-sales-filters__primary > button {
+  height: 38px;
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.esmera-after-sales-filters > .esmera-filter-panel__advanced {
+  position: relative;
+}
+
+.esmera-after-sales-filters .esmera-filter-panel__advanced-panel {
+  width: min(620px, calc(100vw - 48px));
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto;
+  align-items: end;
+}
+
+/* Reports: input and submit controls share one explicit visual height. */
+.esmera-report-filter-period .esmera-input,
+.esmera-report-filter-primary > .esmera-button {
+  height: var(--esmera-control-standard);
+  min-height: var(--esmera-control-standard);
+  box-sizing: border-box;
+}
+
+/* Mobile navigation follows the same Base UI motion contract as drawers. */
+.esmera-mobile-nav-backdrop {
+  opacity: 1;
+  transition: opacity var(--esmera-motion-panel) var(--esmera-ease-enter);
+}
+
+.esmera-mobile-nav-backdrop[data-starting-style],
+.esmera-mobile-nav-backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+.esmera-mobile-nav-backdrop[data-ending-style] {
+  transition-duration: var(--esmera-motion-fast);
+  transition-timing-function: var(--esmera-ease-exit);
+}
+
+.esmera-mobile-nav {
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity var(--esmera-motion-panel) var(--esmera-ease-enter),
+    transform var(--esmera-motion-panel) var(--esmera-ease-enter);
+  will-change: transform;
+}
+
+.esmera-mobile-nav[data-starting-style],
+.esmera-mobile-nav[data-ending-style] {
+  opacity: .98;
+  transform: translateX(-100%);
+}
+
+.esmera-mobile-nav[data-ending-style] {
+  transition-duration: var(--esmera-motion-fast);
+  transition-timing-function: var(--esmera-ease-exit);
+}
+
+@media (max-width: 420px) {
+  .esmera-mobile-nav {
+    width: 100%;
+    border-right: 0;
+  }
+}
+
+@media (min-width: 421px) and (max-width: 767px) {
+  .esmera-mobile-nav {
+    width: min(360px, calc(100vw - 24px));
+    border-right: 1px solid var(--esmera-line-default);
+  }
+
+  .esmera-mobile-nav-viewport {
+    justify-items: start;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .esmera-mobile-nav {
+    width: min(380px, calc(100vw - 48px));
+  }
+}
+
+@media (max-width: 760px) {
+  .esmera-after-sales-filters__primary,
+  .esmera-after-sales-filters .esmera-filter-panel__advanced-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .esmera-after-sales-filters__primary > *,
+  .esmera-after-sales-filters .esmera-filter-panel__advanced-panel > * {
+    width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .esmera-error-summary,
+  .esmera-publication-checklist > header,
+  .esmera-publication-checklist__group {
+    padding: var(--esmera-space-3);
+  }
+}

@@ -151,6 +151,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const keyboardNavigationRef = useRef(false)
+  const closingResetTimerRef = useRef<number | null>(null)
   const [query, setQuery] = useState('')
   const [serverResults, setServerResults] = useState<CommandResult[]>([])
   const [serverResultQuery, setServerResultQuery] = useState('')
@@ -162,6 +163,10 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   const [showAll, setShowAll] = useState(false)
   const [compactViewport, setCompactViewport] = useState(false)
   const [continuityVersion, setContinuityVersion] = useState(0)
+
+  useEffect(() => () => {
+    if (closingResetTimerRef.current !== null) window.clearTimeout(closingResetTimerRef.current)
+  }, [])
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
@@ -206,7 +211,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
 
   const results = useMemo(() => {
     void continuityVersion
-    const local = open ? localCommands(selection, currentHref) : []
+    const local = localCommands(selection, currentHref)
     const needle = query.trim().toLocaleLowerCase('pt-BR')
     const filteredLocal = needle ? local.filter((item) => matchesQuery(item, needle)) : local
     const previousQuery = serverResultQuery.toLocaleLowerCase('pt-BR')
@@ -217,7 +222,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
       ? serverResults.filter((item) => matchesQuery(item, needle))
       : serverResults
     return uniqueResults([...filteredLocal, ...visibleServerResults]).slice(0, 40)
-  }, [continuityVersion, currentHref, open, query, selection, serverResultQuery, serverResults])
+  }, [continuityVersion, currentHref, query, selection, serverResultQuery, serverResults])
 
   const recentResults = useMemo(() => results.filter((result) => result.group === 'Recentes').slice(0, 5), [results])
   const quickActions = useMemo(() => {
@@ -266,7 +271,19 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
     setFilter('all')
     setShowAll(false)
   }
-  const handleOpenChange = (nextOpen: boolean) => { if (!nextOpen) reset(); onOpenChange(nextOpen) }
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (closingResetTimerRef.current !== null) {
+      window.clearTimeout(closingResetTimerRef.current)
+      closingResetTimerRef.current = null
+    }
+    onOpenChange(nextOpen)
+    if (!nextOpen) {
+      closingResetTimerRef.current = window.setTimeout(() => {
+        reset()
+        closingResetTimerRef.current = null
+      }, 160)
+    }
+  }
   const goTo = (result: CommandResult | undefined) => { if (!result) return; handleOpenChange(false); beginNavigation(result.href); router.push(result.href) }
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') { event.preventDefault(); keyboardNavigationRef.current = true; setActiveIndex((index) => navigableResults.length ? (index + 1) % navigableResults.length : 0) }

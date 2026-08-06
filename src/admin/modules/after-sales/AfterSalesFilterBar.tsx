@@ -13,6 +13,7 @@ import {
   type TaskType,
 } from '../../../businessRules/afterSales/model'
 import { Button } from '../../design-system'
+import { FilterPanelAdvanced } from '../../design-system/FilterPanelAdvanced'
 import type { AfterSalesCase, AfterSalesFilters, UserRef } from './types'
 import { relationLabel } from './workspace'
 
@@ -84,18 +85,15 @@ export function AfterSalesFilterBar({ cases, users, filters, selectedCaseId, bus
           <label><span>Status</span><select className="esmera-input" name="status" defaultValue={filters.status}><option value="open">Abertos</option><option value="done">Concluídos</option><option value="all">Todos</option></select></label>
           <label><span>Responsável</span><select className="esmera-input" name="owner" defaultValue={filters.owner}><option value="">Todos</option>{users.map((user) => <option key={String(user.id)} value={String(user.id)}>{user.name || user.email || user.id}</option>)}</select></label>
           <Button type="submit">Aplicar</Button>
+          <FollowUpDialog key={String(selectedCaseId || 'none')} cases={cases} users={users} selectedCaseId={selectedCaseId} busy={busy} onCreate={onCreate} />
         </div>
-        <details className="esmera-after-sales-advanced" open={hasAdvancedFilters || undefined}>
-          <summary>Mais filtros{hasAdvancedFilters ? ' · ativos' : ''}</summary>
-          <div className="esmera-after-sales-advanced__panel">
-            <label><span>Prioridade</span><select className="esmera-input" name="priority" defaultValue={filters.priority}><option value="">Todas</option>{operationalPriorities.map((value) => <option key={value} value={value}>{operationalPriorityLabels[value]}</option>)}</select></label>
-            <label><span>Tipo</span><select className="esmera-input" name="type" defaultValue={filters.type}><option value="">Todos</option>{taskTypes.map((value) => <option key={value} value={value}>{taskTypeLabels[value]}</option>)}<option value="shipment">Entrega</option><option value="occurrence">Ocorrência</option></select></label>
-            <Button type="submit">Aplicar recorte</Button>
-            <Link className="esmera-button esmera-button--quiet" href="/admin/after-sales">Limpar</Link>
-          </div>
-        </details>
+        <FilterPanelAdvanced label="Mais filtros" active={hasAdvancedFilters}>
+          <label><span>Prioridade</span><select className="esmera-input" name="priority" defaultValue={filters.priority}><option value="">Todas</option>{operationalPriorities.map((value) => <option key={value} value={value}>{operationalPriorityLabels[value]}</option>)}</select></label>
+          <label><span>Tipo</span><select className="esmera-input" name="type" defaultValue={filters.type}><option value="">Todos</option>{taskTypes.map((value) => <option key={value} value={value}>{taskTypeLabels[value]}</option>)}<option value="shipment">Entrega</option><option value="occurrence">Ocorrência</option></select></label>
+          <Button type="submit">Aplicar recorte</Button>
+          <Link className="esmera-button esmera-button--quiet" href="/admin/after-sales">Limpar</Link>
+        </FilterPanelAdvanced>
       </form>
-      <FollowUpDialog key={String(selectedCaseId || 'none')} cases={cases} users={users} selectedCaseId={selectedCaseId} busy={busy} onCreate={onCreate} />
     </div>
   )
 }
