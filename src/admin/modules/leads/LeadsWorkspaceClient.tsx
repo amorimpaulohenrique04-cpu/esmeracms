@@ -68,11 +68,19 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
   const selected = useMemo(() => data.find((item) => String(item.id) === String(selectedId)) || null, [data, selectedId])
 
   return (
+    <>
+    <form className="esmera-leads-filters" method="get" action="/admin/leads">
+      <label className="esmera-leads-search"><span>Buscar</span><input className="esmera-input" type="search" name="q" defaultValue={filters.q} placeholder="Nome, telefone, e-mail ou nota" /></label>
+      <div className="esmera-leads-filters__actions">
+        <Button type="submit">Aplicar</Button>
+        <Link className="esmera-button esmera-button--quiet" href="/admin/leads">Limpar</Link>
+      </div>
+    </form>
     <SplitWorkspace
       master={
         data.length ? (
-          <DataTable label="Leads">
-            <thead><tr><th>Nome</th><th>Contato</th><th>Origem</th><th>Status</th><th>Recebido</th></tr></thead>
+          <DataTable label="Leads" className="esmera-leads-table">
+            <thead><tr><th>Nome</th><th>Contato</th><th className="esmera-leads-table__origin">Origem</th><th>Status</th><th className="esmera-leads-table__date">Recebido</th></tr></thead>
             <tbody>
               {data.map((lead) => (
                 <tr
@@ -83,9 +91,9 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
                 >
                   <td><strong>{lead.name || 'Sem nome'}</strong></td>
                   <td>{lead.phone || lead.email || '—'}</td>
-                  <td>{sourceLabels[lead.source || ''] || lead.source || '—'}</td>
+                  <td className="esmera-leads-table__origin">{sourceLabels[lead.source || ''] || lead.source || '—'}</td>
                   <td><Status tone={opportunityId(lead.opportunity) ? 'success' : 'neutral'}>{opportunityId(lead.opportunity) ? 'Qualificado' : 'Novo'}</Status></td>
-                  <td>{shortDate(lead.createdAt)}</td>
+                  <td className="esmera-leads-table__date">{shortDate(lead.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -122,5 +130,6 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
         </ContextInspector>
       ) : undefined}
     />
+    </>
   )
 }

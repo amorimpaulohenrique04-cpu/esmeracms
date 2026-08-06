@@ -405,7 +405,7 @@
 .esmera-quick-actions__item { min-height: var(--esmera-control-compact); display: flex; align-items: center; padding: 0 10px; border-radius: var(--esmera-radius-6); color: var(--esmera-text); font-size: var(--esmera-font-ui-sm); text-decoration: none; }
 .esmera-quick-actions__item:hover { background: var(--esmera-surface-selected); }
 
-@media (max-width: 900px) {
+@container esmera-workspace (max-width: 900px) {
   .esmera-split-workspace { grid-template-columns: 1fr; }
   .esmera-split-workspace.has-detail .esmera-split-workspace__master { display: none; }
 }
