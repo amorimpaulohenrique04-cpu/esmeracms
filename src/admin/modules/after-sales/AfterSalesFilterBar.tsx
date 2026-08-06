@@ -56,15 +56,24 @@ function RegisterCaseDialog({ sales, busy, onCreate, onCaseCreated }: {
   </Dialog.Root>
 }
 
-function FollowUpDialog({ cases, users, selectedCaseId, busy, onCreate }: {
+function saleIdOfCase(cases: AfterSalesCase[], caseId: string | number | null) {
+  if (caseId === null) return ''
+  const match = cases.find((item) => String(item.id) === String(caseId))
+  const sale = match?.sale
+  if (!sale) return ''
+  return String(typeof sale === 'object' ? sale.id : sale)
+}
+
+function FollowUpDialog({ cases, sales, users, selectedCaseId, busy, onCreate }: {
   cases: AfterSalesCase[]
+  sales: SaleOption[]
   users: UserRef[]
   selectedCaseId: string | number | null
   busy: boolean
   onCreate: OperateFn
 }) {
   const [open, setOpen] = useState(false)
-  const [caseId, setCaseId] = useState(String(selectedCaseId || cases[0]?.id || ''))
+  const [saleId, setSaleId] = useState(() => saleIdOfCase(cases, selectedCaseId) || String(sales[0]?.id || ''))
   const [title, setTitle] = useState('')
   const [type, setType] = useState<TaskType>('satisfaction')
   const [dueAt, setDueAt] = useState('')
@@ -78,17 +87,17 @@ function FollowUpDialog({ cases, users, selectedCaseId, busy, onCreate }: {
       <Dialog.Backdrop className="esmera-overlay-backdrop" />
       <Dialog.Viewport className="esmera-dialog-viewport">
         <Dialog.Popup className="esmera-dialog esmera-after-sales-dialog">
-          <div className="esmera-overlay-header"><div><Dialog.Title>Novo follow-up</Dialog.Title><Dialog.Description>Cria uma Task consultável e vinculada ao caso, à venda e ao cliente.</Dialog.Description></div><Dialog.Close className="esmera-icon-button" aria-label="Fechar">×</Dialog.Close></div>
+          <div className="esmera-overlay-header"><div><Dialog.Title>Novo follow-up</Dialog.Title><Dialog.Description>Escolha a venda. O caso de pós-venda é encontrado ou criado automaticamente.</Dialog.Description></div><Dialog.Close className="esmera-icon-button" aria-label="Fechar">×</Dialog.Close></div>
           <form className="esmera-overlay-body esmera-after-sales-form" onSubmit={(event) => {
             event.preventDefault()
-            void onCreate({ action: 'create-task', caseId, title, type, dueAt, priority, assignee: assignee || null, notes }).then(() => {
+            void onCreate({ action: 'create-task', saleId, title, type, dueAt, priority, assignee: assignee || null, notes }).then(() => {
               setOpen(false)
               setTitle('')
               setDueAt('')
               setNotes('')
             })
           }}>
-            <label><span>Caso</span><select className="esmera-input" required value={caseId} onChange={(event) => setCaseId(event.target.value)}><option value="">Selecione</option>{cases.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.caseNumber || item.id} · {relationLabel(item.customer, 'Cliente')}</option>)}</select></label>
+            <label><span>Venda</span><select className="esmera-input" required value={saleId} onChange={(event) => setSaleId(event.target.value)}><option value="">Selecione</option>{sales.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.number || item.id} · {relationLabel(item.customer, 'Cliente')}</option>)}</select></label>
             <label><span>Objetivo</span><input className="esmera-input" required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: confirmar recebimento da peça" /></label>
             <div className="esmera-after-sales-form__grid">
               <label><span>Tipo</span><select className="esmera-input" value={type} onChange={(event) => setType(event.target.value as TaskType)}>{taskTypes.map((value) => <option key={value} value={value}>{taskTypeLabels[value]}</option>)}</select></label>
@@ -97,7 +106,7 @@ function FollowUpDialog({ cases, users, selectedCaseId, busy, onCreate }: {
               <label><span>Responsável</span><select className="esmera-input" value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="">Responsável do caso</option>{users.map((user) => <option key={String(user.id)} value={String(user.id)}>{user.name || user.email || user.id}</option>)}</select></label>
             </div>
             <label><span>Observações</span><textarea className="esmera-input" rows={4} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
-            <div className="esmera-actions"><Dialog.Close className="esmera-button" type="button">Cancelar</Dialog.Close><Button type="submit" disabled={busy || !cases.length}>{busy ? 'Criando…' : 'Criar follow-up'}</Button></div>
+            <div className="esmera-actions"><Dialog.Close className="esmera-button" type="button">Cancelar</Dialog.Close><Button type="submit" disabled={busy || !sales.length}>{busy ? 'Criando…' : 'Criar follow-up'}</Button></div>
           </form>
         </Dialog.Popup>
       </Dialog.Viewport>
@@ -127,7 +136,7 @@ export function AfterSalesFilterBar({ cases, sales, users, filters, selectedCase
           <label><span>Responsável</span><select className="esmera-input" name="owner" defaultValue={filters.owner}><option value="">Todos</option>{users.map((user) => <option key={String(user.id)} value={String(user.id)}>{user.name || user.email || user.id}</option>)}</select></label>
           <Button type="submit">Aplicar</Button>
           <RegisterCaseDialog sales={sales} busy={busy} onCreate={onCreate} onCaseCreated={onCaseCreated} />
-          <FollowUpDialog key={String(selectedCaseId || 'none')} cases={cases} users={users} selectedCaseId={selectedCaseId} busy={busy} onCreate={onCreate} />
+          <FollowUpDialog key={String(selectedCaseId || 'none')} cases={cases} sales={sales} users={users} selectedCaseId={selectedCaseId} busy={busy} onCreate={onCreate} />
         </div>
         <FilterPanelAdvanced label="Mais filtros" active={hasAdvancedFilters}>
           <label><span>Prioridade</span><select className="esmera-input" name="priority" defaultValue={filters.priority}><option value="">Todas</option>{operationalPriorities.map((value) => <option key={value} value={value}>{operationalPriorityLabels[value]}</option>)}</select></label>
