@@ -41,12 +41,6 @@
 }
 
 /* Complete the shared form-system states that were not covered by form-system.scss. */
-.esmera-form-shell {
-  min-width: 0;
-  display: grid;
-  gap: var(--esmera-space-5);
-}
-
 .esmera-error-summary {
   display: grid;
   gap: var(--esmera-space-3);
