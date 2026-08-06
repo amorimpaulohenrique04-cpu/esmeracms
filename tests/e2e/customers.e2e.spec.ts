@@ -115,7 +115,7 @@ test.describe('Customer relational workspace', () => {
     await expect(page.getByText('Disponível após a migração de Opportunities na Etapa 8')).toHaveCount(0)
 
     await page.goto(`http://localhost:3000/admin/customers?customer=${customerId}&tab=history`)
-    await expect(page.getByText(noteText)).toBeVisible()
+    await expect(page.getByText(noteText).filter({ visible: true })).toBeVisible()
     await expect(page.getByText(`Interesse adicionado: ${productTitle}`)).toBeVisible()
 
     await page.goto(`http://localhost:3000/admin/customers?customer=${customerId}&tab=interests`)
@@ -127,7 +127,7 @@ test.describe('Customer relational workspace', () => {
     await expect(page.getByText('Confirmada', { exact: true })).toBeVisible()
 
     await page.goto(`http://localhost:3000/admin/customers?customer=${customerId}&tab=notes`)
-    await expect(page.getByText(noteText)).toBeVisible()
+    await expect(page.getByText(noteText).filter({ visible: true })).toBeVisible()
 
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(`http://localhost:3000/admin/customers?customer=${customerId}&tab=overview`)
