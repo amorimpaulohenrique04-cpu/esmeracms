@@ -1,6 +1,8 @@
 /* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
+import { Suspense } from 'react'
 import type { AdminViewServerProps, Where } from 'payload'
 
+import { LoadingState } from '../../design-system'
 import {
   AccessDenied,
   countDocs,
@@ -14,6 +16,7 @@ import {
 import { createDocumentRevision } from '../../../server/publication/revision'
 import { CategoriesMasterList } from './CategoriesMasterList'
 import { CategoryDetailView } from './CategoryDetailView'
+import { CategoryRelatedProductsPanel } from './CategoryRelatedProductsPanel'
 import {
   relationId,
   type CategoryDetail,
@@ -22,7 +25,6 @@ import {
   type CategoryParent,
   type CategoryTab,
   type CategoryWorkspaceFilters,
-  type RelatedProduct,
 } from './types'
 import './categories.scss'
 
@@ -140,30 +142,20 @@ export async function CategoriesView(props: AdminViewServerProps) {
 
     let detail: CategoryDetail | null = null
     let media: CategoryMedia[] = []
-    let relatedProducts: RelatedProduct[] = []
     let relatedTotal = 0
 
     if (categoryId) {
       detail = await selectedDetail(props, categoryId)
-      const [mediaResult, productsResult, productsCount] = await Promise.all([
+      const [mediaResult, productsCount] = await Promise.all([
         findDocs<CategoryMedia>(req, 'media', {
           sort: '-updatedAt',
           limit: 100,
           depth: 0,
           select: { id: true, filename: true, url: true, alt: true },
         }),
-        findDocs<RelatedProduct>(req, 'products', {
-          sort: 'title',
-          limit: 50,
-          depth: 0,
-          draft: true,
-          where: { categories: { contains: categoryId } } as Where,
-          select: { id: true, title: true, code: true, catalogStatus: true, availability: true, _status: true },
-        }),
         countDocs(req, 'products', { categories: { contains: categoryId } } as Where),
       ])
       media = mediaResult.docs
-      relatedProducts = productsResult.docs
       relatedTotal = productsCount
       detail.productCount = relatedTotal
       detail.depth = hierarchyDepth(detail, hierarchyMap)
@@ -176,35 +168,43 @@ export async function CategoriesView(props: AdminViewServerProps) {
       .filter((term, index, terms) => terms.findIndex((candidate) => candidate.toLocaleLowerCase('pt-BR') === term.toLocaleLowerCase('pt-BR')) === index)
       .sort((left, right) => left.localeCompare(right, 'pt-BR'))
 
-    return <ViewFrame props={props}>
-      <PageHeader
-        eyebrow="Catálogo"
-        title="Categorias"
-        subtitle="Taxonomia operacional em master-detail. Relações com produtos são derivadas; ordem e hierarquia permanecem governadas pelo Payload."
-        actions={<TechnicalLink href="/admin/collections/categories/create" primary>Nova categoria</TechnicalLink>}
-      />
-      <div className={`esmera-categories-workspace${detail ? ' has-detail' : ''}`}>
-        <CategoriesMasterList categories={categories} allOrderIds={allResult.docs.map((category) => category.id)} filters={filters} selectedId={categoryId} />
-        {detail ? (
-          <CategoryDetailView
-            category={detail}
-            tab={tab}
-            filters={filters}
-            categories={allResult.docs}
-            media={media}
-            termSuggestions={termSuggestions}
-            relatedProducts={relatedProducts}
-            relatedTotal={relatedTotal}
-          />
-        ) : (
-          <section className="esmera-category-detail esmera-category-detail--empty">
-            <span className="esmera-eyebrow">Detalhe</span>
-            <h2>Selecione uma categoria</h2>
-            <p>Abra uma linha para editar taxonomia, SEO, mídia e conferir os produtos relacionados sem sair do workspace.</p>
-          </section>
-        )}
-      </div>
-    </ViewFrame>
+    const relatedSection = categoryId && tab === 'products' ? (
+      <Suspense key={`${categoryId}-${tab}`} fallback={<LoadingState compact label="Carregando produtos relacionados…" />}>
+        <CategoryRelatedProductsPanel req={req} categoryId={categoryId} />
+      </Suspense>
+    ) : <LoadingState compact label="Carregando produtos relacionados…" />
+
+    return (
+      <ViewFrame props={props}>
+        <PageHeader
+          eyebrow="Catálogo"
+          title="Categorias"
+          subtitle="Taxonomia operacional em master-detail. Relações com produtos são derivadas; ordem e hierarquia permanecem governadas pelo Payload."
+          actions={<TechnicalLink href="/admin/collections/categories/create" primary>Nova categoria</TechnicalLink>}
+        />
+        <div className={`esmera-categories-workspace${detail ? ' has-detail' : ''}`}>
+          <CategoriesMasterList categories={categories} allOrderIds={allResult.docs.map((category) => category.id)} filters={filters} selectedId={categoryId} />
+          {detail ? (
+            <CategoryDetailView
+              category={detail}
+              tab={tab}
+              filters={filters}
+              categories={allResult.docs}
+              media={media}
+              termSuggestions={termSuggestions}
+              relatedSection={relatedSection}
+              relatedTotal={relatedTotal}
+            />
+          ) : (
+            <section className="esmera-category-detail esmera-category-detail--empty">
+              <span className="esmera-eyebrow">Detalhe</span>
+              <h2>Selecione uma categoria</h2>
+              <p>Abra uma linha para editar taxonomia, SEO, mídia e conferir os produtos relacionados sem sair do workspace.</p>
+            </section>
+          )}
+        </div>
+      </ViewFrame>
+    )
   } catch (error) {
     return <ViewFrame props={props}><PageHeader title="Categorias" subtitle="Catálogo" /><QueryError title="Não foi possível consultar categorias" error={error} /></ViewFrame>
   }

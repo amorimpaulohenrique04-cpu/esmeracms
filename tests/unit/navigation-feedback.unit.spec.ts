@@ -22,7 +22,7 @@ const noModifiers = {
   defaultPrevented: false,
 }
 
-const plainAnchor = { href: '', target: null, hasDownload: false, ariaDisabled: false }
+const plainAnchor = { href: '', target: null, hasDownload: false, ariaDisabled: false, localNav: false }
 
 describe('resolveSkeletonVariant', () => {
   it('mapeia /admin para dashboard', () => {
@@ -118,6 +118,16 @@ describe('shouldTrackAnchorClick', () => {
   it('ignora elemento aria-disabled', () => {
     const anchor = { ...plainAnchor, href: 'https://cms.esmera.test/admin/products', ariaDisabled: true }
     expect(shouldTrackAnchorClick(noModifiers, anchor, current)).toBe(false)
+  })
+
+  it('ignora navegação local de aba interna', () => {
+    const anchor = { ...plainAnchor, href: 'https://cms.esmera.test/admin/categories?category=1&tab=products', localNav: true }
+    expect(shouldTrackAnchorClick(noModifiers, anchor, 'https://cms.esmera.test/admin/categories?category=1&tab=general')).toBe(false)
+  })
+
+  it('continua rastreando mudança de tab sem opt-out local', () => {
+    const anchor = { ...plainAnchor, href: 'https://cms.esmera.test/admin/categories?category=1&tab=products' }
+    expect(shouldTrackAnchorClick(noModifiers, anchor, 'https://cms.esmera.test/admin/categories?category=1&tab=general')).toBe(true)
   })
 
   it('ignora Ctrl/Cmd + clique', () => {

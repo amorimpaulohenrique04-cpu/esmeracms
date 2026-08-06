@@ -20,6 +20,7 @@ export type AnchorMeta = {
   target: string | null
   hasDownload: boolean
   ariaDisabled: boolean
+  localNav: boolean
 }
 
 /**
@@ -51,6 +52,7 @@ export function shouldTrackAnchorClick(modifiers: ClickModifiers, anchor: Anchor
   if (anchor.target === '_blank') return false
   if (anchor.hasDownload) return false
   if (anchor.ariaDisabled) return false
+  if (anchor.localNav) return false
   return isDifferentAdminRoute(anchor.href, currentHref)
 }
 

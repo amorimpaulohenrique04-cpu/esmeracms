@@ -287,7 +287,7 @@ export function SectionNav({ label = 'Seções', children, className = '' }: { l
 }
 
 export function SectionNavLink({ active = false, className = '', ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { active?: boolean }) {
-  return <a className={classes('esmera-section-nav__link', active && 'is-active', className)} aria-current={active ? 'page' : undefined} {...props} />
+  return <a data-esmera-local-nav="true" className={classes('esmera-section-nav__link', active && 'is-active', className)} aria-current={active ? 'page' : undefined} {...props} />
 }
 
 export function QuickActionMenu({

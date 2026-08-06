@@ -53,6 +53,7 @@ export function FormShell({
             <a
               key={tab.id}
               href={tab.href}
+              data-esmera-local-nav="true"
               className={`esmera-form-shell__tab${tab.id === activeTab ? ' is-active' : ''}`}
               aria-current={tab.id === activeTab ? 'page' : undefined}
               onClick={(event) => { event.preventDefault(); onTabChange?.(tab.id) }}
