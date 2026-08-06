@@ -67,12 +67,13 @@ describe('Command Palette — composição desktop e tablet', () => {
     expect(screen.getByTestId('esmera-command-palette')).not.toBeNull()
   })
 
-  it('preserva respiro inferior em notebooks sem alterar tablet ou mobile', () => {
+  it('desconta padding superior, padding inferior e margem de segurança em notebooks', () => {
     const customStyles = readFileSync(resolve(process.cwd(), 'src/app/(payload)/custom.scss'), 'utf8')
+    const expectedMaxHeight = 'calc(100dvh - min(10vh, 88px) - 18px - 48px)'
 
     expect(customStyles).toContain('@media (min-width: 1024px) and (max-height: 960px)')
-    expect(customStyles).toContain('padding: min(8vh, 72px) 18px 32px;')
-    expect(customStyles).toContain('height: min(770px, calc(100dvh - min(8vh, 72px) - 32px));')
-    expect(customStyles).toContain('max-height: calc(100dvh - min(8vh, 72px) - 32px);')
+    expect(customStyles).toContain(`height: min(770px, ${expectedMaxHeight});`)
+    expect(customStyles).toContain(`max-height: ${expectedMaxHeight};`)
+    expect(customStyles).not.toContain('padding: min(8vh, 72px) 18px 32px;')
   })
 })
