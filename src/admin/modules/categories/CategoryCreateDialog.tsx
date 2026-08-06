@@ -54,6 +54,7 @@ export function CategoryCreateDialog({ categories }: { categories: CategoryParen
 
   return <DialogPanel
     trigger="Nova categoria"
+    triggerClassName="esmera-button--primary"
     title="Nova categoria"
     description="Crie a estrutura mínima e complete descrição, mídia, SEO e sinônimos no detalhe."
   >

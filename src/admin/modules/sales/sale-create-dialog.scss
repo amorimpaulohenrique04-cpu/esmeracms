@@ -85,6 +85,22 @@
   justify-content: flex-end;
 }
 
+
+@container esmera-workspace (min-width: 701px) and (max-width: 1220px) {
+  .esmera-sales-command-bar .esmera-command-bar__main {
+    flex-wrap: wrap;
+    row-gap: var(--esmera-space-4);
+  }
+
+  .esmera-sales-command-bar .esmera-command-bar__copy {
+    flex: 1 1 520px;
+  }
+
+  .esmera-sales-command-bar .esmera-command-bar__actions {
+    margin-left: auto;
+  }
+}
+
 @media (max-width: 560px) {
   .esmera-sales-create-grid {
     grid-template-columns: 1fr;

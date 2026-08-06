@@ -150,6 +150,7 @@ export function PageHeader({
   actions,
   context,
   sticky = false,
+  className = '',
 }: {
   eyebrow?: string
   title: string
@@ -157,8 +158,9 @@ export function PageHeader({
   actions?: React.ReactNode
   context?: React.ReactNode
   sticky?: boolean
+  className?: string
 }) {
-  return <PageCommandBar eyebrow={eyebrow} title={title} description={subtitle} actions={actions} context={context} sticky={sticky} />
+  return <PageCommandBar eyebrow={eyebrow} title={title} description={subtitle} actions={actions} context={context} sticky={sticky} className={className} />
 }
 
 type MetricIcon = 'box' | 'lead' | 'money' | 'alert' | 'draft'

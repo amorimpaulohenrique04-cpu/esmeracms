@@ -186,6 +186,7 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
 
     return <ViewFrame props={props} width="fluid">
       <PageHeader
+        className="esmera-sales-command-bar"
         eyebrow="Comercial"
         title="Vendas"
         subtitle="Lista e Pipeline usam o mesmo domínio de Opportunities. Ganhos criam Sales transacionais; Leads permanecem restritos à aquisição e qualificação."
