@@ -25,46 +25,58 @@ async function expectNoDocumentOverflow(page: Page, label: string) {
     const viewportWidth = document.documentElement.clientWidth
     const documentWidth = Math.max(
       document.documentElement.scrollWidth,
-      document.body?.scrollWidth || 0,
+      document.body ? document.body.scrollWidth : 0,
     )
+    const offenders: OverflowOffender[] = []
+    const elements = document.querySelectorAll<HTMLElement>('body *')
 
-    const selectorFor = (element: HTMLElement) => {
-      if (element.id) return `#${element.id}`
-      const classes = [...element.classList].slice(0, 3)
-      return `${element.tagName.toLowerCase()}${classes.length ? `.${classes.join('.')}` : ''}`
-    }
+    for (const element of elements) {
+      const rect = element.getBoundingClientRect()
+      if (rect.width <= 0 || (rect.left >= -1 && rect.right <= viewportWidth + 1)) continue
 
-    const isContainedByScroller = (element: HTMLElement) => {
+      let containedByScroller = false
       let parent = element.parentElement
       while (parent && parent !== document.body) {
-        const style = getComputedStyle(parent)
-        const clipsInlineOverflow = ['auto', 'scroll', 'hidden', 'clip'].includes(style.overflowX)
+        const parentStyle = getComputedStyle(parent)
+        const overflowX = parentStyle.overflowX
+        const clipsInlineOverflow = overflowX === 'auto'
+          || overflowX === 'scroll'
+          || overflowX === 'hidden'
+          || overflowX === 'clip'
         if (clipsInlineOverflow) {
-          const rect = parent.getBoundingClientRect()
-          if (rect.left >= -1 && rect.right <= viewportWidth + 1) return true
+          const parentRect = parent.getBoundingClientRect()
+          if (parentRect.left >= -1 && parentRect.right <= viewportWidth + 1) {
+            containedByScroller = true
+            break
+          }
         }
         parent = parent.parentElement
       }
-      return false
-    }
+      if (containedByScroller) continue
 
-    const offenders = [...document.querySelectorAll<HTMLElement>('body *')]
-      .map((element) => {
-        const rect = element.getBoundingClientRect()
-        return {
-          element,
-          selector: selectorFor(element),
-          left: Math.round(rect.left * 100) / 100,
-          right: Math.round(rect.right * 100) / 100,
-          width: Math.round(rect.width * 100) / 100,
-          overflowX: getComputedStyle(element).overflowX,
+      const classes = Array.from(element.classList).slice(0, 3)
+      let selector = element.tagName.toLowerCase()
+      if (element.id) selector = `#${element.id}`
+      else if (classes.length) selector += `.${classes.join('.')}`
+
+      const offender: OverflowOffender = {
+        selector,
+        left: Math.round(rect.left * 100) / 100,
+        right: Math.round(rect.right * 100) / 100,
+        width: Math.round(rect.width * 100) / 100,
+        overflowX: getComputedStyle(element).overflowX,
+      }
+
+      let insertAt = offenders.length
+      for (let index = 0; index < offenders.length; index += 1) {
+        if (offender.right > offenders[index].right) {
+          insertAt = index
+          break
         }
-      })
-      .filter((item) => item.width > 0 && (item.left < -1 || item.right > viewportWidth + 1))
-      .filter((item) => !isContainedByScroller(item.element))
-      .sort((left, right) => right.right - left.right)
-      .slice(0, 12)
-      .map(({ element: _element, ...item }) => item)
+      }
+      offenders.splice(insertAt, 0, offender)
+      if (offenders.length > 12) offenders.pop()
+    }
 
     return { viewportWidth, documentWidth, offenders }
   })
