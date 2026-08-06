@@ -137,6 +137,8 @@ export function NavigationFeedbackProvider({ children }: { children: React.React
     const onClick = (event: MouseEvent) => {
       const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null
       if (!anchor) return
+      const localNav = anchor.dataset.esmeraLocalNav === 'true'
+        || anchor.matches('.esmera-form-shell__tab, .esmera-section-nav__link')
       const modifiers = {
         button: event.button,
         metaKey: event.metaKey,
@@ -150,7 +152,7 @@ export function NavigationFeedbackProvider({ children }: { children: React.React
         target: anchor.target || null,
         hasDownload: anchor.hasAttribute('download'),
         ariaDisabled: anchor.getAttribute('aria-disabled') === 'true' || anchor.hasAttribute('disabled'),
-        localNav: anchor.dataset.esmeraLocalNav === 'true',
+        localNav,
       }
       if (!shouldTrackAnchorClick(modifiers, meta, currentLocationRef.current || window.location.href)) return
       beginNavigation(anchor.href)
