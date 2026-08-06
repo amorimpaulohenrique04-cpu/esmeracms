@@ -1,6 +1,7 @@
 import Link from 'next/link'
+import type React from 'react'
 
-import { DataTable, EmptyState, Status } from '../../design-system'
+import { Status } from '../../design-system'
 import { CategoryDetailEditor, type CategoryEditorTab } from './CategoryDetailEditor'
 import {
   categoryStatusLabels,
@@ -9,7 +10,6 @@ import {
   type CategoryParent,
   type CategoryTab,
   type CategoryWorkspaceFilters,
-  type RelatedProduct,
 } from './types'
 
 type Props = {
@@ -19,7 +19,7 @@ type Props = {
   categories: CategoryParent[]
   media: CategoryMedia[]
   termSuggestions: string[]
-  relatedProducts: RelatedProduct[]
+  relatedSection: React.ReactNode
   relatedTotal: number
 }
 
@@ -37,7 +37,16 @@ function backHref(filters: CategoryWorkspaceFilters) {
   return `/admin/categories?${params.toString()}`
 }
 
-export function CategoryDetailView({ category, tab, filters, categories, media, termSuggestions, relatedProducts, relatedTotal }: Props) {
+export function CategoryDetailView({
+  category,
+  tab,
+  filters,
+  categories,
+  media,
+  termSuggestions,
+  relatedSection,
+  relatedTotal,
+}: Props) {
   return (
     <section className="esmera-category-detail" aria-label={`Detalhe de ${category.title || 'categoria'}`}>
       <header className="esmera-category-detail__header">
@@ -64,30 +73,7 @@ export function CategoryDetailView({ category, tab, filters, categories, media, 
         initialTab={editorTabs[tab]}
         initialRevision={category.revision ?? null}
         initialUpdatedAt={category.updatedAt ?? null}
-        relatedSection={(
-        <div className="esmera-category-related">
-          <div className="esmera-category-related__intro">
-            <div><span className="esmera-eyebrow">Relação derivada</span><h3>Produtos relacionados</h3></div>
-            <p>Esta lista vem de <code>Products.categories</code>. Nenhum array de produtos é armazenado na categoria.</p>
-          </div>
-          {relatedProducts.length ? (
-            <DataTable label="Produtos relacionados à categoria">
-              <thead><tr><th>Produto</th><th>Catálogo</th><th>Publicação</th><th>Disponibilidade</th></tr></thead>
-              <tbody>
-                {relatedProducts.map((product) => (
-                  <tr key={String(product.id)}>
-                    <td><Link className="esmera-row-title" href={`/admin/products?product=${product.id}&tab=overview`}>{product.title || 'Produto sem título'}</Link><small className="esmera-category-related__code">{product.code || 'Sem código'}</small></td>
-                    <td><Status tone={product.catalogStatus === 'active' ? 'success' : 'neutral'}>{product.catalogStatus === 'active' ? 'Ativo' : 'Arquivado'}</Status></td>
-                    <td><Status tone={product._status === 'published' ? 'info' : 'neutral'}>{product._status === 'published' ? 'Publicado' : 'Rascunho'}</Status></td>
-                    <td>{product.availability || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
-          ) : <EmptyState title="Nenhum produto relacionado" copy="A relação aparece automaticamente quando um produto usa esta categoria." />}
-          {relatedTotal > relatedProducts.length ? <p className="esmera-category-related__more">Mostrando {relatedProducts.length} de {relatedTotal}. Use Produtos para filtrar a categoria completa.</p> : null}
-        </div>
-        )}
+        relatedSection={relatedSection}
       />
     </section>
   )
