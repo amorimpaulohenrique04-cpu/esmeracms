@@ -33,6 +33,13 @@ describe('Popups de criação e responsividade', () => {
     expect(categoriesView).not.toContain('/admin/collections/categories/create')
   })
 
+  it('mantém o popup de clientes dentro da árvore modal clicável', () => {
+    const salesDialog = source('src/admin/modules/sales/SalesWorkspaceClient.tsx')
+    expect(salesDialog).toContain('<ComboboxPrimitive.Positioner className={comboboxClasses.positioner}')
+    expect(salesDialog).toContain('esmera-sales-customer-popup')
+    expect(salesDialog).not.toContain('<ComboboxPrimitive.Portal>')
+  })
+
   it('cria categorias como rascunho e abre o detalhe customizado', () => {
     const route = source('src/app/(payload)/api/admin-categories/route.ts')
     const dialog = source('src/admin/modules/categories/CategoryCreateDialog.tsx')
