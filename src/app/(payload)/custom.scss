@@ -152,8 +152,9 @@ body {
   margin-top: 6px;
 }
 
-/* Caption text must retain AA contrast on selected command results. */
-.esmera-command-result-copy small {
+/* Caption text and keyboard hints must retain AA contrast in the command palette. */
+.esmera-command-result-copy small,
+.esmera-command-key {
   color: var(--esmera-text-secondary);
 }
 
