@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm lint --max-warnings=0 && mkdir -p public && printf 'lint passed' > public/index.html",
+  "buildCommand": "pnpm build && rm -rf public && mkdir -p public && printf 'application build passed' > public/index.html",
   "outputDirectory": "public"
 }
