@@ -7,8 +7,6 @@ import {
   LoadingState,
   MetricStrip,
   MetricStripItem,
-  SectionNav,
-  SectionNavLink,
   SplitWorkspace,
   Status,
 } from '../../design-system'
@@ -24,6 +22,7 @@ import {
   ViewFrame,
 } from '../../views/shared'
 import { CustomerDetailTabPanel } from './CustomerDetailTabPanel'
+import { CustomerDetailTabs } from './CustomerDetailTabs'
 import {
   CustomerCreateDialog,
   CustomerMasterList,
@@ -32,7 +31,6 @@ import {
 import {
   customerOriginLabels,
   customerStatusLabels,
-  customerTabLabels,
   relationId,
   relationLabel,
   type CategoryRef,
@@ -254,22 +252,23 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
           <MetricStripItem label="Oportunidades abertas" value={openOpportunities.length} meta={openOpportunities.length ? `${money(openOpportunityValue)} de potencial informado` : 'Nenhuma negociação aberta'} tone={openOpportunities.length ? 'info' : 'neutral'} />
         </MetricStrip>
 
-        <SectionNav className="esmera-customer-tabs" label="Seções do cliente">
-          {tabs.map((item) => <SectionNavLink key={item} active={tab === item} href={tabHref(filters, detail.id, item)}>{customerTabLabels[item]}</SectionNavLink>)}
-        </SectionNav>
-
-        <Suspense key={`${detail.id}-${tab}`} fallback={<LoadingState compact label="Carregando seção do cliente…" />}>
-          <CustomerDetailTabPanel
-            req={req}
-            tab={tab}
-            customer={detail}
-            sales={sales}
-            interests={interests}
-            products={productsResult.docs}
-            users={usersResult.docs}
-            categories={categoriesResult.docs}
-          />
-        </Suspense>
+        <CustomerDetailTabs
+          activeTab={tab}
+          tabs={tabs.map((item) => ({ id: item, href: tabHref(filters, detail.id, item) }))}
+        >
+          <Suspense key={`${detail.id}-${tab}`} fallback={<LoadingState compact label="Carregando seção do cliente…" />}>
+            <CustomerDetailTabPanel
+              req={req}
+              tab={tab}
+              customer={detail}
+              sales={sales}
+              interests={interests}
+              products={productsResult.docs}
+              users={usersResult.docs}
+              categories={categoriesResult.docs}
+            />
+          </Suspense>
+        </CustomerDetailTabs>
       </section>
     ) : undefined
 
