@@ -41,6 +41,7 @@ describe('Command Palette — composição desktop e tablet', () => {
     render(React.createElement(CommandPalette, { open: true, onOpenChange: vi.fn(), selection: null, currentHref: '/admin' }))
 
     await waitFor(() => expect(screen.getByText('Ações rápidas')).not.toBeNull())
+    await screen.findByText('Novo produto')
     expect(screen.getByRole('button', { name: 'Tudo' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: 'Registros' })).not.toBeNull()
     expect(screen.getByRole('button', { name: 'Ações' })).not.toBeNull()
@@ -49,7 +50,6 @@ describe('Command Palette — composição desktop e tablet', () => {
     expect(screen.getByRole('button', { name: 'Configurações' })).not.toBeNull()
     expect(screen.getByText('Recentes')).not.toBeNull()
     expect(screen.getByText('Produtos')).not.toBeNull()
-    expect(screen.getByText('Novo produto')).not.toBeNull()
     expect(screen.getByText('Seções de Relatórios')).not.toBeNull()
   })
 
