@@ -240,3 +240,36 @@
   .esmera-product-tile__inspect,
   .esmera-products-workspace .esmera-data-table .esmera-product-row-action { transition: none; opacity: 1; }
 }
+
+.esmera-products-import-dialog { width: min(1040px, calc(100vw - 32px)); }
+.esmera-products-import { display: grid; gap: 14px; }
+
+.esmera-products-import__input { display: grid; gap: 14px; }
+.esmera-products-import__field { display: grid; gap: 6px; color: var(--esmera-text-muted); font-size: 11px; font-weight: 600; }
+.esmera-products-import__field textarea { font-family: var(--esmera-font-mono, monospace); font-size: 12px; }
+
+.esmera-products-import__warning {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--esmera-warning, var(--esmera-primary));
+  background: var(--esmera-surface-muted);
+  color: var(--esmera-text);
+  font-size: var(--esmera-font-ui-sm);
+}
+
+.esmera-products-import-table th,
+.esmera-products-import-table td { vertical-align: top; white-space: nowrap; }
+.esmera-products-import-table td .esmera-input { min-width: 130px; }
+.esmera-products-import-table tr.has-error > td.has-error { background: color-mix(in srgb, var(--esmera-danger, #a3372f) 8%, transparent); }
+.esmera-products-import-table__error { display: block; margin-top: 3px; max-width: 220px; overflow-wrap: break-word; color: var(--esmera-danger, #a3372f); font-size: 10px; font-weight: 600; white-space: normal; }
+
+.esmera-products-import__summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: var(--esmera-font-ui-sm); }
+.esmera-products-import__summary .is-danger { color: var(--esmera-danger, #a3372f); font-weight: 600; }
+.esmera-products-import__summary .is-success { color: var(--esmera-success); font-weight: 600; }
+
+.esmera-products-import__result { display: grid; gap: 14px; }
+
+@media (max-width: 640px) {
+  .esmera-products-import-dialog { width: 100%; }
+  .esmera-products-import__summary { flex-direction: column; align-items: flex-start; }
+}
