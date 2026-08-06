@@ -1,10 +1,10 @@
 {
-  "baseSha": "65e03232d05b219108de05083c56f4df62340cec",
+  "baseSha": "e5609a54deb54ec134995497b6be3a7355c6dc37",
   "datasetVersion": "stage23-v2",
   "bootstrapReference": false,
-  "reason": "Aprovação restrita à correção auditada do overflow horizontal do Pipeline no viewport tablet de 768 px. A captura anterior media 800 px; a nova deve permanecer dentro de 768 px com rolagem somente no componente.",
+  "reason": "Aprovação restrita à captura do Pipeline em tablet após corrigir a causa raiz do overflow: um rótulo .esmera-sr-only preservava sua posição estática dentro do quarto estágio, em x=799 px, ampliando o documento de 768 para 800 px. A utility assistiva agora fica presa à viewport e não participa da geometria de scroll.",
   "approvedBy": "technical-audit",
-  "approvedAt": "2026-08-05T21:00:00-03:00",
+  "approvedAt": "2026-08-05T21:50:00-03:00",
   "files": [
     "tablet-768x1024/sales-pipeline.png"
   ]
