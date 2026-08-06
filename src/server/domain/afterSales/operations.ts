@@ -40,7 +40,8 @@ export type CreateCaseInput = {
 }
 
 export type CreateTaskInput = {
-  caseId: string | number
+  caseId?: string | number
+  saleId?: string | number
   title: string
   type: TaskType
   dueAt: string
@@ -131,7 +132,12 @@ export async function createAfterSalesTask(payload: Payload, user: WorkflowUser,
   if (!isTaskType(input.type)) throw new Error('Informe um tipo de follow-up válido.')
   if (!input.dueAt || Number.isNaN(new Date(input.dueAt).getTime())) throw new Error('Informe um prazo válido.')
   if (!operationalPriorities.includes(input.priority)) throw new Error('Informe uma prioridade válida.')
-  const caseDoc = await afterSalesCase(payload, user, input.caseId)
+  if (input.caseId === undefined && input.saleId === undefined) throw new Error('Informe a venda ou o caso do follow-up.')
+
+  const resolvedCaseId = input.caseId !== undefined
+    ? input.caseId
+    : (await createAfterSalesCase(payload, user, { saleId: input.saleId as string | number })).afterSales.id
+  const caseDoc = await afterSalesCase(payload, user, resolvedCaseId)
 
   const task = await payload.create({
     collection: 'tasks',

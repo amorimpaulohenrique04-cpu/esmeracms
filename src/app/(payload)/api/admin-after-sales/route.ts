@@ -98,11 +98,12 @@ export async function POST(request: Request) {
 
     if (body.action === 'create-task') {
       const taskPriority = priority(body.priority)
-      if (body.caseId === undefined || !body.title || !body.dueAt || !isTaskType(body.type) || !taskPriority) {
-        return NextResponse.json({ error: 'Caso, objetivo, tipo, prazo e prioridade são obrigatórios.' }, { status: 400 })
+      if ((body.caseId === undefined && body.saleId === undefined) || !body.title || !body.dueAt || !isTaskType(body.type) || !taskPriority) {
+        return NextResponse.json({ error: 'Venda (ou caso), objetivo, tipo, prazo e prioridade são obrigatórios.' }, { status: 400 })
       }
       return NextResponse.json(await createAfterSalesTask(payload, user, {
         caseId: body.caseId,
+        saleId: body.saleId,
         title: body.title,
         type: body.type,
         dueAt: body.dueAt,
