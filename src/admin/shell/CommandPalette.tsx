@@ -166,7 +166,11 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
     const media = window.matchMedia('(max-width: 620px)')
-    const update = () => setCompactViewport(media.matches)
+    const update = () => {
+      keyboardNavigationRef.current = false
+      setActiveIndex(0)
+      setCompactViewport(media.matches)
+    }
     update()
     media.addEventListener?.('change', update)
     return () => media.removeEventListener?.('change', update)
@@ -234,11 +238,6 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   const safeActiveIndex = navigableResults.length ? Math.min(activeIndex, navigableResults.length - 1) : 0
   const activeSurface: ResultSurface = compactViewport ? 'mobile' : 'desktop'
   const activeResultId = navigableResults[safeActiveIndex] ? `${inputId}-${activeSurface}-result-${safeActiveIndex}` : undefined
-
-  useEffect(() => {
-    keyboardNavigationRef.current = false
-    setActiveIndex(0)
-  }, [compactViewport, filter, showAll])
 
   useEffect(() => {
     if (!open || !keyboardNavigationRef.current || !navigableResults.length || !activeResultId) return
@@ -347,13 +346,13 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
                         className={`esmera-command-filter${filter === item.value ? ' is-active' : ''}`}
                         aria-pressed={filter === item.value}
                         key={item.value}
-                        onClick={() => { setFilter(item.value); setShowAll(item.value !== 'all'); setActiveIndex(0) }}
+                        onClick={() => { keyboardNavigationRef.current = false; setFilter(item.value); setShowAll(item.value !== 'all'); setActiveIndex(0) }}
                       >
                         {item.label}
                       </button>
                     ))}
                   </div>
-                  <button type="button" className="esmera-command-view-all" onClick={() => { setFilter('all'); setShowAll(true); setActiveIndex(0) }}>
+                  <button type="button" className="esmera-command-view-all" onClick={() => { keyboardNavigationRef.current = false; setFilter('all'); setShowAll(true); setActiveIndex(0) }}>
                     Ver todos os resultados <ShellIcon name="arrow" />
                   </button>
                 </div>
