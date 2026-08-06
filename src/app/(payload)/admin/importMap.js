@@ -21,6 +21,7 @@ import { StrikethroughFeatureClient as StrikethroughFeatureClient_e70f5e05f09f93
 import { UnderlineFeatureClient as UnderlineFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { BoldFeatureClient as BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { HomeEditView as HomeEditView_059a3279dcd06514e428e58028726722 } from '../../../admin/modules/home/HomeEditView'
 import { EsmeraNav as EsmeraNav_4e2fd1f2ddee185304cca245e07e098e } from '../../../admin/components/Nav'
 import { AppHeader as AppHeader_14067a8e97406dd23e52ff39f2eca23f } from '../../../admin/shell/AppHeader'
 import { EsmeraIcon as EsmeraIcon_1121b289be69ddf34efb4c0f74982a55 } from '../../../admin/components/Brand'
@@ -33,13 +34,14 @@ import { ProductsView as ProductsView_6d795fd1198cd1546060ea6772677cf9 } from '.
 import { CategoriesView as CategoriesView_4db8f140f3137550ccf2dfb8920b72de } from '../../../admin/modules/categories/CategoriesView'
 import { CustomersView as CustomersView_26abb1d7c41a2b4213f88eb0317549e2 } from '../../../admin/modules/customers/CustomersView'
 import { PrivacyView as PrivacyView_8c499c917d85ddae19bbeedb3dcf545c } from '../../../admin/modules/privacy/PrivacyView'
+import { LeadsView as LeadsView_cb9de06b38e70ba2c379eeb79fe7ada0 } from '../../../admin/modules/leads/LeadsView'
 import { SalesWorkspace as SalesWorkspace_703dd3f93950ad9283cd0ee6edd55f0e } from '../../../admin/modules/sales/SalesViews'
+import { SalesConfirmedView as SalesConfirmedView_45f65c967c12cd76af4b0e049de016fc } from '../../../admin/modules/sales/SalesConfirmedView'
 import { PipelineRedirect as PipelineRedirect_703dd3f93950ad9283cd0ee6edd55f0e } from '../../../admin/modules/sales/SalesViews'
 import { AfterSalesView as AfterSalesView_a04d9bbf6695b6ef28a35977cb48e1eb } from '../../../admin/modules/after-sales/AfterSalesView'
 import { ReportsView as ReportsView_a230f9b08237d86547f30e894ddc4104 } from '../../../admin/modules/reports/ReportsView'
 import { SettingsView as SettingsView_59dc6cc19c03fad932b5da08a3d40365 } from '../../../admin/modules/settings/SettingsView'
 import { TechnicalView as TechnicalView_6414fd31981f506c5d49d22d0a7206b3 } from '../../../admin/modules/technical/TechnicalView'
-import { HomeEditView as HomeEditView_pr09b } from '../../../admin/modules/home/HomeEditView'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -67,6 +69,7 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#UnderlineFeatureClient": UnderlineFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#BoldFeatureClient": BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#ItalicFeatureClient": ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "/admin/modules/home/HomeEditView#HomeEditView": HomeEditView_059a3279dcd06514e428e58028726722,
   "/admin/components/Nav#EsmeraNav": EsmeraNav_4e2fd1f2ddee185304cca245e07e098e,
   "/admin/shell/AppHeader#AppHeader": AppHeader_14067a8e97406dd23e52ff39f2eca23f,
   "/admin/components/Brand#EsmeraIcon": EsmeraIcon_1121b289be69ddf34efb4c0f74982a55,
@@ -79,12 +82,13 @@ export const importMap = {
   "/admin/modules/categories/CategoriesView#CategoriesView": CategoriesView_4db8f140f3137550ccf2dfb8920b72de,
   "/admin/modules/customers/CustomersView#CustomersView": CustomersView_26abb1d7c41a2b4213f88eb0317549e2,
   "/admin/modules/privacy/PrivacyView#PrivacyView": PrivacyView_8c499c917d85ddae19bbeedb3dcf545c,
+  "/admin/modules/leads/LeadsView#LeadsView": LeadsView_cb9de06b38e70ba2c379eeb79fe7ada0,
   "/admin/modules/sales/SalesViews#SalesWorkspace": SalesWorkspace_703dd3f93950ad9283cd0ee6edd55f0e,
+  "/admin/modules/sales/SalesConfirmedView#SalesConfirmedView": SalesConfirmedView_45f65c967c12cd76af4b0e049de016fc,
   "/admin/modules/sales/SalesViews#PipelineRedirect": PipelineRedirect_703dd3f93950ad9283cd0ee6edd55f0e,
   "/admin/modules/after-sales/AfterSalesView#AfterSalesView": AfterSalesView_a04d9bbf6695b6ef28a35977cb48e1eb,
   "/admin/modules/reports/ReportsView#ReportsView": ReportsView_a230f9b08237d86547f30e894ddc4104,
   "/admin/modules/settings/SettingsView#SettingsView": SettingsView_59dc6cc19c03fad932b5da08a3d40365,
   "/admin/modules/technical/TechnicalView#TechnicalView": TechnicalView_6414fd31981f506c5d49d22d0a7206b3,
-  "/admin/modules/home/HomeEditView#HomeEditView": HomeEditView_pr09b,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

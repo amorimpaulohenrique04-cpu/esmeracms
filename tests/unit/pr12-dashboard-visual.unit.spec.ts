@@ -59,8 +59,8 @@ describe('PR-12A — Dashboard visual', () => {
   it('preserva as rotas reais do Dashboard (nenhum link foi trocado por placeholder)', () => {
     expect(view).toContain('getDashboardSnapshot')
     expect(view).toContain('/admin/products?status=active&publication=published')
-    expect(view).toContain('/admin/sales?view=pipeline')
-    expect(view).toContain('/admin/collections/sales')
+    expect(view).toContain('/admin/opportunities?view=pipeline')
+    expect(view).toContain('/admin/sales')
     expect(view).toContain('/admin/after-sales?focus=all&status=open')
   })
 

@@ -11,11 +11,13 @@ import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 let pathname = '/admin'
+let search = ''
 const push = vi.fn()
 const navigationFeedback = vi.hoisted(() => ({ beginNavigation: vi.fn() }))
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
+  useSearchParams: () => new URLSearchParams(search),
   useRouter: () => ({ push }),
 }))
 
@@ -30,6 +32,7 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   pathname = '/admin'
+  search = ''
   push.mockClear()
   navigationFeedback.beginNavigation.mockClear()
 })
@@ -65,11 +68,14 @@ describe('PR-11 — GlobalCreateMenu', () => {
     expect(labels.some((label) => label.includes('Nova oportunidade'))).toBe(true)
   })
 
-  it('admin vê todas as ações permitidas', async () => {
+  it('admin vê todas as ações permitidas, incluindo "Nova venda" desabilitada', async () => {
     render(React.createElement(GlobalCreateMenu, { role: 'admin' }))
     fireEvent.click(screen.getByTestId('esmera-global-create'))
     const items = await screen.findAllByRole('menuitem')
-    expect(items.length).toBe(4)
+    expect(items.length).toBe(5)
+    const saleItem = items.find((item) => (item.textContent || '').includes('Nova venda'))
+    expect(saleItem).not.toBeUndefined()
+    expect(saleItem?.getAttribute('aria-disabled')).toBe('true')
   })
 
   it('o item contextual aparece primeiro', async () => {
