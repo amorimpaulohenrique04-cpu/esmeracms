@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - ci/verify-funnel-86e570c-arm
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
