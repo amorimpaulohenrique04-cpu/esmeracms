@@ -732,8 +732,7 @@ export function SaleCreateDialog({ products }: { products: ProductRef[] }) {
             />
             <ComboboxPrimitive.Trigger className={comboboxClasses.trigger} aria-label="Abrir resultados">⌄</ComboboxPrimitive.Trigger>
           </ComboboxPrimitive.InputGroup>
-          <ComboboxPrimitive.Portal>
-            <ComboboxPrimitive.Positioner className={comboboxClasses.positioner} sideOffset={4} align="start">
+          <ComboboxPrimitive.Positioner className={comboboxClasses.positioner} sideOffset={4} align="start">
               <ComboboxPrimitive.Popup className={`${comboboxClasses.popup} esmera-sales-customer-popup`} aria-busy={searching || undefined}>
                 <ComboboxPrimitive.Empty className="esmera-sales-customer-empty">
                   {searching ? 'Buscando clientes…' : query.trim().length < 2 ? 'Digite ao menos 2 caracteres.' : 'Nenhum cliente encontrado.'}
@@ -744,8 +743,7 @@ export function SaleCreateDialog({ products }: { products: ProductRef[] }) {
                   </ComboboxPrimitive.Item>}
                 </ComboboxPrimitive.List>
               </ComboboxPrimitive.Popup>
-            </ComboboxPrimitive.Positioner>
-          </ComboboxPrimitive.Portal>
+          </ComboboxPrimitive.Positioner>
         </ComboboxPrimitive.Root>
       </Field>
 
