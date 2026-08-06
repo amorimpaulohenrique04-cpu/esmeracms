@@ -33,11 +33,14 @@ describe('Popups de criação e responsividade', () => {
     expect(categoriesView).not.toContain('/admin/collections/categories/create')
   })
 
-  it('mantém o popup de clientes dentro da árvore modal clicável', () => {
+  it('mantém o portal de clientes ancorado dentro da árvore modal clicável', () => {
     const salesDialog = source('src/admin/modules/sales/SalesWorkspaceClient.tsx')
+    const salesStyles = source('src/admin/modules/sales/sale-create-dialog.scss')
+    expect(salesDialog).toContain('const portalContainerRef = useRef<HTMLFormElement>(null)')
+    expect(salesDialog).toContain('<form ref={portalContainerRef}')
+    expect(salesDialog).toContain('<ComboboxPrimitive.Portal container={portalContainerRef}')
     expect(salesDialog).toContain('<ComboboxPrimitive.Positioner className={comboboxClasses.positioner}')
-    expect(salesDialog).toContain('esmera-sales-customer-popup')
-    expect(salesDialog).not.toContain('<ComboboxPrimitive.Portal>')
+    expect(salesStyles).toMatch(/\.esmera-sales-customer-portal\s*\{[\s\S]*display: contents/)
   })
 
   it('cria categorias como rascunho e abre o detalhe customizado', () => {
