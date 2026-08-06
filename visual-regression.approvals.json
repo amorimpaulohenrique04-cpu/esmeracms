@@ -1,11 +1,14 @@
 {
-  "baseSha": "e5609a54deb54ec134995497b6be3a7355c6dc37",
+  "baseSha": "9528e3be6ad7bfd4cd4482e9bf1792afac653579",
   "datasetVersion": "stage23-v2",
   "bootstrapReference": false,
-  "reason": "Aprovação restrita à captura do Pipeline em tablet após corrigir a causa raiz do overflow: um rótulo .esmera-sr-only preservava sua posição estática dentro do quarto estágio, em x=799 px, ampliando o documento de 768 para 800 px. A utility assistiva agora fica presa à viewport e não participa da geometria de scroll.",
+  "reason": "Aprova a composição responsiva da Command Palette incorporada pelo PR #39 e o respiro inferior específico para notebooks do PR #40. A aprovação fica restrita às quatro capturas da própria Command Palette; nenhuma outra tela ou cenário visual é aceito.",
   "approvedBy": "technical-audit",
-  "approvedAt": "2026-08-05T21:50:00-03:00",
+  "approvedAt": "2026-08-05T23:42:00-03:00",
   "files": [
-    "tablet-768x1024/sales-pipeline.png"
+    "desktop-1440x900/command-palette.png",
+    "notebook-1280x800/command-palette.png",
+    "tablet-768x1024/command-palette.png",
+    "tablet-landscape-1024x768/command-palette.png"
   ]
 }
