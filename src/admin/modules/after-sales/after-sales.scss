@@ -64,6 +64,14 @@
   gap: 8px;
 }
 
+.esmera-after-sales-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 8px;
+}
+.esmera-after-sales-actions > .esmera-button { min-height: 38px; white-space: nowrap; }
+
 .esmera-after-sales-filters label,
 .esmera-after-sales-form label,
 .esmera-after-sales-compose label,
@@ -78,9 +86,7 @@
 }
 
 .esmera-after-sales-filters .esmera-input,
-.esmera-after-sales-filters .esmera-button,
-.esmera-after-sales-toolbar > .esmera-button { min-height: 38px; }
-.esmera-after-sales-toolbar > .esmera-button { flex: 0 0 auto; white-space: nowrap; }
+.esmera-after-sales-filters .esmera-button { min-height: 38px; }
 
 .esmera-after-sales-advanced { position: relative; width: fit-content; }
 .esmera-after-sales-advanced summary {
@@ -309,7 +315,8 @@
   .esmera-after-sales-toolbar { align-items: stretch; flex-direction: column; }
   .esmera-after-sales-filters__primary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .esmera-after-sales-search { grid-column: 1 / -1; }
-  .esmera-after-sales-toolbar > .esmera-button { width: 100%; }
+  .esmera-after-sales-actions { width: 100%; }
+  .esmera-after-sales-actions > .esmera-button { flex: 1 1 0; width: 100%; }
   .esmera-after-sales-workspace,
   .esmera-after-sales-workspace.has-inspector { display: block; }
   .esmera-after-sales-inspector {
@@ -341,6 +348,7 @@
   .esmera-after-sales-filters__primary { grid-template-columns: 1fr 1fr; }
   .esmera-after-sales-search { grid-column: 1 / -1; }
   .esmera-after-sales-filters__primary > .esmera-button { grid-column: 1 / -1; width: 100%; }
+  .esmera-after-sales-actions { flex-direction: column; }
   .esmera-after-sales-advanced { width: 100%; }
   .esmera-after-sales-advanced summary { width: 100%; justify-content: space-between; }
   .esmera-after-sales-advanced__panel {

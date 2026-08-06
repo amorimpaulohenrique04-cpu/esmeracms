@@ -401,10 +401,15 @@ export function CategoryDetailEditor({
             )}
           </FieldV2>
           <details className="esmera-category-advanced esmera-category-field--wide">
-            <summary>Ajustes avançados</summary>
-            <FieldV2 id="category-order" path="order" label="Ordem editorial" hint="Normalmente controlada pela reordenação da lista." error={errorFor('order')}>
-              {(control) => <input {...control} className="esmera-input" type="number" min="0" step="1" value={order} onChange={(event) => { setOrder(event.target.value); edited() }} />}
-            </FieldV2>
+            <summary>
+              <span className="esmera-category-advanced__title">Ajustes avançados</span>
+              <span className="esmera-category-advanced__tag">Opcional</span>
+            </summary>
+            <div className="esmera-category-advanced__body">
+              <FieldV2 id="category-order" path="order" label="Ordem editorial" hint="Normalmente controlada pela reordenação da lista." error={errorFor('order')}>
+                {(control) => <input {...control} className="esmera-input" type="number" min="0" step="1" value={order} onChange={(event) => { setOrder(event.target.value); edited() }} />}
+              </FieldV2>
+            </div>
           </details>
         </div>
       ) : null}

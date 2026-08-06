@@ -437,16 +437,97 @@
   .esmera-segmented-control__item { flex: 1; }
 }
 
-.esmera-funnel-stepper { margin: 0 0 var(--esmera-space-4); }
-.esmera-funnel-stepper ol { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.esmera-funnel-stepper li { display: flex; align-items: center; }
-.esmera-funnel-stepper li:not(:last-child)::after { content: ''; width: 18px; height: 1px; margin: 0 4px; background: var(--esmera-line-default); }
-.esmera-funnel-stepper a { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 6px; border-radius: 999px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); font-weight: var(--esmera-weight-semibold); text-decoration: none; }
+.esmera-funnel-stepper {
+  margin: 0 0 var(--esmera-space-4);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.esmera-funnel-stepper::-webkit-scrollbar { display: none; }
+
+.esmera-funnel-stepper ol {
+  display: flex;
+  align-items: center;
+  min-width: max-content;
+  margin: 0;
+  padding: 3px 2px;
+  list-style: none;
+}
+
+.esmera-funnel-stepper__step { display: flex; align-items: center; flex: 0 0 auto; }
+
+.esmera-funnel-stepper__connector {
+  width: 26px;
+  height: 1px;
+  flex: 0 0 26px;
+  margin: 0 2px;
+  background: var(--esmera-line-default);
+  transition: background-color var(--esmera-motion-standard) var(--esmera-ease);
+}
+.esmera-funnel-stepper__step.is-done .esmera-funnel-stepper__connector,
+.esmera-funnel-stepper__step.is-current .esmera-funnel-stepper__connector {
+  background: var(--esmera-success);
+  opacity: .4;
+}
+
+.esmera-funnel-stepper a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-ui-sm);
+  font-weight: var(--esmera-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color var(--esmera-motion-standard) var(--esmera-ease), color var(--esmera-motion-standard) var(--esmera-ease);
+}
 .esmera-funnel-stepper a:hover { background: var(--esmera-surface-hover); color: var(--esmera-text); }
-.esmera-funnel-stepper__index { width: 18px; height: 18px; flex: 0 0 auto; display: inline-grid; place-items: center; border-radius: 50%; background: var(--esmera-surface-hover); color: var(--esmera-text-muted); font-size: 10px; }
-.esmera-funnel-stepper li.is-current a { background: var(--esmera-primary-soft); color: var(--esmera-text); }
-.esmera-funnel-stepper li.is-current .esmera-funnel-stepper__index { background: var(--esmera-selection-bar); color: var(--esmera-on-primary); }
-.esmera-funnel-stepper li.is-done .esmera-funnel-stepper__index { background: var(--esmera-success, var(--esmera-selection-bar)); color: var(--esmera-on-primary); }
+.esmera-funnel-stepper a:active { background: var(--esmera-surface-selected); }
+.esmera-funnel-stepper a:focus-visible { outline: 2px solid var(--esmera-focus); outline-offset: 2px; box-shadow: var(--esmera-focus-ring); }
+
+.esmera-funnel-stepper__index {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--esmera-surface-hover);
+  color: var(--esmera-text-muted);
+  font-size: 11px;
+  font-weight: var(--esmera-weight-semibold);
+  line-height: 1;
+}
+.esmera-funnel-stepper__check { width: 12px; height: 12px; stroke-width: 2.4; }
+.esmera-funnel-stepper__label { line-height: 1; }
+
+.esmera-funnel-stepper__step.is-current a { background: var(--esmera-success-soft); color: var(--esmera-text); font-weight: var(--esmera-weight-semibold); }
+.esmera-funnel-stepper__step.is-current a:hover { background: var(--esmera-success-soft); }
+.esmera-funnel-stepper__step.is-current .esmera-funnel-stepper__index { background: var(--esmera-success); color: var(--esmera-on-primary); }
+
+.esmera-funnel-stepper__step.is-done a { color: var(--esmera-text-secondary); }
+.esmera-funnel-stepper__step.is-done .esmera-funnel-stepper__index { background: var(--esmera-success-soft); color: var(--esmera-success); }
+
+@media (min-width: 641px) {
+  .esmera-funnel-stepper ol { width: 100%; justify-content: space-between; }
+  .esmera-funnel-stepper__connector { flex: 1 1 26px; }
+}
+
+@media (max-width: 640px) {
+  .esmera-funnel-stepper__connector { width: 16px; flex-basis: 16px; }
+  .esmera-funnel-stepper a { padding-right: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esmera-funnel-stepper { scroll-behavior: auto; }
+  .esmera-funnel-stepper a,
+  .esmera-funnel-stepper__connector { transition: none; }
+}
 
 /* A política de prefers-reduced-motion é compartilhada e vive em tokens.scss,
    importado por todos os entry points do admin. Não duplicar aqui. */
