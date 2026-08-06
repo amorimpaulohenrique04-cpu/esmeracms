@@ -51,14 +51,22 @@ body {
   min-height: 24px;
 }
 
+/*
+ * Keep assistive-only copy attached to the viewport rather than to an off-screen
+ * grid track. Absolute positioning without coordinates preserved the element's
+ * static X position inside horizontally scrollable content and enlarged the
+ * document from 768px to 800px even though the Pipeline itself was contained.
+ */
 .esmera-sr-only {
-  position: absolute !important;
+  position: fixed !important;
+  inset: 0 auto auto 0 !important;
   width: 1px !important;
   height: 1px !important;
   padding: 0 !important;
   margin: -1px !important;
   overflow: hidden !important;
   clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
   white-space: nowrap !important;
   border: 0 !important;
 }
