@@ -601,6 +601,7 @@ function effectiveProductPrice(product: ProductRef | undefined, variantSku: stri
 export function SaleCreateDialog({ products }: { products: ProductRef[] }) {
   const router = useRouter()
   const closeRef = useRef<HTMLButtonElement>(null)
+  const portalContainerRef = useRef<HTMLFormElement>(null)
   const [customer, setCustomer] = useState<CustomerRef | null>(null)
   const [query, setQuery] = useState('')
   const [customers, setCustomers] = useState<CustomerRef[]>([])
@@ -698,7 +699,7 @@ export function SaleCreateDialog({ products }: { products: ProductRef[] }) {
     title="Nova venda"
     description="Crie uma venda confirmada sem sair do workspace. Totais e snapshots são calculados pelo servidor."
   >
-    <form className="esmera-sales-create-form esmera-sales-close-form" onSubmit={submit}>
+    <form ref={portalContainerRef} className="esmera-sales-create-form esmera-sales-close-form" onSubmit={submit}>
       <Field className="esmera-sales-customer-field" label="Cliente">
         <ComboboxPrimitive.Root
           items={customers}
@@ -732,7 +733,8 @@ export function SaleCreateDialog({ products }: { products: ProductRef[] }) {
             />
             <ComboboxPrimitive.Trigger className={comboboxClasses.trigger} aria-label="Abrir resultados">⌄</ComboboxPrimitive.Trigger>
           </ComboboxPrimitive.InputGroup>
-          <ComboboxPrimitive.Positioner className={comboboxClasses.positioner} sideOffset={4} align="start">
+          <ComboboxPrimitive.Portal container={portalContainerRef} className="esmera-sales-customer-portal">
+            <ComboboxPrimitive.Positioner className={comboboxClasses.positioner} sideOffset={4} align="start">
               <ComboboxPrimitive.Popup className={`${comboboxClasses.popup} esmera-sales-customer-popup`} aria-busy={searching || undefined}>
                 <ComboboxPrimitive.Empty className="esmera-sales-customer-empty">
                   {searching ? 'Buscando clientes…' : query.trim().length < 2 ? 'Digite ao menos 2 caracteres.' : 'Nenhum cliente encontrado.'}
@@ -743,7 +745,8 @@ export function SaleCreateDialog({ products }: { products: ProductRef[] }) {
                   </ComboboxPrimitive.Item>}
                 </ComboboxPrimitive.List>
               </ComboboxPrimitive.Popup>
-          </ComboboxPrimitive.Positioner>
+            </ComboboxPrimitive.Positioner>
+          </ComboboxPrimitive.Portal>
         </ComboboxPrimitive.Root>
       </Field>
 
