@@ -11,6 +11,7 @@ import {
   type OpportunityStage,
 } from '../../../businessRules/opportunities/stages'
 import { relationshipID } from '../../../businessRules/relationships'
+import { syncClientInterests } from '../../../hooks/clientInterests/syncClientInterests'
 
 type WorkflowUser = { id?: string | number } | null | undefined
 
@@ -321,6 +322,13 @@ export async function winOpportunity(payload: Payload, user: WorkflowUser, input
       req,
       data: { stage: 'won', wonSale: sale.id } as never,
     })
+
+    await syncClientInterests(payload, user, {
+      customerId: customerID,
+      productIds: input.items.map((item) => item.product),
+      source: 'sale',
+      status: 'purchased',
+    }, req)
 
     await payload.create({
       collection: 'activities',

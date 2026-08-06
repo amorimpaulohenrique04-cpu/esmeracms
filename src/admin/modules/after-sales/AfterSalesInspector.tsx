@@ -47,7 +47,7 @@ import {
   statusTone,
 } from './workspace'
 
-function ShipmentCreator({ caseId, busy, onCreate }: { caseId: string | number; busy: boolean; onCreate: (body: Record<string, unknown>) => Promise<void> }) {
+function ShipmentCreator({ caseId, busy, onCreate }: { caseId: string | number; busy: boolean; onCreate: (body: Record<string, unknown>) => Promise<Record<string, unknown> | undefined> }) {
   const [carrier, setCarrier] = useState('')
   const [trackingCode, setTrackingCode] = useState('')
   const [estimatedDelivery, setEstimatedDelivery] = useState('')
@@ -67,7 +67,7 @@ function ShipmentCreator({ caseId, busy, onCreate }: { caseId: string | number; 
   </form></details>
 }
 
-function OccurrenceCreator({ caseId, busy, onCreate }: { caseId: string | number; busy: boolean; onCreate: (body: Record<string, unknown>) => Promise<void> }) {
+function OccurrenceCreator({ caseId, busy, onCreate }: { caseId: string | number; busy: boolean; onCreate: (body: Record<string, unknown>) => Promise<Record<string, unknown> | undefined> }) {
   const [type, setType] = useState<OccurrenceType>('damage')
   const [severity, setSeverity] = useState<OccurrenceSeverity>('medium')
   const [description, setDescription] = useState('')
@@ -83,7 +83,7 @@ function OccurrenceCreator({ caseId, busy, onCreate }: { caseId: string | number
   </form></details>
 }
 
-function OccurrenceResolution({ occurrence, busy, onResolve }: { occurrence: OccurrenceRecord; busy: boolean; onResolve: (body: Record<string, unknown>) => Promise<void> }) {
+function OccurrenceResolution({ occurrence, busy, onResolve }: { occurrence: OccurrenceRecord; busy: boolean; onResolve: (body: Record<string, unknown>) => Promise<Record<string, unknown> | undefined> }) {
   const [resolution, setResolution] = useState('')
   const [status, setStatus] = useState<OccurrenceStatus>('resolved')
 
@@ -104,7 +104,7 @@ export function AfterSalesInspector({ afterSalesCase, tasks, shipments, occurren
   occurrences: OccurrenceRecord[]
   activities: ActivityRecord[]
   busy: boolean
-  onOperate: (body: Record<string, unknown>) => Promise<void>
+  onOperate: (body: Record<string, unknown>) => Promise<Record<string, unknown> | undefined>
   onClose: () => void
 }) {
   const [caseStatus, setCaseStatus] = useState<AfterSalesStatus>(afterSalesCase.status || 'open')

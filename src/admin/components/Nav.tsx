@@ -2,13 +2,21 @@
 
 import { useAuth } from '@payloadcms/ui'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { EsmeraRole } from '../../access/roles'
-import { isShellLinkActive, visibleOperationalLinks, visibleTechnicalLinks } from '../shell/navigation'
+import { isShellLinkActive, type ShellNavGroup, visibleOperationalLinks, visibleTechnicalLinks } from '../shell/navigation'
 import { ShellIcon } from '../shell/ShellIcon'
 import { EsmeraIcon } from './Brand'
+
+const GROUP_LABELS: Record<ShellNavGroup, string | null> = {
+  dashboard: null,
+  funil: 'Funil comercial',
+  relacionamento: 'Relacionamento',
+  catalogo: 'Catálogo',
+  outros: null,
+}
 
 type NavUser = {
   id: number | string
@@ -24,6 +32,7 @@ const PEEK_EXIT_DELAY = 120
 
 export function EsmeraNav() {
   const pathname = usePathname()
+  const search = useSearchParams().toString()
   const auth = useAuth()
   const user = auth.user as NavUser | null
   const role = user?.role || null
@@ -123,6 +132,8 @@ export function EsmeraNav() {
 
   if (!user) return null
 
+  const technicalNavLinks = visibleTechnicalLinks(role)
+
   return (
     <nav
       className="esmera-nav"
@@ -141,28 +152,34 @@ export function EsmeraNav() {
       </Link>
 
       <div className="esmera-nav-section" aria-label="Portal operacional">
-        {visibleOperationalLinks(role).map((item) => {
-          const active = isShellLinkActive(pathname, item)
+        {visibleOperationalLinks(role).map((item, index, items) => {
+          const active = isShellLinkActive(pathname, search, item)
+          const groupLabel = GROUP_LABELS[item.group]
+          const showGroupHeader = groupLabel && items[index - 1]?.group !== item.group
           return (
-            <Link
-              className={`esmera-nav-link${active ? ' is-active' : ''}`}
-              href={item.href}
-              key={item.href}
-              title={item.label}
-              aria-current={active ? 'page' : undefined}
-            >
-              <ShellIcon name={item.icon} className="esmera-nav-icon" />
-              <span>{item.label}</span>
-            </Link>
+            <React.Fragment key={item.href}>
+              {showGroupHeader ? <div className="esmera-nav-group-label">{groupLabel}</div> : null}
+              <Link
+                className={`esmera-nav-link${active ? ' is-active' : ''}`}
+                href={item.href}
+                title={item.label}
+                aria-current={active ? 'page' : undefined}
+              >
+                <ShellIcon name={item.icon} className="esmera-nav-icon" />
+                <span>{item.label}</span>
+                {item.step ? <small className="esmera-nav-step">{item.step}</small> : null}
+              </Link>
+            </React.Fragment>
           )
         })}
       </div>
 
+      {technicalNavLinks.length ? <>
       <div className="esmera-nav-divider" />
-      <div className="esmera-nav-caption">Admin técnico</div>
+      <div className="esmera-nav-caption">Configurações avançadas</div>
       <div className="esmera-nav-section esmera-nav-section--technical">
-        {visibleTechnicalLinks(role).map((item) => {
-          const active = isShellLinkActive(pathname, item)
+        {technicalNavLinks.map((item) => {
+          const active = isShellLinkActive(pathname, search, item)
           return (
             <Link
               className={`esmera-nav-link${active ? ' is-active' : ''}`}
@@ -177,6 +194,7 @@ export function EsmeraNav() {
           )
         })}
       </div>
+      </> : null}
 
       <div className="esmera-nav-footer">
         <Link className="esmera-user" href="/admin/account" title={`${name} · ${roleLabel}`}>

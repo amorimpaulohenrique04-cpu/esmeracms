@@ -19,6 +19,7 @@ import type {
   AfterSalesCase,
   AfterSalesFilters,
   OccurrenceRecord,
+  SaleOption,
   ShipmentRecord,
   TaskRecord,
   UserRef,
@@ -42,6 +43,7 @@ type Props = {
   occurrences: OccurrenceRecord[]
   activities: ActivityRecord[]
   users: UserRef[]
+  sales: SaleOption[]
   filters: AfterSalesFilters
 }
 
@@ -80,7 +82,7 @@ function WorkspaceInner(props: Props) {
       }
       if (result.afterSales) {
         const afterSales = result.afterSales as AfterSalesCase
-        queryClient.setQueryData<AfterSalesCase[]>(['after-sales', 'cases'], (current = []) => current.map((item) => String(item.id) === String(afterSales.id) ? { ...item, ...afterSales } : item))
+        queryClient.setQueryData<AfterSalesCase[]>(['after-sales', 'cases'], (current = []) => current.some((item) => String(item.id) === String(afterSales.id)) ? current.map((item) => String(item.id) === String(afterSales.id) ? { ...item, ...afterSales } : item) : [...current, afterSales])
       }
       setFeedback('Operação salva.')
       router.refresh()
@@ -90,13 +92,13 @@ function WorkspaceInner(props: Props) {
 
   async function operate(body: Record<string, unknown>) {
     setFeedback(null)
-    await operation.mutateAsync(body)
+    return await operation.mutateAsync(body)
   }
 
   const caseMap = useMemo(() => new Map(cases.map((item) => [String(item.id), item])), [cases])
 
-  const openInspector = useCallback((caseId: string | number, trigger: HTMLButtonElement) => {
-    triggerRef.current = trigger
+  const openInspector = useCallback((caseId: string | number, trigger?: HTMLButtonElement) => {
+    triggerRef.current = trigger || null
     setSelectedCaseId(caseId)
     setMobileInspectorOpen(true)
     const url = new URL(window.location.href)
@@ -221,7 +223,16 @@ function WorkspaceInner(props: Props) {
 
   return <>
     <AfterSalesMetricStrip filters={props.filters} metrics={metrics} />
-    <AfterSalesFilterBar cases={cases} users={props.users} filters={props.filters} selectedCaseId={selectedCaseId} busy={operation.isPending} onCreate={operate} />
+    <AfterSalesFilterBar
+      cases={cases}
+      sales={props.sales}
+      users={props.users}
+      filters={props.filters}
+      selectedCaseId={selectedCaseId}
+      busy={operation.isPending}
+      onCreate={operate}
+      onCaseCreated={(caseId) => openInspector(caseId)}
+    />
     {feedback ? <p className="esmera-after-sales-feedback" role="status" aria-live="polite">{feedback}</p> : null}
     <div className={`esmera-after-sales-workspace${selectedCase ? ' has-inspector' : ''}${mobileInspectorOpen ? ' is-mobile-inspector-open' : ''}`}>
       <AfterSalesQueue rows={rows} filters={props.filters} selectedCaseId={selectedCaseId} sorting={sorting} onSortingChange={setSorting} onInspect={openInspector} />

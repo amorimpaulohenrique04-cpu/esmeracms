@@ -239,9 +239,9 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
           </div>
           <div className="esmera-customer-detail__actions">
             <Status tone={statusTone(detail.status)}>{customerStatusLabels[detail.status] || '—'}</Status>
-            <Link className="esmera-button" href={`/admin/sales?view=list&customer=${detail.id}`}>Contexto comercial</Link>
+            <Link className="esmera-button" href={`/admin/opportunities?view=list&customer=${detail.id}`}>Contexto comercial</Link>
             {role === 'admin' ? <CustomerMergeDialog source={detail} customers={mergeCandidates} /> : null}
-            <TechnicalLink href={`/admin/collections/customers/${detail.id}`}>Admin técnico</TechnicalLink>
+            {role === 'admin' ? <TechnicalLink href={`/admin/collections/customers/${detail.id}`}>Configurações avançadas</TechnicalLink> : null}
           </div>
         </header>
 
@@ -274,7 +274,7 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
 
     return (
       <ViewFrame props={props} width="wide">
-        <PageHeader eyebrow="Relacionamento" title="Clientes" subtitle="Workspace relacional para entender identidade, interesses, oportunidades, vendas, pós-venda, tarefas e histórico sem abrir múltiplas Collections." actions={<><CustomerCreateDialog /><TechnicalLink href="/admin/collections/customers">Admin técnico</TechnicalLink></>} />
+        <PageHeader eyebrow="Relacionamento" title="Clientes" subtitle="Workspace relacional para entender identidade, interesses, oportunidades, vendas, pós-venda, tarefas e histórico sem abrir múltiplas Collections." actions={<><CustomerCreateDialog />{role === 'admin' ? <TechnicalLink href="/admin/collections/customers">Configurações avançadas</TechnicalLink> : null}</>} />
         <SplitWorkspace
           className="esmera-customers-workspace"
           hasDetail={Boolean(detail)}

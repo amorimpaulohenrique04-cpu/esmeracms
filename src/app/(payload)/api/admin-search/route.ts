@@ -60,11 +60,11 @@ function contextualActions(user: unknown, pathname: string, search: string): Sea
     )
   }
 
-  if (pathname.startsWith('/admin/sales') && canManageBusiness(user)) {
+  if (pathname.startsWith('/admin/opportunities') && canManageBusiness(user)) {
     items.push(
       { id: 'context-new-opportunity', group: 'Nesta tela', label: 'Nova oportunidade', href: '/admin/collections/opportunities/create', icon: 'plus' },
-      { id: 'context-sales-list', group: 'Nesta tela', label: 'Alternar para Lista', href: '/admin/sales?view=list', icon: 'receipt' },
-      { id: 'context-sales-pipeline', group: 'Nesta tela', label: 'Alternar para Pipeline', href: '/admin/sales?view=pipeline', icon: 'receipt' },
+      { id: 'context-sales-list', group: 'Nesta tela', label: 'Alternar para Lista', href: '/admin/opportunities?view=list', icon: 'receipt' },
+      { id: 'context-sales-pipeline', group: 'Nesta tela', label: 'Alternar para Pipeline', href: '/admin/opportunities?view=pipeline', icon: 'receipt' },
     )
   }
 
@@ -79,7 +79,7 @@ function contextualActions(user: unknown, pathname: string, search: string): Sea
     items.push(
       { id: 'context-report-current', group: 'Nesta tela', label: 'Copiar recorte atual', meta: current, href: current, icon: 'chart' },
       { id: 'context-report-clear', group: 'Nesta tela', label: 'Limpar investigação', meta: 'Manter somente o período padrão', href: '/admin/reports', icon: 'chart' },
-      { id: 'context-report-sales', group: 'Nesta tela', label: 'Investigar vendas', meta: 'Abrir visão comercial relacionada', href: '/admin/sales?view=list', icon: 'receipt' },
+      { id: 'context-report-sales', group: 'Nesta tela', label: 'Investigar vendas', meta: 'Abrir visão comercial relacionada', href: '/admin/opportunities?view=list', icon: 'receipt' },
     )
   }
 
@@ -90,8 +90,11 @@ function actionsFor(user: unknown, pathname: string, search: string): SearchItem
   const items: SearchItem[] = [
     ...contextualActions(user, pathname, search),
     { id: 'action-dashboard', group: 'Navegação', label: 'Abrir Dashboard', href: '/admin', icon: 'grid' },
-    { id: 'action-technical', group: 'Navegação', label: 'Abrir Admin técnico', href: '/admin/technical', icon: 'database' },
   ]
+
+  if (isAdmin(user)) {
+    items.push({ id: 'action-technical', group: 'Navegação', label: 'Abrir Configurações avançadas', href: '/admin/technical', icon: 'database' })
+  }
 
   if (canManageSite(user)) {
     items.push(
@@ -105,12 +108,12 @@ function actionsFor(user: unknown, pathname: string, search: string): SearchItem
   if (canManageBusiness(user)) {
     items.push(
       { id: 'action-customers', group: 'Navegação', label: 'Abrir Clientes', href: '/admin/customers', icon: 'users' },
-      { id: 'action-sales', group: 'Navegação', label: 'Abrir Vendas', href: '/admin/sales?view=list', icon: 'receipt' },
-      { id: 'action-pipeline', group: 'Navegação', label: 'Abrir Pipeline de Vendas', href: '/admin/sales?view=pipeline', icon: 'receipt' },
+      { id: 'action-sales', group: 'Navegação', label: 'Abrir Vendas', href: '/admin/sales', icon: 'receipt' },
+      { id: 'action-pipeline', group: 'Navegação', label: 'Abrir Oportunidades', href: '/admin/opportunities?view=pipeline', icon: 'receipt' },
       { id: 'action-after-sales', group: 'Navegação', label: 'Abrir Pós-venda', href: '/admin/after-sales', icon: 'heart' },
       { id: 'action-reports', group: 'Navegação', label: 'Abrir Relatórios', href: '/admin/reports', icon: 'chart' },
       { id: 'action-new-customer', group: 'Criar', label: 'Novo cliente', href: '/admin/collections/customers/create', icon: 'plus' },
-      { id: 'action-new-lead', group: 'Criar', label: 'Novo lead', meta: 'Registrar entrada e qualificação', href: '/admin/collections/leads/create', icon: 'person' },
+      { id: 'action-new-lead', group: 'Criar', label: 'Novo lead', meta: 'Registrar entrada e qualificação', href: '/admin/leads', icon: 'person' },
       { id: 'action-new-opportunity', group: 'Criar', label: 'Nova oportunidade', meta: 'Iniciar negociação comercial', href: '/admin/collections/opportunities/create', icon: 'plus' },
       { id: 'action-new-follow-up', group: 'Criar', label: 'Novo follow-up', meta: 'Criar tarefa operacional real', href: '/admin/collections/tasks/create?type=follow_up', icon: 'plus' },
     )
@@ -162,17 +165,17 @@ export async function GET(request: Request) {
         collection: 'opportunities', overrideAccess: false, user, depth: 1, limit: 6,
         where: { or: [{ code: { like: query } }, { nextAction: { like: query } }, { 'customer.name': { like: query } }] } as Where,
         select: { id: true, code: true, stage: true, nextAction: true, customer: true },
-      }).then((result) => result.docs.map((doc) => ({ id: `opportunity-${doc.id}`, group: 'Oportunidades', label: text(doc.code) || 'Oportunidade sem código', meta: [relationLabel(doc.customer), opportunityStageLabels[doc.stage as keyof typeof opportunityStageLabels] || text(doc.stage), text(doc.nextAction)].filter(Boolean).join(' · ') || undefined, href: `/admin/collections/opportunities/${doc.id}`, icon: 'receipt' }))),
+      }).then((result) => result.docs.map((doc) => ({ id: `opportunity-${doc.id}`, group: 'Oportunidades', label: text(doc.code) || 'Oportunidade sem código', meta: [relationLabel(doc.customer), opportunityStageLabels[doc.stage as keyof typeof opportunityStageLabels] || text(doc.stage), text(doc.nextAction)].filter(Boolean).join(' · ') || undefined, href: `/admin/opportunities?view=list&q=${encodeURIComponent(text(doc.code) || String(doc.id))}`, icon: 'receipt' }))),
       payload.find({
         collection: 'leads', overrideAccess: false, user, depth: 0, limit: 6,
         where: { or: [{ name: { like: query } }, { phone: { like: query } }, { email: { like: query } }] } as Where,
-        select: { id: true, name: true, stage: true, source: true },
-      }).then((result) => result.docs.map((doc) => ({ id: `lead-${doc.id}`, group: 'Leads recentes', label: text(doc.name) || 'Lead sem nome', meta: [text(doc.source), text(doc.stage)].filter(Boolean).join(' · ') || undefined, href: `/admin/collections/leads/${doc.id}`, icon: 'person' }))),
+        select: { id: true, name: true, source: true },
+      }).then((result) => result.docs.map((doc) => ({ id: `lead-${doc.id}`, group: 'Leads recentes', label: text(doc.name) || 'Lead sem nome', meta: text(doc.source) || undefined, href: `/admin/leads?q=${encodeURIComponent(text(doc.name) || String(doc.id))}`, icon: 'person' }))),
       payload.find({
         collection: 'sales', overrideAccess: false, user, depth: 0, limit: 6,
         where: { number: { like: query } } as Where,
         select: { id: true, number: true, status: true, totalCents: true },
-      }).then((result) => result.docs.map((doc) => ({ id: `sale-${doc.id}`, group: 'Vendas recentes', label: `Venda #${text(doc.number) || '—'}`, meta: text(doc.status) || undefined, href: `/admin/collections/sales/${doc.id}`, icon: 'receipt' }))),
+      }).then((result) => result.docs.map((doc) => ({ id: `sale-${doc.id}`, group: 'Vendas recentes', label: `Venda #${text(doc.number) || '—'}`, meta: text(doc.status) || undefined, href: `/admin/sales?q=${encodeURIComponent(text(doc.number) || String(doc.id))}`, icon: 'receipt' }))),
     )
   }
 

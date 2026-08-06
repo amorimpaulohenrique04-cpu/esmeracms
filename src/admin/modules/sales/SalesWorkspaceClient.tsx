@@ -199,7 +199,7 @@ function filterHref(filters: SalesWorkspaceFilters, patch: Partial<SalesWorkspac
   if (next.page > 1) params.set('page', String(next.page))
   if (next.limit !== 50) params.set('limit', String(next.limit))
   if (next.sort) params.set('sort', next.sort)
-  return `/admin/sales?${params.toString()}`
+  return `/admin/opportunities?${params.toString()}`
 }
 
 function InspectorContent({ opportunity, activities }: { opportunity: OpportunityRecord; activities: ActivityRecord[] }) {
@@ -433,7 +433,7 @@ function PipelineColumn({ stage, records, activities, products, onMove, onClose,
 }
 
 function Filters({ filters, users }: { filters: SalesWorkspaceFilters; users: UserRef[] }) {
-  return <form method="get" action="/admin/sales">
+  return <form method="get" action="/admin/opportunities">
     <input type="hidden" name="view" value={filters.view} />
     <input type="hidden" name="limit" value={filters.limit} />
     <FilterPanel
@@ -450,13 +450,13 @@ function Filters({ filters, users }: { filters: SalesWorkspaceFilters; users: Us
         <label><span>Etapa</span><select className="esmera-input" name="stage" defaultValue={filters.stage}><option value="">Todas</option>{opportunityStages.map((stage) => <option key={stage} value={stage}>{opportunityStageLabels[stage]}</option>)}</select></label>
         <Button type="submit">Aplicar recorte</Button>
       </div>}
-      actions={<><Button type="submit" tone="primary">Aplicar</Button><Link className="esmera-button esmera-button--quiet" href={`/admin/sales?view=${filters.view}`}>Limpar</Link></>}
+      actions={<><Button type="submit" tone="primary">Aplicar</Button><Link className="esmera-button esmera-button--quiet" href={`/admin/opportunities?view=${filters.view}`}>Limpar</Link></>}
     />
   </form>
 }
 
 function Transactions({ transactions }: { transactions: SalesTransaction[] }) {
-  return <DataSection className="esmera-sales-transactions" eyebrow="Fulfillment" title="Vendas confirmadas recentes" description="Sales transacionais criadas a partir de oportunidades ganhas." action={<Link href="/admin/collections/sales">Ver Admin técnico</Link>}>{transactions.length ? <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Venda</th><th>Cliente</th><th>Status</th><th>Total</th><th>Confirmada</th><th /></tr></thead><tbody>{transactions.map((sale) => <tr key={String(sale.id)}><td><strong>{sale.number || sale.id}</strong></td><td>{relationLabel(sale.customer, '—')}</td><td><Status tone={sale.status === 'delivered' ? 'success' : 'info'}>{saleStatusLabels[sale.status || ''] || sale.status}</Status></td><td><span className="esmera-nums">{money(sale.totalCents)}</span></td><td>{shortDate(sale.confirmedAt || sale.updatedAt)}</td><td><Link href={`/admin/collections/sales/${sale.id}`}>Abrir</Link></td></tr>)}</tbody></table></div> : <EmptyState title="Nenhuma venda confirmada" copy="Quando uma oportunidade for ganha, a Sale criada aparecerá aqui." />}</DataSection>
+  return <DataSection className="esmera-sales-transactions" eyebrow="Fulfillment" title="Vendas confirmadas recentes" description="Sales transacionais criadas a partir de oportunidades ganhas." action={<Link href="/admin/sales">Ver todas as vendas</Link>}>{transactions.length ? <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Venda</th><th>Cliente</th><th>Status</th><th>Total</th><th>Confirmada</th><th /></tr></thead><tbody>{transactions.map((sale) => <tr key={String(sale.id)}><td><strong>{sale.number || sale.id}</strong></td><td>{relationLabel(sale.customer, '—')}</td><td><Status tone={sale.status === 'delivered' ? 'success' : 'info'}>{saleStatusLabels[sale.status || ''] || sale.status}</Status></td><td><span className="esmera-nums">{money(sale.totalCents)}</span></td><td>{shortDate(sale.confirmedAt || sale.updatedAt)}</td><td><Link href={`/admin/collections/sales/${sale.id}`}>Abrir</Link></td></tr>)}</tbody></table></div> : <EmptyState title="Nenhuma venda confirmada" copy="Quando uma oportunidade for ganha, a Sale criada aparecerá aqui." />}</DataSection>
 }
 
 function WorkspaceInner(props: Props) {

@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
 import type { AdminViewServerProps } from 'payload'
 
+import { FunnelStepper } from '../../design-system'
 import {
   AccessDenied,
   ensureUser,
@@ -17,6 +18,7 @@ import type {
   AfterSalesFilters,
   OccurrenceRecord,
   QueueFocus,
+  SaleOption,
   ShipmentRecord,
   TaskRecord,
   UserRef,
@@ -54,7 +56,7 @@ export async function AfterSalesView(props: AdminViewServerProps) {
   const filters = filtersFrom(await paramsOf(props))
 
   try {
-    const [caseResult, taskResult, shipmentResult, occurrenceResult, activityResult, usersResult] = await Promise.all([
+    const [caseResult, taskResult, shipmentResult, occurrenceResult, activityResult, usersResult, saleResult] = await Promise.all([
       findDocs<AfterSalesCase>(req, 'after-sales', {
         sort: '-updatedAt',
         limit: 500,
@@ -151,6 +153,12 @@ export async function AfterSalesView(props: AdminViewServerProps) {
         depth: 0,
         select: { id: true, name: true, email: true },
       }),
+      findDocs<SaleOption>(req, 'sales', {
+        sort: '-updatedAt',
+        limit: 300,
+        depth: 1,
+        select: { id: true, number: true, customer: true },
+      }),
     ])
 
     return <ViewFrame props={props}>
@@ -158,8 +166,9 @@ export async function AfterSalesView(props: AdminViewServerProps) {
         eyebrow="Operações"
         title="Pós-venda"
         subtitle="Fila operacional de tarefas, entregas e ocorrências. Prazos e estados reais substituem percentuais artificiais."
-        actions={<><TechnicalLink href="/admin/collections/after-sales/create" primary>Novo caso</TechnicalLink><TechnicalLink href="/admin/collections/tasks">Tarefas técnicas</TechnicalLink></>}
+        actions={<TechnicalLink href="/admin/collections/tasks">Tarefas técnicas</TechnicalLink>}
       />
+      <FunnelStepper current={4} />
       <AfterSalesHydratedWorkspace
         cases={caseResult.docs}
         tasks={taskResult.docs}
@@ -167,6 +176,7 @@ export async function AfterSalesView(props: AdminViewServerProps) {
         occurrences={occurrenceResult.docs}
         activities={activityResult.docs}
         users={usersResult.docs}
+        sales={saleResult.docs}
         filters={filters}
       />
     </ViewFrame>

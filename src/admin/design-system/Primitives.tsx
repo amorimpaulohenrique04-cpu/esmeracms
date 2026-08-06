@@ -42,6 +42,33 @@ export function PageCommandBar({
   )
 }
 
+const FUNNEL_STEPS = [
+  { step: 1 as const, label: 'Captação', href: '/admin/leads' },
+  { step: 2 as const, label: 'Oportunidades', href: '/admin/opportunities' },
+  { step: 3 as const, label: 'Vendas', href: '/admin/sales' },
+  { step: 4 as const, label: 'Pós-venda', href: '/admin/after-sales' },
+]
+
+export function FunnelStepper({ current, className = '' }: { current: 1 | 2 | 3 | 4; className?: string }) {
+  return (
+    <nav className={classes('esmera-funnel-stepper', className)} aria-label="Etapas do funil comercial">
+      <ol>
+        {FUNNEL_STEPS.map((item) => {
+          const state = item.step === current ? 'is-current' : item.step < current ? 'is-done' : 'is-upcoming'
+          return (
+            <li key={item.step} className={state}>
+              <a href={item.href} aria-current={item.step === current ? 'step' : undefined}>
+                <span className="esmera-funnel-stepper__index">{item.step}</span>
+                <span className="esmera-funnel-stepper__label">{item.label}</span>
+              </a>
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
+
 export function SegmentedControl({
   label,
   children,

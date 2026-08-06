@@ -8,6 +8,7 @@ import {
   opportunityStages,
 } from '../businessRules/opportunities/stages'
 import { businessUserRelationship } from '../fields/userRelationship'
+import { deriveActivityKind } from '../hooks/activities/deriveActivityKind'
 
 export const Activities: CollectionConfig = {
   slug: 'activities',
@@ -26,6 +27,7 @@ export const Activities: CollectionConfig = {
     update: admins,
     delete: admins,
   },
+  hooks: { beforeValidate: [deriveActivityKind] },
   fields: [
     {
       name: 'eventType',
@@ -55,6 +57,7 @@ export const Activities: CollectionConfig = {
       type: 'select',
       label: 'Tipo',
       required: true,
+      admin: { readOnly: true, description: 'Derivado automaticamente do evento estruturado.' },
       options: [
         { label: 'Contato', value: 'contact' },
         { label: 'Mensagem', value: 'message' },
