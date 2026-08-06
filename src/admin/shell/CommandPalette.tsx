@@ -201,6 +201,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   }, [open])
 
   const results = useMemo(() => {
+    void continuityVersion
     const local = open ? localCommands(selection, currentHref) : []
     const needle = query.trim().toLocaleLowerCase('pt-BR')
     const filteredLocal = needle ? local.filter((item) => matchesQuery(item, needle)) : local
@@ -215,7 +216,11 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
   }, [continuityVersion, currentHref, open, query, selection, serverResultQuery, serverResults])
 
   const recentResults = useMemo(() => results.filter((result) => result.group === 'Recentes').slice(0, 5), [results])
-  const quickActions = useMemo(() => results.filter(isQuickAction).sort((left, right) => quickActionPriority(left) - quickActionPriority(right)).slice(0, 5), [results])
+  const quickActions = useMemo(() => {
+    const sortedActions = results.filter(isQuickAction).sort((left, right) => quickActionPriority(left) - quickActionPriority(right))
+    const dashboard = results.find((result) => result.label === 'Abrir Dashboard')
+    return uniqueResults([...sortedActions.slice(0, 4), ...(dashboard ? [dashboard] : []), ...sortedActions]).slice(0, 5)
+  }, [results])
   const reportSections = useMemo(() => results.filter((result) => result.group === 'Seções de Relatórios').slice(0, 5), [results])
   const filteredResults = useMemo(() => results.filter((result) => matchesFilter(result, filter)), [filter, results])
   const desktopHomeResults = useMemo(() => uniqueResults([...recentResults, ...quickActions, ...reportSections]), [quickActions, recentResults, reportSections])
@@ -328,7 +333,7 @@ export function CommandPalette({ open, onOpenChange, selection, currentHref }: {
                 />
                 {compactViewport ? <span className={`esmera-command-indicator is-${searchState}`} role="status" aria-live="polite">{stateLabel}</span> : <kbd className="esmera-command-key">⌘ K</kbd>}
               </div>
-              <span className="esmera-command-status" role="status" aria-live="polite">{stateLabel}</span>
+              {!compactViewport ? <span className="esmera-command-status" role="status" aria-live="polite">{stateLabel}</span> : null}
               <Dialog.Close className="esmera-command-close" aria-label="Fechar busca">{compactViewport ? 'Esc' : <ShellIcon name="close" />}</Dialog.Close>
             </div>
 
