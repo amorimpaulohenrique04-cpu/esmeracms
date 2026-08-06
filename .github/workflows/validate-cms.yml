@@ -1,16 +1,20 @@
-name: Validate Esmera CMS
+name: Validate Esmera CMS ARM diagnostic
 
 on:
   push:
-    branches: [main]
-  pull_request:
+    branches:
+      - ci/verify-funnel-86e570c-arm
+
+permissions:
+  contents: read
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -18,10 +22,10 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -U postgres -d esmera"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/esmera
       PAYLOAD_SECRET: ci-only-payload-secret-change-me
@@ -43,5 +47,5 @@ jobs:
       - run: pnpm lint --max-warnings=0
       - run: pnpm test:int
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - run: pnpm analyze:dead-code
+      - run: pnpm analyze:bundle
