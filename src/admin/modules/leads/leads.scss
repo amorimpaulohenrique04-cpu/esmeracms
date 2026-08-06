@@ -5,3 +5,34 @@
 .esmera-leads-facts div { display: flex; justify-content: space-between; gap: 10px; }
 .esmera-leads-facts dt { color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 .esmera-leads-facts dd { margin: 0; font-size: var(--esmera-font-ui-sm); }
+
+.esmera-leads-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+.esmera-leads-search {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: var(--esmera-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.esmera-leads-search .esmera-input { min-height: 38px; }
+.esmera-leads-filters__actions { display: flex; flex: 0 0 auto; gap: 8px; }
+.esmera-leads-filters__actions .esmera-button { min-height: 38px; white-space: nowrap; }
+
+@container esmera-workspace (max-width: 720px) {
+  .esmera-leads-table__date { display: none; }
+}
+
+@container esmera-workspace (max-width: 560px) {
+  .esmera-leads-filters { flex-direction: column; align-items: stretch; }
+  .esmera-leads-filters__actions { width: 100%; }
+  .esmera-leads-filters__actions .esmera-button { flex: 1 1 0; }
+  .esmera-leads-table__origin { display: none; }
+}

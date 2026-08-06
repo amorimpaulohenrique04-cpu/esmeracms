@@ -135,8 +135,6 @@ export function AfterSalesFilterBar({ cases, sales, users, filters, selectedCase
           <label><span>Status</span><select className="esmera-input" name="status" defaultValue={filters.status}><option value="open">Abertos</option><option value="done">Concluídos</option><option value="all">Todos</option></select></label>
           <label><span>Responsável</span><select className="esmera-input" name="owner" defaultValue={filters.owner}><option value="">Todos</option>{users.map((user) => <option key={String(user.id)} value={String(user.id)}>{user.name || user.email || user.id}</option>)}</select></label>
           <Button type="submit">Aplicar</Button>
-          <RegisterCaseDialog sales={sales} busy={busy} onCreate={onCreate} onCaseCreated={onCaseCreated} />
-          <FollowUpDialog key={String(selectedCaseId || 'none')} cases={cases} sales={sales} users={users} selectedCaseId={selectedCaseId} busy={busy} onCreate={onCreate} />
         </div>
         <FilterPanelAdvanced label="Mais filtros" active={hasAdvancedFilters}>
           <label><span>Prioridade</span><select className="esmera-input" name="priority" defaultValue={filters.priority}><option value="">Todas</option>{operationalPriorities.map((value) => <option key={value} value={value}>{operationalPriorityLabels[value]}</option>)}</select></label>
@@ -145,6 +143,10 @@ export function AfterSalesFilterBar({ cases, sales, users, filters, selectedCase
           <Link className="esmera-button esmera-button--quiet" href="/admin/after-sales">Limpar</Link>
         </FilterPanelAdvanced>
       </form>
+      <div className="esmera-after-sales-actions">
+        <RegisterCaseDialog sales={sales} busy={busy} onCreate={onCreate} onCaseCreated={onCaseCreated} />
+        <FollowUpDialog key={String(selectedCaseId || 'none')} cases={cases} sales={sales} users={users} selectedCaseId={selectedCaseId} busy={busy} onCreate={onCreate} />
+      </div>
     </div>
   )
 }

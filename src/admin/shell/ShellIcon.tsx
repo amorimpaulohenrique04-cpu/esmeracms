@@ -20,6 +20,7 @@ export function ShellIcon({ name, className = 'esmera-shell-icon' }: { name: str
     person: <><circle cx="12" cy="8" r="3"/><path d="M5 21c0-4.5 2.8-8 7-8s7 3.5 7 8"/></>,
     clock: <><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></>,
     filter: <><path d="M4 6h16M7 12h10M10 18h4"/><circle cx="8" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="12" cy="18" r="1"/></>,
+    check: <path d="M5 12.5 10 17l9-10"/>,
   }
 
   return (

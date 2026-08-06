@@ -13,6 +13,7 @@ import {
 import { assessProductPublication } from '../../../server/publication/productAssessment'
 import { createDocumentRevision } from '../../../server/publication/revision'
 import { ProductDocumentView } from './ProductDocumentView'
+import { ProductImportDialog } from './ProductImportDialog'
 import { ProductsWorkspaceClient } from './ProductsWorkspaceClient'
 import type {
   ProductCategory,
@@ -153,7 +154,7 @@ export async function ProductsView(props: AdminViewServerProps) {
     ])
 
     return <ViewFrame props={props}>
-      <PageHeader eyebrow="Catálogo" title="Produtos" subtitle="Operação do catálogo com filtros, prontidão, publicação, grid, ações em lote e acesso ao documento editorial completo." actions={<TechnicalLink href="/admin/collections/products/create" primary>Novo produto</TechnicalLink>} />
+      <PageHeader eyebrow="Catálogo" title="Produtos" subtitle="Operação do catálogo com filtros, prontidão, publicação, grid, ações em lote e acesso ao documento editorial completo." actions={<><TechnicalLink href="/admin/collections/products/create" primary>Novo produto</TechnicalLink><ProductImportDialog /></>} />
       <ProductsWorkspaceClient products={result.docs} categories={categoryResult.docs} filters={filters} totalDocs={result.totalDocs} totalPages={result.totalPages} />
     </ViewFrame>
   } catch (error) {
