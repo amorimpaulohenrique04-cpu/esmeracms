@@ -1,0 +1,78 @@
+name: Verify funnel fixes on ARM
+
+on:
+  push:
+    branches:
+      - ci/verify-funnel-86e570c-arm
+
+permissions:
+  contents: read
+
+jobs:
+  validate-arm:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: esmera_verify
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d esmera_verify"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      CI: true
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/esmera_verify
+      PAYLOAD_SECRET: verify-ci-only-secret
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Payload types
+        run: pnpm generate:types
+
+      - name: Generate Payload import map
+        run: pnpm generate:importmap
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint --max-warnings=0
+
+      - name: Run integration tests
+        run: pnpm test:int
+
+      - name: Build
+        run: pnpm build
+
+      - name: Analyze dead code
+        run: pnpm analyze:dead-code
+
+      - name: Analyze bundle
+        run: pnpm analyze:bundle
