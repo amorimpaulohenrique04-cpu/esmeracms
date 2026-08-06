@@ -1,9 +1,10 @@
 /* eslint-disable react-hooks/error-boundaries -- Query failures are handled here; render failures remain handled by the Next.js/Payload boundaries. */
 import Link from 'next/link'
+import { Suspense } from 'react'
 import type { AdminViewServerProps, Where } from 'payload'
 
 import {
-  DataSection,
+  LoadingState,
   MetricStrip,
   MetricStripItem,
   SectionNav,
@@ -13,8 +14,6 @@ import {
 } from '../../design-system'
 import {
   AccessDenied,
-  dateTime,
-  EmptyState,
   ensureUser,
   findDocs,
   money,
@@ -24,25 +23,18 @@ import {
   TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
+import { CustomerDetailTabPanel } from './CustomerDetailTabPanel'
 import {
   CustomerCreateDialog,
-  CustomerInterestComposer,
   CustomerMasterList,
   CustomerMergeDialog,
-  CustomerNoteComposer,
-  CustomerProfileEditor,
 } from './CustomerWorkspaceClient'
 import {
-  activityEventLabels,
   customerOriginLabels,
   customerStatusLabels,
   customerTabLabels,
-  hasCustomerRelation,
   relationId,
   relationLabel,
-  saleStatusLabels,
-  type ActivitySummary,
-  type AfterSaleSummary,
   type CategoryRef,
   type ClientInterestSummary,
   type CustomerDetail,
@@ -51,7 +43,6 @@ import {
   type CustomerTab,
   type ProductRef,
   type SaleSummary,
-  type TaskSummary,
   type UserRef,
 } from './types'
 import './customers.scss'
@@ -131,10 +122,6 @@ function statusTone(status?: string | null): 'success' | 'warning' | 'danger' | 
   if (['cancelled', 'urgent'].includes(status || '')) return 'danger'
   if (status === 'draft') return 'info'
   return 'neutral'
-}
-
-function activityLabel(activity: ActivitySummary) {
-  return activityEventLabels[activity.eventType || ''] || activity.summary || 'Atividade'
 }
 
 export async function CustomersWorkspaceView(props: AdminViewServerProps) {
@@ -220,29 +207,20 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
 
     let detail: CustomerDetail | null = null
     let sales: SaleSummary[] = []
-    let afterSales: AfterSaleSummary[] = []
     let interests: ClientInterestSummary[] = []
     let opportunities: OpportunitySummary[] = []
-    let activities: ActivitySummary[] = []
-    let tasks: TaskSummary[] = []
 
     if (selectedId) {
       detail = await req.payload.findByID({ collection: 'customers', id: selectedId, depth: 2, overrideAccess: false, user: req.user, req }) as unknown as CustomerDetail
       detail.status = detail.status || 'active'
-      const [salesResult, afterSalesResult, interestsResult, opportunitiesResult, activitiesResult, tasksResult] = await Promise.all([
+      const [salesResult, interestsResult, opportunitiesResult] = await Promise.all([
         findDocs<SaleSummary>(req, 'sales', { sort: '-confirmedAt', limit: 300, depth: 1, where: { customer: { equals: selectedId } } as Where }),
-        findDocs<AfterSaleSummary>(req, 'after-sales', { sort: '-updatedAt', limit: 300, depth: 1, where: { customer: { equals: selectedId } } as Where }),
         findDocs<ClientInterestSummary>(req, 'client-interests', { sort: '-addedAt', limit: 300, depth: 1, where: { customer: { equals: selectedId } } as Where }),
         findDocs<OpportunitySummary>(req, 'opportunities', { sort: 'rank', limit: 300, depth: 0, where: { customer: { equals: selectedId } } as Where, select: { id: true, stage: true, estimatedValueCents: true, nextAction: true, nextActionAt: true } }),
-        findDocs<ActivitySummary>(req, 'activities', { sort: '-occurredAt', limit: 1000, depth: 1 }),
-        findDocs<TaskSummary>(req, 'tasks', { sort: 'dueAt', limit: 1000, depth: 1 }),
       ])
       sales = salesResult.docs
-      afterSales = afterSalesResult.docs
       interests = interestsResult.docs
       opportunities = opportunitiesResult.docs
-      activities = activitiesResult.docs.filter((activity) => hasCustomerRelation(activity.relatedTo, selectedId))
-      tasks = tasksResult.docs.filter((task) => hasCustomerRelation(task.relatedTo, selectedId))
     }
 
     const selectedPurchases = sales.filter((sale) => purchaseStatuses.has(sale.status || ''))
@@ -250,60 +228,62 @@ export async function CustomersWorkspaceView(props: AdminViewServerProps) {
     const lastPurchase = selectedPurchases[0]
     const openOpportunities = opportunities.filter((opportunity) => openOpportunityStages.has(opportunity.stage || ''))
     const openOpportunityValue = openOpportunities.reduce((sum, opportunity) => sum + (opportunity.estimatedValueCents || 0), 0)
-    const nextTask = tasks.find((task) => task.status === 'pending' || task.status === 'in_progress')
-    const noteActivities = activities.filter((activity) => activity.eventType === 'note.created' || activity.kind === 'note')
 
-    const detailContent = detail ? <section className="esmera-customer-detail">
-      <header className="esmera-customer-detail__header">
-        <div>
-          <Link className="esmera-customer-back" href="/admin/customers">← Clientes</Link>
-          <span className="esmera-eyebrow">Cliente</span>
-          <h2>{detail.name || 'Cliente sem nome'}</h2>
-          <p>{detail.phone || 'Sem telefone'} · {detail.email || 'Sem e-mail'} · cliente desde {shortDate(detail.createdAt)}</p>
-          <small>Responsável: {relationLabel(detail.owner, 'não definido')} · origem {customerOriginLabels[detail.origin || ''] || 'não informada'}</small>
-        </div>
-        <div className="esmera-customer-detail__actions">
-          <Status tone={statusTone(detail.status)}>{customerStatusLabels[detail.status] || '—'}</Status>
-          <Link className="esmera-button" href={`/admin/sales?view=list&customer=${detail.id}`}>Contexto comercial</Link>
-          {role === 'admin' ? <CustomerMergeDialog source={detail} customers={mergeCandidates} /> : null}
-          <TechnicalLink href={`/admin/collections/customers/${detail.id}`}>Admin técnico</TechnicalLink>
-        </div>
-      </header>
+    const detailContent = detail ? (
+      <section className="esmera-customer-detail">
+        <header className="esmera-customer-detail__header">
+          <div>
+            <Link className="esmera-customer-back" href="/admin/customers">← Clientes</Link>
+            <span className="esmera-eyebrow">Cliente</span>
+            <h2>{detail.name || 'Cliente sem nome'}</h2>
+            <p>{detail.phone || 'Sem telefone'} · {detail.email || 'Sem e-mail'} · cliente desde {shortDate(detail.createdAt)}</p>
+            <small>Responsável: {relationLabel(detail.owner, 'não definido')} · origem {customerOriginLabels[detail.origin || ''] || 'não informada'}</small>
+          </div>
+          <div className="esmera-customer-detail__actions">
+            <Status tone={statusTone(detail.status)}>{customerStatusLabels[detail.status] || '—'}</Status>
+            <Link className="esmera-button" href={`/admin/sales?view=list&customer=${detail.id}`}>Contexto comercial</Link>
+            {role === 'admin' ? <CustomerMergeDialog source={detail} customers={mergeCandidates} /> : null}
+            <TechnicalLink href={`/admin/collections/customers/${detail.id}`}>Admin técnico</TechnicalLink>
+          </div>
+        </header>
 
-      <MetricStrip columns={4} className="esmera-customer-summary-grid" label="Resumo do cliente">
-        <MetricStripItem label="Compras" value={selectedPurchases.length} meta={lastPurchase ? `Última em ${shortDate(lastPurchase.confirmedAt || lastPurchase.updatedAt)}` : 'Nenhuma compra confirmada'} />
-        <MetricStripItem label="Valor histórico" value={money(lifetimeValue)} meta="Somente vendas confirmadas ou posteriores" tone="success" />
-        <MetricStripItem label="Interesses ativos" value={interests.filter((interest) => ['active', 'curation', 'paused'].includes(interest.status || '')).length} meta="Associações explícitas a produtos" />
-        <MetricStripItem label="Oportunidades abertas" value={openOpportunities.length} meta={openOpportunities.length ? `${money(openOpportunityValue)} de potencial informado` : 'Nenhuma negociação aberta'} tone={openOpportunities.length ? 'info' : 'neutral'} />
-      </MetricStrip>
+        <MetricStrip columns={4} className="esmera-customer-summary-grid" label="Resumo do cliente">
+          <MetricStripItem label="Compras" value={selectedPurchases.length} meta={lastPurchase ? `Última em ${shortDate(lastPurchase.confirmedAt || lastPurchase.updatedAt)}` : 'Nenhuma compra confirmada'} />
+          <MetricStripItem label="Valor histórico" value={money(lifetimeValue)} meta="Somente vendas confirmadas ou posteriores" tone="success" />
+          <MetricStripItem label="Interesses ativos" value={interests.filter((interest) => ['active', 'curation', 'paused'].includes(interest.status || '')).length} meta="Associações explícitas a produtos" />
+          <MetricStripItem label="Oportunidades abertas" value={openOpportunities.length} meta={openOpportunities.length ? `${money(openOpportunityValue)} de potencial informado` : 'Nenhuma negociação aberta'} tone={openOpportunities.length ? 'info' : 'neutral'} />
+        </MetricStrip>
 
-      <SectionNav className="esmera-customer-tabs" label="Seções do cliente">{tabs.map((item) => <SectionNavLink key={item} active={tab === item} href={tabHref(filters, detail!.id, item)}>{customerTabLabels[item]}</SectionNavLink>)}</SectionNav>
+        <SectionNav className="esmera-customer-tabs" label="Seções do cliente">
+          {tabs.map((item) => <SectionNavLink key={item} active={tab === item} href={tabHref(filters, detail.id, item)}>{customerTabLabels[item]}</SectionNavLink>)}
+        </SectionNav>
 
-      {tab === 'overview' ? <div className="esmera-customer-overview">
-        <DataSection compact eyebrow="Próxima ação" title={nextTask?.title || 'Nenhuma tarefa aberta'} description={nextTask ? `${dateTime(nextTask.dueAt)} · ${relationLabel(nextTask.assignee, 'sem responsável')}` : 'Crie uma tarefa real quando houver um próximo passo definido.'} action={nextTask ? <TechnicalLink href={`/admin/collections/tasks/${nextTask.id}`}>Abrir tarefa</TechnicalLink> : <TechnicalLink href="/admin/collections/tasks/create">Nova tarefa</TechnicalLink>}><div /></DataSection>
-        <DataSection eyebrow="Perfil" title="Identidade e interesse" description="Status do cliente é independente da etapa de qualquer oportunidade comercial."><CustomerProfileEditor customer={detail} users={usersResult.docs} categories={categoriesResult.docs} /></DataSection>
-      </div> : null}
+        <Suspense key={`${detail.id}-${tab}`} fallback={<LoadingState compact label="Carregando seção do cliente…" />}>
+          <CustomerDetailTabPanel
+            req={req}
+            tab={tab}
+            customer={detail}
+            sales={sales}
+            interests={interests}
+            products={productsResult.docs}
+            users={usersResult.docs}
+            categories={categoriesResult.docs}
+          />
+        </Suspense>
+      </section>
+    ) : undefined
 
-      {tab === 'history' ? <DataSection eyebrow="Event stream" title="Histórico relacional" description="Activities é append-mostly: operadores criam eventos; somente administradores alteram o passado.">{!activities.length ? <EmptyState title="Nenhuma atividade registrada" copy="Notas, interesses e mudanças comerciais passam a compor esta timeline." /> : <ol className="esmera-customer-timeline">{activities.map((activity) => <li key={String(activity.id)}><span className="esmera-customer-timeline__marker" aria-hidden="true" /><div><span>{activityLabel(activity)}</span><strong>{activity.summary || activityLabel(activity)}</strong>{activity.details ? <p>{activity.details}</p> : null}<small>{dateTime(activity.occurredAt)} · {relationLabel(activity.owner, 'sistema')}</small></div></li>)}</ol>}</DataSection> : null}
-
-      {tab === 'interests' ? <DataSection eyebrow="Curadoria" title="Interesses explícitos" description="Relações com produto ficam em ClientInterests para preservar status e histórico por interesse."><CustomerInterestComposer customerId={detail.id} products={productsResult.docs} interests={interests} /></DataSection> : null}
-
-      {tab === 'sales' ? <DataSection eyebrow="Comercial" title="Vendas do cliente" description={`${sales.length} registro${sales.length === 1 ? '' : 's'} relacionado${sales.length === 1 ? '' : 's'}.`}>{!sales.length ? <EmptyState title="Nenhuma venda" copy="As vendas relacionadas aparecerão aqui automaticamente." /> : <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Venda</th><th>Status</th><th>Total</th><th>Data</th><th /></tr></thead><tbody>{sales.map((sale) => <tr key={String(sale.id)}><td><strong>{sale.number || sale.id}</strong></td><td><Status tone={statusTone(sale.status)}>{saleStatusLabels[sale.status || ''] || sale.status || '—'}</Status></td><td>{money(sale.totalCents)}</td><td>{shortDate(sale.confirmedAt || sale.updatedAt)}</td><td><Link href={`/admin/sales?view=list&sale=${sale.id}`}>Abrir</Link></td></tr>)}</tbody></table></div>}</DataSection> : null}
-
-      {tab === 'after-sales' ? <DataSection eyebrow="Continuidade" title="Pós-venda" description="Entrega, follow-ups e ocorrências vinculados ao cliente.">{!afterSales.length ? <EmptyState title="Nenhum pós-venda" copy="Casos criados a partir de vendas aparecerão aqui automaticamente." /> : <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Venda</th><th>Status</th><th>Prioridade</th><th>Entrega</th><th /></tr></thead><tbody>{afterSales.map((item) => <tr key={String(item.id)}><td>{typeof item.sale === 'object' && item.sale ? item.sale.number || item.sale.id : relationId(item.sale) || '—'}</td><td><Status tone={statusTone(item.status)}>{item.status || '—'}</Status></td><td>{item.priority || '—'}</td><td>{shortDate(item.deliveredAt || item.expectedDeliveryAt)}</td><td><Link href={`/admin/collections/after-sales/${item.id}`}>Abrir</Link></td></tr>)}</tbody></table></div>}</DataSection> : null}
-
-      {tab === 'notes' ? <DataSection eyebrow="Registro" title="Notas" description="Novas notas são eventos imutáveis para o operador e entram na timeline."><CustomerNoteComposer customerId={detail.id} />{!noteActivities.length ? <EmptyState title="Nenhuma nota" copy="Registre apenas contexto relevante para o relacionamento." /> : <ul className="esmera-customer-notes">{noteActivities.map((activity) => <li key={String(activity.id)}><p>{activity.details || activity.summary}</p><small>{dateTime(activity.occurredAt)} · {relationLabel(activity.owner, 'sistema')}</small></li>)}</ul>}</DataSection> : null}
-    </section> : undefined
-
-    return <ViewFrame props={props} width="wide">
-      <PageHeader eyebrow="Relacionamento" title="Clientes" subtitle="Workspace relacional para entender identidade, interesses, oportunidades, vendas, pós-venda, tarefas e histórico sem abrir múltiplas Collections." actions={<><CustomerCreateDialog /><TechnicalLink href="/admin/collections/customers">Admin técnico</TechnicalLink></>} />
-      <SplitWorkspace
-        className="esmera-customers-workspace"
-        hasDetail={Boolean(detail)}
-        master={<CustomerMasterList customers={listItems} filters={filters} selectedId={selectedId} users={usersResult.docs} />}
-        detail={detailContent}
-      />
-    </ViewFrame>
+    return (
+      <ViewFrame props={props} width="wide">
+        <PageHeader eyebrow="Relacionamento" title="Clientes" subtitle="Workspace relacional para entender identidade, interesses, oportunidades, vendas, pós-venda, tarefas e histórico sem abrir múltiplas Collections." actions={<><CustomerCreateDialog /><TechnicalLink href="/admin/collections/customers">Admin técnico</TechnicalLink></>} />
+        <SplitWorkspace
+          className="esmera-customers-workspace"
+          hasDetail={Boolean(detail)}
+          master={<CustomerMasterList customers={listItems} filters={filters} selectedId={selectedId} users={usersResult.docs} />}
+          detail={detailContent}
+        />
+      </ViewFrame>
+    )
   } catch (error) {
     return <ViewFrame props={props} width="wide"><PageHeader title="Clientes" subtitle="Relacionamento" /><QueryError title="Não foi possível consultar clientes" error={error} /></ViewFrame>
   }
