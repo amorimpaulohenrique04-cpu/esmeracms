@@ -33,6 +33,17 @@ describe('Popups de criação e responsividade', () => {
     expect(categoriesView).not.toContain('/admin/collections/categories/create')
   })
 
+  it('preserva a ação primária de categoria e evita compressão do cabeçalho de vendas', () => {
+    const overlays = source('src/admin/design-system/Overlays.tsx')
+    const categoryDialog = source('src/admin/modules/categories/CategoryCreateDialog.tsx')
+    const salesView = source('src/admin/modules/sales/SalesViews.tsx')
+    const salesStyles = source('src/admin/modules/sales/sale-create-dialog.scss')
+    expect(overlays).toContain("triggerClassName = ''")
+    expect(categoryDialog).toContain('triggerClassName="esmera-button--primary"')
+    expect(salesView).toContain('className="esmera-sales-command-bar"')
+    expect(salesStyles).toMatch(/@container esmera-workspace \(min-width: 701px\) and \(max-width: 1220px\)[\s\S]*flex-wrap: wrap[\s\S]*flex: 1 1 520px/)
+  })
+
   it('mantém o portal de clientes ancorado dentro da árvore modal clicável', () => {
     const salesDialog = source('src/admin/modules/sales/SalesWorkspaceClient.tsx')
     const salesStyles = source('src/admin/modules/sales/sale-create-dialog.scss')
