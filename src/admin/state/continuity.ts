@@ -52,6 +52,10 @@ export function rememberAdminItem(item: Omit<AdminRecentItem, 'visitedAt'>) {
   writeArray(RECENT_KEY, [next, ...items].slice(0, 10))
 }
 
+export function clearRecentAdminItems() {
+  writeArray<AdminRecentItem>(RECENT_KEY, [])
+}
+
 export function savedAdminViews() {
   return readArray<SavedAdminView>(SAVED_VIEWS_KEY)
     .filter((item) => item && typeof item.id === 'string' && typeof item.href === 'string')
