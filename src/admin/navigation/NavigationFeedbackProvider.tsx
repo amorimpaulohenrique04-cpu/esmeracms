@@ -150,6 +150,7 @@ export function NavigationFeedbackProvider({ children }: { children: React.React
         target: anchor.target || null,
         hasDownload: anchor.hasAttribute('download'),
         ariaDisabled: anchor.getAttribute('aria-disabled') === 'true' || anchor.hasAttribute('disabled'),
+        localNav: anchor.dataset.esmeraLocalNav === 'true',
       }
       if (!shouldTrackAnchorClick(modifiers, meta, currentLocationRef.current || window.location.href)) return
       beginNavigation(anchor.href)
