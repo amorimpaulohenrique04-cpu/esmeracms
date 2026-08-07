@@ -34,6 +34,7 @@ describe('product import against Payload', () => {
     const category = await payload.create({
       collection: 'categories',
       overrideAccess: true,
+      draft: true,
       data: {
         title: `Cerâmica ${suffix}`,
         slug: `ceramica-${suffix}`,
@@ -48,7 +49,7 @@ describe('product import against Payload', () => {
         title: `Vaso existente ${suffix}`,
         slug: `vaso-existente-${suffix}`,
         code,
-        catalogStatus: 'hidden',
+        catalogStatus: 'archived',
         availability: 'available',
         priceMode: 'fixed',
         basePriceCents: 89000,
@@ -111,7 +112,7 @@ describe('product import against Payload', () => {
     const updated = await payload.findByID({ collection: 'products', id: productId, overrideAccess: true })
     expect(updated.title).toBe(`Vaso existente ${suffix}`)
     expect(updated.basePriceCents).toBe(149000)
-    expect(updated.catalogStatus).toBe('hidden')
+    expect(updated.catalogStatus).toBe('archived')
     expect(updated.priceMode).toBe('fixed')
   })
 })
