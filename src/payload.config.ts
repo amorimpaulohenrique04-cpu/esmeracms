@@ -18,6 +18,7 @@ import { Leads } from './collections/Leads'
 import { Media } from './collections/Media'
 import { Occurrences } from './collections/Occurrences'
 import { Opportunities } from './collections/Opportunities'
+import { ProductImports } from './collections/ProductImports'
 import { Products } from './collections/Products'
 import { ReportExportFiles } from './collections/ReportExportFiles'
 import { ReportExports } from './collections/ReportExports'
@@ -32,10 +33,11 @@ import { Contact } from './globals/Contact'
 import { Home } from './globals/Home'
 import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
-import { canRunEsmeraJobs, esmeraJobTasks } from './server/jobs'
-import { GenerateReportExportJob } from './server/jobs/reportExport'
 import { parseDecoCorsOrigins } from './server/env/cors'
 import { requireDatabaseURL } from './server/env/postgres'
+import { canRunEsmeraJobs, esmeraJobTasks } from './server/jobs'
+import { ProductImportJob } from './server/jobs/productImport'
+import { GenerateReportExportJob } from './server/jobs/reportExport'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -143,7 +145,7 @@ export default buildConfig({
       run: canRunEsmeraJobs,
       cancel: ({ req }) => isAdmin(req.user),
     },
-    tasks: [...esmeraJobTasks, GenerateReportExportJob],
+    tasks: [...esmeraJobTasks, GenerateReportExportJob, ProductImportJob],
     enableConcurrencyControl: true,
     shouldAutoRun: async () => process.env.PAYLOAD_JOBS_AUTORUN === 'true',
     autoRun: [
@@ -165,6 +167,7 @@ export default buildConfig({
     ReportExportFiles,
     Categories,
     OperationalProducts,
+    ProductImports,
     Leads,
     Customers,
     ClientInterests,

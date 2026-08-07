@@ -45,6 +45,12 @@ export const Media: CollectionConfig = {
       type: 'text',
       label: 'Crédito',
     },
+    {
+      name: 'sourceSha256',
+      type: 'text',
+      index: true,
+      admin: { hidden: true },
+    },
   ],
   upload: {
     focalPoint: true,

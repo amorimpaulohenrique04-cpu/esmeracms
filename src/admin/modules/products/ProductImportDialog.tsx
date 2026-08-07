@@ -21,7 +21,28 @@ type PreviewRow = {
 type PreviewResponse = { rows: PreviewRow[]; unknownHeaders: string[]; delimiter: ',' | ';' | '\t' | '|' }
 type CommitRowResult = { rowIndex: number; sourceLine: number; status: 'created' | 'updated' | 'skipped' | 'error'; error?: string }
 type CommitResponse = { created: number; updated: number; skipped: number; errored: number; rows: CommitRowResult[] }
+type QueuedResponse = { importId: string; status: string; totalRows: number; processedRows: number; pollUrl: string }
+type ImportStatusResponse = {
+  importId: string
+  status: 'queued' | 'processing' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled'
+  totalRows: number
+  processedRows: number
+  created: number
+  updated: number
+  skipped: number
+  errored: number
+  results: CommitRowResult[]
+  error?: string | null
+  errorCsvUrl?: string | null
+}
 type RowFilter = 'all' | 'pending' | 'new' | 'conflicts'
+
+type ProgressState = {
+  importId: string
+  status: ImportStatusResponse['status']
+  processedRows: number
+  totalRows: number
+}
 
 async function callImportApi<T>(body: Record<string, unknown>): Promise<T> {
   const response = await fetch('/api/admin-products-import', {
@@ -33,6 +54,13 @@ async function callImportApi<T>(body: Record<string, unknown>): Promise<T> {
   const result = await response.json() as T & { error?: string }
   if (!response.ok) throw new Error((result as { error?: string }).error || 'Falha na importação.')
   return result
+}
+
+async function fetchImportStatus(url: string, signal: AbortSignal): Promise<ImportStatusResponse> {
+  const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', signal })
+  const data = await response.json() as ImportStatusResponse & { error?: string }
+  if (!response.ok) throw new Error(data.error || 'Não foi possível consultar o andamento da importação.')
+  return data
 }
 
 function csvCell(value: string) {
@@ -76,6 +104,10 @@ function downloadErrorCsv(result: CommitResponse) {
   URL.revokeObjectURL(url)
 }
 
+function terminalStatus(status: ImportStatusResponse['status']) {
+  return status === 'completed' || status === 'completed_with_errors' || status === 'failed' || status === 'cancelled'
+}
+
 export function ProductImportDialog() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -89,9 +121,17 @@ export function ProductImportDialog() {
   const [encoding, setEncoding] = useState<string | null>(null)
   const [delimiter, setDelimiter] = useState<PreviewResponse['delimiter'] | null>(null)
   const [filter, setFilter] = useState<RowFilter>('all')
+  const [progress, setProgress] = useState<ProgressState | null>(null)
+  const [remoteErrorCsv, setRemoteErrorCsv] = useState<string | null>(null)
+  const [finalStatus, setFinalStatus] = useState<ImportStatusResponse['status'] | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const idempotencyRef = useRef<string | null>(null)
+  const pollAbortRef = useRef<AbortController | null>(null)
 
   function reset() {
+    pollAbortRef.current?.abort()
+    pollAbortRef.current = null
+    idempotencyRef.current = null
     setStep('input')
     setRawText('')
     setRows([])
@@ -101,6 +141,9 @@ export function ProductImportDialog() {
     setEncoding(null)
     setDelimiter(null)
     setFilter('all')
+    setProgress(null)
+    setRemoteErrorCsv(null)
+    setFinalStatus(null)
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -117,6 +160,7 @@ export function ProductImportDialog() {
       setDelimiter(data.delimiter)
       setFilter('all')
       setStep('preview')
+      idempotencyRef.current = null
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível pré-visualizar.')
     } finally {
@@ -158,14 +202,17 @@ export function ProductImportDialog() {
         }),
       }
     }))
+    idempotencyRef.current = null
   }
 
   function removeRow(rowIndex: number) {
     setRows((current) => current.filter((row) => row.rowIndex !== rowIndex))
+    idempotencyRef.current = null
   }
 
   function setConflictAction(rowIndex: number, action: 'update' | 'skip') {
     setRows((current) => current.map((row) => row.rowIndex === rowIndex ? { ...row, action } : row))
+    idempotencyRef.current = null
   }
 
   async function revalidate() {
@@ -182,9 +229,43 @@ export function ProductImportDialog() {
     return true
   }), [filter, rows])
 
+  async function pollImport(initial: QueuedResponse) {
+    const controller = new AbortController()
+    pollAbortRef.current?.abort()
+    pollAbortRef.current = controller
+    let pollUrl = initial.pollUrl
+    setProgress({ importId: initial.importId, status: initial.status as ImportStatusResponse['status'], processedRows: initial.processedRows, totalRows: initial.totalRows })
+
+    while (!controller.signal.aborted) {
+      const status = await fetchImportStatus(pollUrl, controller.signal)
+      setProgress({ importId: status.importId, status: status.status, processedRows: status.processedRows, totalRows: status.totalRows })
+      if (terminalStatus(status.status)) {
+        setFinalStatus(status.status)
+        setRemoteErrorCsv(status.errorCsvUrl || null)
+        setResult({
+          created: status.created,
+          updated: status.updated,
+          skipped: status.skipped,
+          errored: status.errored,
+          rows: status.results || [],
+        })
+        if (status.status === 'failed') setError(status.error || 'A importação falhou durante o processamento.')
+        setStep('result')
+        setProgress(null)
+        router.refresh()
+        pollAbortRef.current = null
+        return
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 1000))
+      pollUrl = `/api/admin-products-import?importId=${encodeURIComponent(status.importId)}`
+    }
+  }
+
   async function confirmImport() {
     setBusy(true)
     setError(null)
+    setFinalStatus(null)
+    setRemoteErrorCsv(null)
     try {
       const payload = rows.map((row) => ({
         rowIndex: row.rowIndex,
@@ -192,22 +273,44 @@ export function ProductImportDialog() {
         values: row.values,
         onConflict: row.isDuplicate && row.action === 'update' ? 'update' : 'skip',
       }))
-      const data = await callImportApi<CommitResponse>({ action: 'commit', rows: payload })
-      setResult(data)
-      setStep('result')
-      router.refresh()
+      idempotencyRef.current ||= crypto.randomUUID()
+      const data = await callImportApi<CommitResponse | QueuedResponse>({
+        action: 'commit',
+        rows: payload,
+        idempotencyKey: idempotencyRef.current,
+      })
+      if ('importId' in data) await pollImport(data)
+      else {
+        setResult(data)
+        setFinalStatus(data.errored ? 'completed_with_errors' : 'completed')
+        setStep('result')
+        router.refresh()
+      }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Não foi possível concluir a importação.')
     } finally {
       setBusy(false)
     }
   }
 
+  async function cancelImport() {
+    if (!progress?.importId) return
+    try {
+      await callImportApi<{ status: 'cancelled' }>({ action: 'cancel', importId: progress.importId })
+      setProgress((current) => current ? { ...current, status: 'cancelled' } : current)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível cancelar a importação.')
+    }
+  }
+
   function changeOpen(next: boolean) {
-    if (!next && step === 'preview' && rows.length > 0 && !window.confirm('Fechar e descartar as correções desta importação?')) return
+    if (!next && step === 'preview' && rows.length > 0 && !window.confirm(busy ? 'A importação está em andamento. Fechar esta janela não interrompe o job. Fechar mesmo assim?' : 'Fechar e descartar as correções desta importação?')) return
     setOpen(next)
     if (!next) reset()
   }
+
+  const progressPercent = progress?.totalRows ? Math.round((progress.processedRows / progress.totalRows) * 100) : 0
 
   return <Dialog.Root open={open} onOpenChange={changeOpen}>
     <Dialog.Trigger className="esmera-button">Importar produtos</Dialog.Trigger>
@@ -251,6 +354,12 @@ export function ProductImportDialog() {
                 </div>
                 {unknownHeaders.length ? <p className="esmera-products-import__warning">Colunas não reconhecidas (ignoradas): {unknownHeaders.join(', ')}</p> : null}
 
+                {progress ? <div className="esmera-products-import__progress" aria-live="polite">
+                  <div><strong>{progress.status === 'queued' ? 'Na fila' : progress.status === 'processing' ? 'Importando produtos' : 'Finalizando'}</strong><span>{progress.processedRows} de {progress.totalRows} linhas · {progressPercent}%</span></div>
+                  <progress max={progress.totalRows || 1} value={progress.processedRows} aria-label={`Importação ${progressPercent}% concluída`} />
+                  {progress.status !== 'cancelled' ? <button type="button" className="esmera-button esmera-button--quiet" onClick={() => void cancelImport()}>Cancelar importação</button> : <span>Cancelamento solicitado.</span>}
+                </div> : null}
+
                 <div className="esmera-products-import__filters" aria-label="Filtrar linhas da importação">
                   <button type="button" className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>Todas ({rows.length})</button>
                   <button type="button" className={filter === 'pending' ? 'is-active' : ''} onClick={() => setFilter('pending')}>Só pendências ({pendingRows.length})</button>
@@ -282,6 +391,7 @@ export function ProductImportDialog() {
                                 aria-invalid={issue?.severity === 'error' ? 'true' : undefined}
                                 aria-describedby={issue ? errorID : undefined}
                                 inputMode={column === 'price' ? 'decimal' : undefined}
+                                disabled={busy}
                                 onBlur={(event) => updateCell(row.rowIndex, column, event.target.value)}
                               />
                               {price?.ok ? <small className="esmera-products-import-table__normalized">{price.normalized}</small> : null}
@@ -289,12 +399,12 @@ export function ProductImportDialog() {
                             </td>
                           })}
                           <td>{row.isDuplicate ? (
-                            <select className="esmera-input" aria-label={`Conflito, linha ${row.sourceLine}`} value={row.action} onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}>
+                            <select className="esmera-input" aria-label={`Conflito, linha ${row.sourceLine}`} value={row.action} disabled={busy} onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}>
                               <option value="skip">Ignorar</option>
                               <option value="update">Atualizar</option>
                             </select>
                           ) : <span>Novo</span>}</td>
-                          <td><button type="button" className="esmera-icon-button" aria-label={`Remover linha ${row.sourceLine}`} onClick={() => removeRow(row.rowIndex)}>×</button></td>
+                          <td><button type="button" className="esmera-icon-button" aria-label={`Remover linha ${row.sourceLine}`} disabled={busy} onClick={() => removeRow(row.rowIndex)}>×</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -312,12 +422,12 @@ export function ProductImportDialog() {
                         const issue = row.issues.find((item) => item.column === column)
                         const errorID = `import-mobile-error-${row.rowIndex}-${column}`
                         return <label key={column}><span>{importColumnLabels[column]}{importColumnRequired[column] ? ' *' : ''}</span>
-                          <input className="esmera-input" defaultValue={row.values[column] || ''} aria-invalid={issue?.severity === 'error' ? 'true' : undefined} aria-describedby={issue ? errorID : undefined} inputMode={column === 'price' ? 'decimal' : undefined} onBlur={(event) => updateCell(row.rowIndex, column, event.target.value)} />
+                          <input className="esmera-input" defaultValue={row.values[column] || ''} disabled={busy} aria-invalid={issue?.severity === 'error' ? 'true' : undefined} aria-describedby={issue ? errorID : undefined} inputMode={column === 'price' ? 'decimal' : undefined} onBlur={(event) => updateCell(row.rowIndex, column, event.target.value)} />
                           {issue ? <small id={errorID}>{issue.message}</small> : null}
                         </label>
                       })}
-                      {row.isDuplicate ? <label><span>Conflito</span><select className="esmera-input" value={row.action} onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}><option value="skip">Ignorar</option><option value="update">Atualizar</option></select></label> : null}
-                      <button type="button" className="esmera-button esmera-button--quiet" onClick={() => removeRow(row.rowIndex)}>Remover linha</button>
+                      {row.isDuplicate ? <label><span>Conflito</span><select className="esmera-input" value={row.action} disabled={busy} onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}><option value="skip">Ignorar</option><option value="update">Atualizar</option></select></label> : null}
+                      <button type="button" className="esmera-button esmera-button--quiet" disabled={busy} onClick={() => removeRow(row.rowIndex)}>Remover linha</button>
                     </div>
                   </details>)}
                 </div>
@@ -327,9 +437,9 @@ export function ProductImportDialog() {
                   <span className={blockingCount ? 'is-danger' : 'is-success'}>{blockingCount ? `${blockingCount} pendência(s) bloqueando` : 'Sem pendências'}</span>
                 </div>
                 <div className="esmera-actions">
-                  <button className="esmera-button" type="button" onClick={() => setStep('input')}>Voltar</button>
-                  <Button type="button" onClick={() => void revalidate()} disabled={busy || !rows.length}>{busy ? 'Revalidando…' : 'Revalidar duplicatas'}</Button>
-                  <Button type="button" aria-describedby={blockingCount ? 'import-blocking-reason' : undefined} onClick={() => void confirmImport()} disabled={busy || !rows.length || blockingCount > 0}>{busy ? 'Importando…' : `Confirmar importação (${rows.length})`}</Button>
+                  <button className="esmera-button" type="button" onClick={() => setStep('input')} disabled={busy}>Voltar</button>
+                  <Button type="button" onClick={() => void revalidate()} disabled={busy || !rows.length}>{busy ? 'Processando…' : 'Revalidar duplicatas'}</Button>
+                  <Button type="button" aria-describedby={blockingCount ? 'import-blocking-reason' : undefined} onClick={() => void confirmImport()} disabled={busy || !rows.length || blockingCount > 0}>{busy ? (progress ? `Importando ${progressPercent}%` : 'Preparando…') : `Confirmar importação (${rows.length})`}</Button>
                 </div>
                 {blockingCount ? <span id="import-blocking-reason" className="esmera-products-import__sr-note">Corrija as pendências antes de confirmar.</span> : null}
               </div>
@@ -337,6 +447,7 @@ export function ProductImportDialog() {
 
             {step === 'result' && result ? (
               <div className="esmera-products-import__result">
+                {finalStatus ? <p className="esmera-products-import__result-status">{finalStatus === 'completed' ? 'Importação concluída.' : finalStatus === 'completed_with_errors' ? 'Importação concluída com algumas linhas rejeitadas.' : finalStatus === 'cancelled' ? 'Importação cancelada.' : finalStatus === 'failed' ? 'A importação falhou.' : ''}</p> : null}
                 <dl className="esmera-leads-facts">
                   <div><dt>Criados</dt><dd>{result.created}</dd></div>
                   <div><dt>Atualizados</dt><dd>{result.updated}</dd></div>
@@ -347,7 +458,7 @@ export function ProductImportDialog() {
                   <><div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Linha da planilha</th><th>Erro</th></tr></thead><tbody>
                     {result.rows.filter((item) => item.status === 'error').map((item) => <tr key={item.rowIndex}><td>{item.sourceLine}</td><td>{item.error}</td></tr>)}
                   </tbody></table></div>
-                  <button type="button" className="esmera-button esmera-button--quiet" onClick={() => downloadErrorCsv(result)}>Baixar relatório de erros (.csv)</button></>
+                  {remoteErrorCsv ? <a href={remoteErrorCsv} className="esmera-button esmera-button--quiet">Baixar relatório de erros (.csv)</a> : <button type="button" className="esmera-button esmera-button--quiet" onClick={() => downloadErrorCsv(result)}>Baixar relatório de erros (.csv)</button>}</>
                 ) : null}
                 <div className="esmera-actions"><Dialog.Close className="esmera-button esmera-button--primary" type="button">Concluir</Dialog.Close></div>
               </div>
