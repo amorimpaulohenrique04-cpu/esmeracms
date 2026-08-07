@@ -93,29 +93,24 @@ test.describe('Stages 16–20 hardening', () => {
 
   test('enforces the role-aware navigation matrix', async () => {
     const editorNav = editorPage.getByTestId('esmera-nav')
-    await expect(editorNav.getByRole('link', { name: 'Produtos', exact: true })).toBeVisible()
-    await expect(editorNav.getByRole('link', { name: 'Categorias', exact: true })).toBeVisible()
-    await expect(editorNav.getByRole('link', { name: 'Configurações', exact: true })).toBeVisible()
-    await expect(editorNav.getByRole('link', { name: 'Clientes', exact: true })).toHaveCount(0)
-    await expect(editorNav.getByRole('link', { name: 'Oportunidades', exact: true })).toHaveCount(0)
-    await expect(editorNav.getByRole('link', { name: 'Vendas', exact: true })).toHaveCount(0)
-    await expect(editorNav.getByRole('link', { name: 'Configurações avançadas', exact: true })).toHaveCount(0)
+    for (const href of ['/admin/products', '/admin/categories', '/admin/settings']) {
+      await expect(editorNav.locator(`a[href="${href}"]`)).toBeVisible()
+    }
+    for (const href of ['/admin/leads', '/admin/opportunities', '/admin/sales', '/admin/customers', '/admin/technical']) {
+      await expect(editorNav.locator(`a[href="${href}"]`)).toHaveCount(0)
+    }
 
     const commercialNav = commercialPage.getByTestId('esmera-nav')
-    await expect(commercialNav.getByRole('link', { name: 'Captação', exact: true })).toBeVisible()
-    await expect(commercialNav.getByRole('link', { name: 'Oportunidades', exact: true })).toBeVisible()
-    await expect(commercialNav.getByRole('link', { name: 'Clientes', exact: true })).toBeVisible()
-    await expect(commercialNav.getByRole('link', { name: 'Privacidade', exact: true })).toBeVisible()
-    await expect(commercialNav.getByRole('link', { name: 'Vendas', exact: true })).toBeVisible()
-    await expect(commercialNav.getByRole('link', { name: 'Pós-venda', exact: true })).toBeVisible()
-    await expect(commercialNav.getByRole('link', { name: 'Relatórios', exact: true })).toBeVisible()
-    await expect(commercialNav.getByRole('link', { name: 'Produtos', exact: true })).toHaveCount(0)
-    await expect(commercialNav.getByRole('link', { name: 'Categorias', exact: true })).toHaveCount(0)
-    await expect(commercialNav.getByRole('link', { name: 'Configurações avançadas', exact: true })).toHaveCount(0)
+    for (const href of ['/admin/leads', '/admin/opportunities', '/admin/sales', '/admin/after-sales', '/admin/customers', '/admin/privacy', '/admin/reports']) {
+      await expect(commercialNav.locator(`a[href="${href}"]`)).toBeVisible()
+    }
+    for (const href of ['/admin/products', '/admin/categories', '/admin/settings', '/admin/technical']) {
+      await expect(commercialNav.locator(`a[href="${href}"]`)).toHaveCount(0)
+    }
 
     const adminNav = adminPage.getByTestId('esmera-nav')
-    for (const label of ['Captação', 'Oportunidades', 'Vendas', 'Pós-venda', 'Clientes', 'Privacidade', 'Produtos', 'Categorias', 'Relatórios', 'Configurações', 'Configurações avançadas', 'Usuários']) {
-      await expect(adminNav.getByRole('link', { name: label, exact: true })).toBeVisible()
+    for (const href of ['/admin/leads', '/admin/opportunities', '/admin/sales', '/admin/after-sales', '/admin/customers', '/admin/privacy', '/admin/products', '/admin/categories', '/admin/reports', '/admin/settings', '/admin/technical', '/admin/collections/users']) {
+      await expect(adminNav.locator(`a[href="${href}"]`)).toBeVisible()
     }
   })
 
