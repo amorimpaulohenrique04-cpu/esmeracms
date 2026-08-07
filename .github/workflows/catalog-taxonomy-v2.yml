@@ -5,6 +5,9 @@ on:
     branches: [agent/catalog-taxonomy-v2-20260806]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -29,6 +32,8 @@ jobs:
       CI: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -37,12 +42,23 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Apply compatibility patches
+        run: node scripts/apply-catalog-v2-patches.mjs
       - run: pnpm generate:types
       - run: pnpm generate:importmap
       - run: pnpm typecheck
       - run: pnpm lint --max-warnings=0
       - run: pnpm test:int
       - run: pnpm build
+      - name: Commit generated and patched files
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package.json src
+            git commit -m "chore(catalog): apply generated V2 compatibility updates"
+            git push origin HEAD:agent/catalog-taxonomy-v2-20260806
+          fi
       - name: Prepare workspace artifact
         if: always()
         run: tar --exclude=.git --exclude=node_modules --exclude=.next -czf /tmp/catalog-taxonomy-workspace.tgz .
