@@ -36,6 +36,7 @@ type ExistingProduct = {
   priceMode?: string | null
   basePriceCents?: number | null
   gallery?: unknown[] | null
+  deletedAt?: string | null
 }
 
 type CategoryRecord = {
@@ -131,6 +132,7 @@ async function findImportProducts(
 
   const result = await payload.find({
     collection: 'products',
+    trash: true,
     where: { or },
     depth: 0,
     limit: Math.min(10_000, Math.max(100, normalizedCodes.length + legacyCodes.length + slugCandidates.length + 20)),
@@ -151,6 +153,7 @@ async function findImportProducts(
       priceMode: true,
       basePriceCents: true,
       gallery: true,
+      deletedAt: true,
     },
   } as never)
   return result.docs as unknown as ExistingProduct[]
@@ -263,7 +266,7 @@ export async function previewImport(
       issues,
       isDuplicate: existingId !== null,
       existingProductId: existingId,
-      action: existingId !== null ? 'skip' : 'create',
+      action: existingDoc?.deletedAt ? 'update' : existingId !== null ? 'skip' : 'create',
     }
   })
 
@@ -487,6 +490,29 @@ function progressOf(report: ImportCommitReport, totalRows: number): ImportCommit
   }
 }
 
+function importErrorMessage(error: unknown) {
+  const fallback = error instanceof Error ? error.message : 'Falha desconhecida.'
+  if (!error || typeof error !== 'object') return fallback
+
+  const data = (error as { data?: unknown }).data
+  const entries = Array.isArray(data)
+    ? data
+    : data && typeof data === 'object' && Array.isArray((data as { errors?: unknown[] }).errors)
+      ? (data as { errors: unknown[] }).errors
+      : []
+
+  const details = [...new Set(entries.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return []
+    const message = (entry as { message?: unknown }).message
+    const label = (entry as { label?: unknown }).label
+    if (typeof message === 'string' && message.trim()) return [message.trim()]
+    if (typeof label === 'string' && label.trim()) return [label.trim()]
+    return []
+  }))]
+
+  return details.length ? details.join(' ') : fallback
+}
+
 export async function commitImport(
   payload: Payload,
   user: WorkflowUser,
@@ -636,13 +662,15 @@ export async function commitImport(
         const rowReq = { ...(options.req || {}), payload, user: user as never, transactionID } as PayloadRequest
         try {
           if (existingId !== null) {
+            const updateData = existing?.deletedAt ? { ...data, deletedAt: null } : data
             await payload.update({
               collection: 'products',
               id: existingId,
+              trash: true,
               overrideAccess: false,
               user: user as never,
               req: rowReq,
-              data: data as never,
+              data: updateData as never,
             } as never)
             await payload.db.commitTransaction(transactionID)
             report.updated += 1
@@ -652,6 +680,7 @@ export async function commitImport(
               ...data,
               id: existingId,
               codeNormalized: codeKey,
+              deletedAt: null,
             } as ExistingProduct)
           } else {
             const created = await payload.create({
@@ -682,7 +711,7 @@ export async function commitImport(
           rowIndex: input.rowIndex,
           sourceLine,
           status: 'error',
-          error: error instanceof Error ? error.message : 'Falha desconhecida.',
+          error: importErrorMessage(error),
         })
       }
     }
