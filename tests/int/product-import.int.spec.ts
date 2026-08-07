@@ -9,6 +9,13 @@ import {
   type ImportCommitInput,
 } from '../../src/server/domain/products/importOperations'
 
+function annotateCI(stage: string, error: unknown) {
+  if (!process.env.CI) return
+  const message = error instanceof Error ? `${error.name}: ${error.message}\n${error.stack || ''}` : String(error)
+  const escaped = message.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+  process.stderr.write(`::error file=tests/int/product-import.int.spec.ts::${stage}: ${escaped}\n`)
+}
+
 describe('product import against Payload', () => {
   let payload: Payload
   let userId: string | number
@@ -18,44 +25,49 @@ describe('product import against Payload', () => {
   const code = `OBJ-Á${suffix}`
 
   beforeAll(async () => {
-    payload = await getPayload({ config })
-    const user = await payload.create({
-      collection: 'users',
-      overrideAccess: true,
-      data: {
-        name: `Import Test ${suffix}`,
-        email: `import-${suffix}@example.com`,
-        password: 'ImportTest!123',
-        role: 'admin',
-      },
-    })
-    userId = user.id
+    try {
+      payload = await getPayload({ config })
+      const user = await payload.create({
+        collection: 'users',
+        overrideAccess: true,
+        data: {
+          name: `Import Test ${suffix}`,
+          email: `import-${suffix}@example.com`,
+          password: 'ImportTest!123',
+          role: 'admin',
+        },
+      })
+      userId = user.id
 
-    const category = await payload.create({
-      collection: 'categories',
-      overrideAccess: true,
-      draft: true,
-      data: {
-        title: `Cerâmica ${suffix}`,
-        slug: `ceramica-${suffix}`,
-      },
-    })
-    categoryId = category.id
+      const category = await payload.create({
+        collection: 'categories',
+        overrideAccess: true,
+        draft: true,
+        data: {
+          title: `Cerâmica ${suffix}`,
+          slug: `ceramica-${suffix}`,
+        },
+      })
+      categoryId = category.id
 
-    const product = await payload.create({
-      collection: 'products',
-      overrideAccess: true,
-      data: {
-        title: `Vaso existente ${suffix}`,
-        slug: `vaso-existente-${suffix}`,
-        code,
-        catalogStatus: 'archived',
-        availability: 'available',
-        priceMode: 'fixed',
-        basePriceCents: 89000,
-      },
-    })
-    productId = product.id
+      const product = await payload.create({
+        collection: 'products',
+        overrideAccess: true,
+        data: {
+          title: `Vaso existente ${suffix}`,
+          slug: `vaso-existente-${suffix}`,
+          code,
+          catalogStatus: 'archived',
+          availability: 'available',
+          priceMode: 'fixed',
+          basePriceCents: 89000,
+        },
+      })
+      productId = product.id
+    } catch (error) {
+      annotateCI('setup', error)
+      throw error
+    }
   })
 
   afterAll(async () => {
@@ -118,69 +130,75 @@ describe('product import against Payload', () => {
   })
 
   it('encontra produto na lixeira, restaura e atualiza em vez de tentar criar duplicata', async () => {
-    const user = await payload.findByID({ collection: 'users', id: userId, overrideAccess: true })
-    const trashedCode = `TRASH-${suffix}`
-    const trashed = await payload.create({
-      collection: 'products',
-      overrideAccess: true,
-      data: {
-        title: `Produto na lixeira ${suffix}`,
-        slug: `produto-na-lixeira-${suffix}`,
+    try {
+      const user = await payload.findByID({ collection: 'users', id: userId, overrideAccess: true })
+      const trashedCode = `TRASH-${suffix}`
+      const trashed = await payload.create({
+        collection: 'products',
+        overrideAccess: true,
+        data: {
+          title: `Produto na lixeira ${suffix}`,
+          slug: `produto-na-lixeira-${suffix}`,
+          code: trashedCode,
+          catalogStatus: 'archived',
+          availability: 'available',
+          priceMode: 'fixed',
+          basePriceCents: 10000,
+        },
+      })
+
+      await payload.delete({ collection: 'products', id: trashed.id, overrideAccess: true })
+
+      const text = [
+        'nome;codigo;categoria;preco;modo_preco;disponibilidade;status;imagens;material;descricao;slug',
+        `;${trashedCode};;250;;;;;;;`,
+      ].join('\n')
+      const preview = await previewImport(payload, user, text)
+
+      expect(preview.rows[0]?.isDuplicate).toBe(true)
+      expect(preview.rows[0]?.existingProductId).toBe(trashed.id)
+      expect(preview.rows[0]?.action).toBe('update')
+      expect(preview.blockingCount).toBe(0)
+
+      const values: ImportCommitInput['values'] = {
+        title: '',
         code: trashedCode,
-        catalogStatus: 'archived',
-        availability: 'available',
-        priceMode: 'fixed',
-        basePriceCents: 10000,
-      },
-    })
+        categories: '',
+        price: '250',
+        priceMode: '',
+        availability: '',
+        catalogStatus: '',
+        imageUrls: '',
+        material: '',
+        description: '',
+        slug: '',
+      }
+      const report = await commitImport(payload, user, [{
+        rowIndex: 0,
+        sourceLine: 2,
+        values,
+        onConflict: 'update',
+      }])
 
-    await payload.delete({ collection: 'products', id: trashed.id, overrideAccess: true })
+      if (report.errored) annotateCI('trash commit report', new Error(JSON.stringify(report)))
+      expect(report.created).toBe(0)
+      expect(report.updated).toBe(1)
+      expect(report.errored).toBe(0)
 
-    const text = [
-      'nome;codigo;categoria;preco;modo_preco;disponibilidade;status;imagens;material;descricao;slug',
-      `;${trashedCode};;250;;;;;;;`,
-    ].join('\n')
-    const preview = await previewImport(payload, user, text)
+      const restored = await payload.findByID({
+        collection: 'products',
+        id: trashed.id,
+        trash: true,
+        overrideAccess: true,
+      } as never) as unknown as { deletedAt?: string | null; basePriceCents?: number | null }
+      expect(restored.deletedAt).toBeNull()
+      expect(restored.basePriceCents).toBe(25000)
 
-    expect(preview.rows[0]?.isDuplicate).toBe(true)
-    expect(preview.rows[0]?.existingProductId).toBe(trashed.id)
-    expect(preview.rows[0]?.action).toBe('update')
-    expect(preview.blockingCount).toBe(0)
-
-    const values: ImportCommitInput['values'] = {
-      title: '',
-      code: trashedCode,
-      categories: '',
-      price: '250',
-      priceMode: '',
-      availability: '',
-      catalogStatus: '',
-      imageUrls: '',
-      material: '',
-      description: '',
-      slug: '',
+      await payload.delete({ collection: 'products', id: trashed.id, overrideAccess: true }).catch(() => undefined)
+    } catch (error) {
+      annotateCI('trash regression', error)
+      throw error
     }
-    const report = await commitImport(payload, user, [{
-      rowIndex: 0,
-      sourceLine: 2,
-      values,
-      onConflict: 'update',
-    }])
-
-    expect(report.created).toBe(0)
-    expect(report.updated).toBe(1)
-    expect(report.errored).toBe(0)
-
-    const restored = await payload.findByID({
-      collection: 'products',
-      id: trashed.id,
-      trash: true,
-      overrideAccess: true,
-    } as never) as unknown as { deletedAt?: string | null; basePriceCents?: number | null }
-    expect(restored.deletedAt).toBeNull()
-    expect(restored.basePriceCents).toBe(25000)
-
-    await payload.delete({ collection: 'products', id: trashed.id, overrideAccess: true }).catch(() => undefined)
   })
 
   it('publica automaticamente a mídia criada pelo importador', async () => {
