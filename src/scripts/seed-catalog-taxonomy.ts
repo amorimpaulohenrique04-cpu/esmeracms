@@ -42,7 +42,7 @@ const nodes: SeedNode[] = [
   { key: 'diffusers', title: 'Difusores', slug: 'difusores', nodeType: 'collection', taxonomyAxis: 'piece_type', parentKey: 'lavabo', order: 500 },
   { key: 'toothbrush', title: 'Porta-escova', slug: 'porta-escova', nodeType: 'collection', taxonomyAxis: 'piece_type', parentKey: 'lavabo', order: 600 },
   { key: 'cotton', title: 'Porta-algodão e cotonete', slug: 'porta-algodao-cotonete', nodeType: 'collection', taxonomyAxis: 'piece_type', parentKey: 'lavabo', order: 700 },
-  { key: 'crystals-lavabo', title: 'Porta-cristais', slug: 'porta-cristais-lavabo', nodeType: 'collection', taxonomyAxis: 'piece_type', parentKey: 'lavabo', order: 800 },
+  { key: 'crystals-lavabo', title: 'Porta-cristais para lavabo', slug: 'porta-cristais-lavabo', nodeType: 'collection', taxonomyAxis: 'piece_type', parentKey: 'lavabo', order: 800 },
 
   { key: 'trays', title: 'BANDEJAS', slug: 'bandejas', nodeType: 'collection', taxonomyAxis: 'piece_type', listingMode: 'descendants', parentKey: 'pieces', order: 200 },
   { key: 'trays-small', title: 'Bandejas pequenas', slug: 'bandejas-pequenas', nodeType: 'collection', taxonomyAxis: 'piece_type', parentKey: 'trays', order: 100 },
@@ -229,7 +229,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exitCode = 1
-})
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
