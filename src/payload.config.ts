@@ -70,7 +70,6 @@ const OperationalProducts = {
     {
       name: 'codeNormalized',
       type: 'text',
-      required: true,
       unique: true,
       index: true,
       admin: { hidden: true },
@@ -97,7 +96,6 @@ const OperationalCategories = {
     {
       name: 'titleNormalized',
       type: 'text',
-      required: true,
       index: true,
       admin: { hidden: true },
     },
