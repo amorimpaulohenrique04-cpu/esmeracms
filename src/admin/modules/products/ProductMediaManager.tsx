@@ -63,11 +63,27 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
   const [clearArmed, setClearArmed] = useState(false)
   const lastSaved = useRef(initialGallery)
 
+  async function archiveForEmptyGallery() {
+    const response = await fetch('/api/admin-products', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ action: 'archive', ids: [productId] }),
+    })
+    const body = await response.json() as { error?: string; errors?: Array<{ message?: string }> }
+    const actionError = body.errors?.[0]?.message
+    if (!response.ok || actionError) {
+      throw new Error(actionError || body.error || 'Não foi possível arquivar o produto antes de limpar a galeria.')
+    }
+  }
+
   async function persist(next: ProductGalleryItem[], successMessage = 'Galeria salva no rascunho.') {
     setSaving(true)
     setRollback(false)
     setFeedback(null)
     try {
+      if (!next.length) await archiveForEmptyGallery()
+
       const response = await fetch('/api/admin-products', {
         method: 'POST',
         credentials: 'same-origin',
@@ -87,9 +103,10 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
       const body = await response.json() as { error?: string }
       if (!response.ok) throw new Error(body.error || 'Não foi possível salvar a galeria.')
       lastSaved.current = next
-      setFeedback(successMessage)
+      const message = next.length ? successMessage : `${successMessage} O produto foi arquivado até receber novas imagens.`
+      setFeedback(message)
       announceDraftChanged({ kind: 'product', id: productId, field: 'gallery' })
-      announceAdmin(successMessage)
+      announceAdmin(message)
     } catch (error) {
       setGallery(lastSaved.current)
       setRollback(true)
