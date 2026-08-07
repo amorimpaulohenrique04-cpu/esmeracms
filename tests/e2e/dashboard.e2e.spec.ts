@@ -36,9 +36,9 @@ test.describe('Final operational dashboard', () => {
     await expect(page.getByText('15%')).toHaveCount(0)
 
     const newStage = page.getByRole('link', { name: /Novo: \d+ oportunidades/ })
-    await expect(newStage).toHaveAttribute('href', '/admin/sales?view=list&stage=new')
+    await expect(newStage).toHaveAttribute('href', '/admin/opportunities?view=list&stage=new')
     await newStage.click()
-    await expect(page).toHaveURL(/\/admin\/sales\?view=list&stage=new$/)
+    await expect(page).toHaveURL(/\/admin\/opportunities\?view=list&stage=new$/)
   })
 
   test('keeps the final dashboard usable on tablet and mobile', async () => {
