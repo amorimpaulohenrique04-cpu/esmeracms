@@ -11,6 +11,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16
@@ -47,8 +48,11 @@ jobs:
           if ! compgen -G "src/migrations/*catalog_taxonomy_v2*" > /dev/null; then
             pnpm payload migrate:create catalog_taxonomy_v2 --skip-empty
           fi
-      - name: Validate migrations from a fresh database
-        run: pnpm payload migrate:fresh
+      - name: Validate migrations from an empty database
+        run: |
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d esmera -v ON_ERROR_STOP=1 \
+            -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          pnpm payload migrate
       - name: Validate idempotent taxonomy seed
         run: |
           pnpm seed:catalog-taxonomy
