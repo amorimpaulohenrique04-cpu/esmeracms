@@ -21,6 +21,42 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
     ALTER TABLE "media" ADD COLUMN IF NOT EXISTS "source_sha256" varchar;
     CREATE INDEX IF NOT EXISTS "media_source_sha256_idx" ON "media" USING btree ("source_sha256");
 
+    -- Chaves normalizadas usadas pelo preview/commit para resolver duplicatas e
+    -- categorias em consultas indexadas, sem varrer o catálogo inteiro.
+    ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "code_normalized" varchar;
+    ALTER TABLE "_products_v" ADD COLUMN IF NOT EXISTS "version_code_normalized" varchar;
+    ALTER TABLE "categories" ADD COLUMN IF NOT EXISTS "title_normalized" varchar;
+    ALTER TABLE "_categories_v" ADD COLUMN IF NOT EXISTS "version_title_normalized" varchar;
+
+    UPDATE "products"
+      SET "code_normalized" = translate(lower(trim("code")),
+        'áàãâäéèêëíìîïóòõôöúùûüç',
+        'aaaaaeeeeiiiiooooouuuuc')
+      WHERE "code" IS NOT NULL AND ("code_normalized" IS NULL OR "code_normalized" = '');
+
+    UPDATE "_products_v"
+      SET "version_code_normalized" = translate(lower(trim("version_code")),
+        'áàãâäéèêëíìîïóòõôöúùûüç',
+        'aaaaaeeeeiiiiooooouuuuc')
+      WHERE "version_code" IS NOT NULL AND ("version_code_normalized" IS NULL OR "version_code_normalized" = '');
+
+    UPDATE "categories"
+      SET "title_normalized" = translate(lower(trim("title")),
+        'áàãâäéèêëíìîïóòõôöúùûüç',
+        'aaaaaeeeeiiiiooooouuuuc')
+      WHERE "title" IS NOT NULL AND ("title_normalized" IS NULL OR "title_normalized" = '');
+
+    UPDATE "_categories_v"
+      SET "version_title_normalized" = translate(lower(trim("version_title")),
+        'áàãâäéèêëíìîïóòõôöúùûüç',
+        'aaaaaeeeeiiiiooooouuuuc')
+      WHERE "version_title" IS NOT NULL AND ("version_title_normalized" IS NULL OR "version_title_normalized" = '');
+
+    CREATE UNIQUE INDEX IF NOT EXISTS "products_code_normalized_idx" ON "products" USING btree ("code_normalized");
+    CREATE INDEX IF NOT EXISTS "products_versions_code_normalized_idx" ON "_products_v" USING btree ("version_code_normalized");
+    CREATE INDEX IF NOT EXISTS "categories_title_normalized_idx" ON "categories" USING btree ("title_normalized");
+    CREATE INDEX IF NOT EXISTS "categories_versions_title_normalized_idx" ON "_categories_v" USING btree ("version_title_normalized");
+
     CREATE TABLE IF NOT EXISTS "product_imports" (
       "id" serial PRIMARY KEY NOT NULL,
       "status" "enum_product_imports_status" NOT NULL,
@@ -89,6 +125,15 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
     DROP INDEX IF EXISTS "product_imports_status_idx";
     DROP TABLE IF EXISTS "product_imports";
     DROP TYPE IF EXISTS "public"."enum_product_imports_status";
+
+    DROP INDEX IF EXISTS "categories_versions_title_normalized_idx";
+    DROP INDEX IF EXISTS "categories_title_normalized_idx";
+    DROP INDEX IF EXISTS "products_versions_code_normalized_idx";
+    DROP INDEX IF EXISTS "products_code_normalized_idx";
+    ALTER TABLE "_categories_v" DROP COLUMN IF EXISTS "version_title_normalized";
+    ALTER TABLE "categories" DROP COLUMN IF EXISTS "title_normalized";
+    ALTER TABLE "_products_v" DROP COLUMN IF EXISTS "version_code_normalized";
+    ALTER TABLE "products" DROP COLUMN IF EXISTS "code_normalized";
 
     DROP INDEX IF EXISTS "media_source_sha256_idx";
     ALTER TABLE "media" DROP COLUMN IF EXISTS "source_sha256";
