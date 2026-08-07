@@ -34,19 +34,49 @@
 .esmera-products-import__dropzone input { max-width: min(100%, 360px); }
 
 .esmera-products-import__meta,
-.esmera-products-import__filters {
+.esmera-products-import__filters,
+.esmera-products-import__windowbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 7px;
 }
 
-.esmera-products-import__meta span {
+.esmera-products-import__meta > span {
   padding: 5px 8px;
   border: 1px solid var(--esmera-line-subtle);
   border-radius: var(--esmera-radius-round);
   color: var(--esmera-text-muted);
   font-size: var(--esmera-font-caption);
+}
+
+.esmera-products-import__sheet {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-caption);
+}
+
+.esmera-products-import__sheet .esmera-input {
+  min-width: 150px;
+  min-height: 34px;
+}
+
+.esmera-products-import__resolving,
+.esmera-products-import__warning {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--esmera-line-subtle);
+  border-radius: var(--esmera-control-radius);
+  background: var(--esmera-surface-muted);
+  color: var(--esmera-text-secondary);
+  font-size: var(--esmera-font-ui-sm);
+}
+
+.esmera-products-import__resolving {
+  border-style: dashed;
 }
 
 .esmera-products-import__filters button {
@@ -66,6 +96,19 @@
   background: var(--esmera-primary-soft);
   color: var(--esmera-text);
   font-weight: var(--esmera-weight-semibold);
+}
+
+.esmera-products-import__windowbar {
+  justify-content: space-between;
+  min-height: 32px;
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-caption);
+}
+
+.esmera-products-import__windowbar > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .esmera-products-import__progress {
@@ -189,6 +232,17 @@
     border-radius: 0;
   }
 
+  .esmera-products-import__meta,
+  .esmera-products-import__windowbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .esmera-products-import__sheet {
+    width: 100%;
+    margin-left: 0;
+  }
+  .esmera-products-import__sheet .esmera-input { flex: 1; }
+  .esmera-products-import__windowbar > div { justify-content: space-between; width: 100%; }
   .esmera-products-import__grid { display: none; }
   .esmera-products-import__cards { display: grid; gap: 10px; }
   .esmera-products-import__summary { align-items: flex-start; flex-direction: column; }
