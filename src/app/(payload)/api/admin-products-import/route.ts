@@ -56,6 +56,8 @@ type ProductImportRecord = {
   error?: string | null
 }
 
+type RequestUser = { id: string | number; role?: string | null }
+
 function message(error: unknown) {
   return error instanceof Error ? error.message : 'Não foi possível processar a importação.'
 }
@@ -71,6 +73,12 @@ function relationshipID(value: unknown): string | number | null {
     if (typeof id === 'string' || typeof id === 'number') return id
   }
   return null
+}
+
+function canAccessImport(record: ProductImportRecord, user: RequestUser) {
+  if (user.role === 'admin') return true
+  const requestedBy = relationshipID(record.requestedBy)
+  return requestedBy !== null && String(requestedBy) === String(user.id)
 }
 
 function bodyTooLarge(request: Request) {
@@ -182,7 +190,7 @@ function errorCsv(record: ProductImportRecord) {
 export async function GET(request: Request) {
   const auth = await authenticatedRequest(request)
   if ('response' in auth) return auth.response
-  const { req } = auth
+  const { req, user } = auth
   const url = new URL(request.url)
   const importId = url.searchParams.get('importId')
 
@@ -199,6 +207,9 @@ export async function GET(request: Request) {
 
   try {
     const record = await readImport(req, importId)
+    if (!canAccessImport(record, user as RequestUser)) {
+      return NextResponse.json({ error: 'Você não pode acessar esta importação.' }, { status: 403 })
+    }
     if (url.searchParams.get('format') === 'csv') {
       const csv = errorCsv(record)
       return new NextResponse(`\uFEFF${csv}`, {
@@ -262,8 +273,7 @@ export async function POST(request: Request) {
     if (body.action === 'cancel') {
       if (!body.importId) return NextResponse.json({ error: 'Importação não informada.' }, { status: 400 })
       const record = await readImport(req, body.importId)
-      const requestedBy = relationshipID(record.requestedBy)
-      if (requestedBy !== null && String(requestedBy) !== String(user.id) && (user as { role?: string }).role !== 'admin') {
+      if (!canAccessImport(record, user as RequestUser)) {
         return NextResponse.json({ error: 'Você não pode cancelar esta importação.' }, { status: 403 })
       }
       if (record.status === 'completed' || record.status === 'completed_with_errors' || record.status === 'failed') {
@@ -305,7 +315,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Chave de idempotência ausente ou inválida.' }, { status: 400 })
       }
       const existing = await findByIdempotency(req, key)
-      if (existing) return queuedResponse(existing)
+      if (existing) {
+        if (!canAccessImport(existing, user as RequestUser)) {
+          return NextResponse.json({ error: 'Chave de idempotência já utilizada.' }, { status: 409 })
+        }
+        return queuedResponse(existing)
+      }
 
       let record: ProductImportRecord | null = null
       try {
