@@ -4,6 +4,7 @@ import * as migration_20260802_205108_public_content_publication from './2026080
 import * as migration_20260802_213200_home_partial_overrides from './20260802_213200_home_partial_overrides'
 import * as migration_20260804_015500_public_revision from './20260804_015500_public_revision'
 import * as migration_20260807_104500_product_import_v2 from './20260807_104500_product_import_v2'
+import * as migration_20260807_164500_cleanup_imported_product_media from './20260807_164500_cleanup_imported_product_media'
 
 export const migrations = [
   {
@@ -35,5 +36,10 @@ export const migrations = [
     up: migration_20260807_104500_product_import_v2.up,
     down: migration_20260807_104500_product_import_v2.down,
     name: '20260807_104500_product_import_v2',
+  },
+  {
+    up: migration_20260807_164500_cleanup_imported_product_media.up,
+    down: migration_20260807_164500_cleanup_imported_product_media.down,
+    name: '20260807_164500_cleanup_imported_product_media',
   },
 ]
