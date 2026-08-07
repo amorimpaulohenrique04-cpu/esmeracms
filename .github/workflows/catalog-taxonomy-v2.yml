@@ -43,7 +43,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Apply compatibility patches
-        run: node scripts/apply-catalog-v2-patches.mjs
+        run: |
+          node scripts/apply-catalog-v2-patches.mjs
+          node scripts/apply-catalog-v2-query-fixes.mjs
       - run: pnpm generate:types
       - run: pnpm generate:importmap
       - run: pnpm typecheck
