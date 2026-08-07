@@ -508,6 +508,7 @@ export async function commitImport(
         if (finalStatus === 'active' && relationshipCount(finalGallery) === 0) throw new Error('Produto ativo precisa ter ao menos uma imagem no estado final.')
 
         const transactionID = await payload.db.beginTransaction()
+        if (transactionID === null) throw new Error('Não foi possível iniciar a transação desta linha.')
         const rowReq = { ...(options.req || {}), payload, user: user as never, transactionID } as PayloadRequest
         try {
           if (existingId !== null) {
