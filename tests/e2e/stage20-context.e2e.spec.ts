@@ -21,9 +21,9 @@ test.describe('Stage 20 operational context', () => {
     await expect(page.getByRole('link', { name: 'Grid', exact: true })).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('input[name="q"]').first()).toHaveValue('contexto-stage20')
 
-    await page.getByRole('link', { name: 'Admin técnico', exact: true }).click()
+    await page.getByRole('link', { name: 'Configurações avançadas', exact: true }).click()
     await expect(page).toHaveURL('http://localhost:3000/admin/technical')
-    await expect(page.getByRole('heading', { name: 'Admin técnico' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Configurações avançadas' })).toBeVisible()
 
     await page.goBack({ waitUntil: 'domcontentloaded' })
     await expect(page).toHaveURL(operationalURL)
