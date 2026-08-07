@@ -20,6 +20,19 @@ export const Media: CollectionConfig = {
     update: siteEditors,
     delete: siteEditors,
   },
+  hooks: {
+    beforeChange: [
+      ({ data, operation }) => {
+        // Mídia criada pelo importador de produtos já é um asset técnico pronto
+        // para a vitrine. O produto continua em rascunho, mas a imagem precisa
+        // estar publicada para o contrato do storefront aceitar a galeria.
+        if (operation === 'create' && typeof data.sourceSha256 === 'string' && data.sourceSha256.trim()) {
+          return { ...data, _status: 'published' }
+        }
+        return data
+      },
+    ],
+  },
   versions: {
     drafts: true,
     maxPerDoc: 30,
