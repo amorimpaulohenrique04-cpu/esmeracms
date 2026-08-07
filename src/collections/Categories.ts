@@ -414,7 +414,6 @@ export const Categories: CollectionConfig = {
               name: 'nodeType',
               type: 'select',
               label: 'Tipo do nó',
-              required: true,
               defaultValue: 'collection',
               index: true,
               options: [
@@ -428,7 +427,6 @@ export const Categories: CollectionConfig = {
               name: 'taxonomyAxis',
               type: 'select',
               label: 'Eixo taxonômico',
-              required: true,
               defaultValue: 'navigation',
               index: true,
               options: [
@@ -490,7 +488,6 @@ export const Categories: CollectionConfig = {
               name: 'listingMode',
               type: 'select',
               label: 'Modo de listagem',
-              required: true,
               defaultValue: 'assigned',
               options: [
                 { label: 'Produtos atribuídos', value: 'assigned' },

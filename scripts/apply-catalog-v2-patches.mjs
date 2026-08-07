@@ -373,7 +373,7 @@ edit('src/admin/modules/categories/CategoryDetailEditor.tsx', (source) => {
   )
   source = replaceRequired(
     source,
-    "          <FieldV2 id=\"category-seo\" path=\"seo\" label=\"Título SEO\" optional error={errorFor('seo')}">",
+    `          <FieldV2 id="category-seo" path="seo" label="Título SEO" optional error={errorFor('seo')}>`,
     `          <div className="esmera-category-editorial-callout esmera-category-field--wide">
             <div>
               <strong>Conteúdo editorial e destaques do mega menu</strong>

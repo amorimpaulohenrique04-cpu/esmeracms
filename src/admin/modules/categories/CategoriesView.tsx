@@ -116,6 +116,8 @@ export async function CategoriesView(props: AdminViewServerProps) {
           title: true,
           slug: true,
           status: true,
+          nodeType: true,
+          taxonomyAxis: true,
           order: true,
           parent: true,
           image: true,

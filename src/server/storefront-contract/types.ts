@@ -24,3 +24,4 @@ export type StorefrontContractValidation = {
   status: 'compatible' | 'partial' | 'incompatible'
   issues: StorefrontContractDiagnostic[]
 }
+export * from '../storefront-v2/types'

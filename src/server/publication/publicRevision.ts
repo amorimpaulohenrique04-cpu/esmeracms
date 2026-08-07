@@ -225,6 +225,27 @@ function projectProduct(document: PublicRecord, path = 'product'): unknown {
 }
 
 function projectCategory(document: PublicRecord, path = 'category'): unknown {
+  const menu = document.menu === undefined ? undefined : document.menu === null ? null : record(document.menu)
+  const listingRules = document.listingRules === undefined ? undefined : document.listingRules === null ? null : record(document.listingRules)
+  const collectionPage = document.collectionPage === undefined ? undefined : document.collectionPage === null ? null : record(document.collectionPage)
+  const contentBlocks = Array.isArray(document.contentBlocks)
+    ? document.contentBlocks.map(canonicalValue)
+    : document.contentBlocks
+  const menuHighlights = Array.isArray(document.menuHighlights)
+    ? document.menuHighlights.map((value, index) => {
+      const highlight = record(value) || {}
+      return {
+        title: scalar(highlight.title),
+        eyebrow: scalar(highlight.eyebrow),
+        description: scalar(highlight.description),
+        image: projectMedia(highlight.image, `${path}.menuHighlights.${index}.image`),
+        linkLabel: scalar(highlight.linkLabel),
+        destination: relationID(highlight.destination, `${path}.menuHighlights.${index}.destination`),
+        externalURL: scalar(highlight.externalURL),
+      }
+    })
+    : document.menuHighlights
+
   return {
     id: scalar(document.id),
     title: scalar(document.title),
@@ -235,6 +256,16 @@ function projectCategory(document: PublicRecord, path = 'category'): unknown {
     order: scalar(document.order),
     parent: relationID(document.parent, `${path}.parent`),
     image: projectMedia(document.image, `${path}.image`),
+    nodeType: scalar(document.nodeType),
+    taxonomyAxis: scalar(document.taxonomyAxis),
+    menu: menu && typeof menu === 'object' ? canonicalValue(menu) : menu,
+    listingMode: scalar(document.listingMode),
+    listingRules: listingRules && typeof listingRules === 'object' ? canonicalValue(listingRules) : listingRules,
+    collectionPage: collectionPage && typeof collectionPage === 'object' ? canonicalValue(collectionPage) : collectionPage,
+    contentBlocks,
+    menuHighlights,
+    externalURL: scalar(document.externalURL),
+    hubPath: scalar(document.hubPath),
     seo: projectSEO(document.seo, `${path}.seo`),
   }
 }

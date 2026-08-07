@@ -284,16 +284,157 @@ export interface Category {
    * Status controla participação no catálogo. Publicação é controlada separadamente pelo workflow do Payload.
    */
   status: 'active' | 'archive';
+  nodeType?: ('collection' | 'editorial' | 'external' | 'group') | null;
+  taxonomyAxis?: ('navigation' | 'piece_type' | 'collection' | 'environment' | 'campaign' | 'service') | null;
   /**
    * A hierarquia é validada no servidor; relações cíclicas são rejeitadas.
    */
   parent?: (number | null) | Category;
   description?: string | null;
-  image?: (number | null) | Media;
   order?: number | null;
+  menu?: {
+    showInMenu?: boolean | null;
+    label?: string | null;
+    visibility?: ('all' | 'desktop' | 'mobile') | null;
+    icon?: string | null;
+  };
+  listingMode?: ('assigned' | 'descendants' | 'rules' | 'hybrid') | null;
+  listingRules?: {
+    availability?: ('unique' | 'available' | 'made_to_order' | 'limited')[] | null;
+    materials?:
+      | {
+          value: string;
+          id?: string | null;
+        }[]
+      | null;
+    productStatus?: ('active' | 'archived')[] | null;
+    minPrice?: number | null;
+    maxPrice?: number | null;
+    publishedAfter?: string | null;
+    publishedBefore?: string | null;
+    sort?: ('editorial' | 'newest' | 'price_asc' | 'price_desc' | 'name_asc') | null;
+  };
+  collectionPage?: {
+    eyebrow?: string | null;
+    shortDescription?: string | null;
+    visibleFilters?:
+      ('category' | 'collection' | 'environment' | 'piece_type' | 'material' | 'availability' | 'price')[] | null;
+    defaultSort?: ('editorial' | 'newest' | 'price_asc' | 'price_desc' | 'name_asc') | null;
+    productsPerPage?: number | null;
+    showProductCount?: boolean | null;
+    layout?: ('grid' | 'editorial') | null;
+  };
+  externalURL?: string | null;
+  hubPath?: string | null;
+  image?: (number | null) | Media;
   searchTerms?:
     | {
         term: string;
+        id?: string | null;
+      }[]
+    | null;
+  contentBlocks?:
+    | (
+        | {
+            placement: 'before' | 'after';
+            content: {
+              root: {
+                type: string;
+                children: {
+                  type: any;
+                  version: number;
+                  [k: string]: unknown;
+                }[];
+                direction: ('ltr' | 'rtl') | null;
+                format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+                indent: number;
+                version: number;
+              };
+              [k: string]: unknown;
+            };
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'richText';
+          }
+        | {
+            placement: 'before' | 'after';
+            image: number | Media;
+            alt: string;
+            caption?: string | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'image';
+          }
+        | {
+            placement: 'before' | 'after';
+            eyebrow?: string | null;
+            title: string;
+            copy: string;
+            image: number | Media;
+            imagePosition?: ('left' | 'right') | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'imageText';
+          }
+        | {
+            placement: 'before' | 'after';
+            eyebrow?: string | null;
+            title: string;
+            copy: string;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'manifesto';
+          }
+        | {
+            placement: 'before' | 'after';
+            material: string;
+            title: string;
+            copy?: string | null;
+            image?: (number | null) | Media;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'materialHighlight';
+          }
+        | {
+            placement: 'before' | 'after';
+            title?: string | null;
+            copy?: string | null;
+            label: string;
+            destination?: (number | null) | Category;
+            externalURL?: string | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'cta';
+          }
+        | {
+            placement: 'before' | 'after';
+            items: {
+              image: number | Media;
+              alt: string;
+              id?: string | null;
+            }[];
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'gallery';
+          }
+        | {
+            placement: 'before' | 'after';
+            label?: string | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'divider';
+          }
+      )[]
+    | null;
+  menuHighlights?:
+    | {
+        title?: string | null;
+        eyebrow?: string | null;
+        description?: string | null;
+        image?: (number | null) | Media;
+        linkLabel?: string | null;
+        destination?: (number | null) | Category;
+        externalURL?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -303,6 +444,8 @@ export interface Category {
     socialImage?: (number | null) | Media;
     noIndex?: boolean | null;
   };
+  publicationRevision?: string | null;
+  publicationContractVersion?: string | null;
   updatedAt: string;
   createdAt: string;
   deletedAt?: string | null;
@@ -325,6 +468,9 @@ export interface Product {
    * Rascunho/publicação é controlado separadamente pelo workflow do Payload.
    */
   catalogStatus: 'active' | 'archived';
+  /**
+   * O produto pode aparecer em mais de uma prateleira. Agrupadores de menu não são selecionáveis.
+   */
   categories?: (number | Category)[] | null;
   material?: string | null;
   description?: {
@@ -430,6 +576,8 @@ export interface Product {
     socialImage?: (number | null) | Media;
     noIndex?: boolean | null;
   };
+  publicationRevision?: string | null;
+  publicationContractVersion?: string | null;
   publicationReady?: boolean | null;
   publicationIssues?:
     | {
@@ -804,6 +952,9 @@ export interface Activity {
         | 'contact.logged'
       )
     | null;
+  /**
+   * Derivado automaticamente do evento estruturado.
+   */
   kind: 'contact' | 'message' | 'proposal' | 'stage_change' | 'sale' | 'note' | 'delivery' | 'follow_up' | 'occurrence';
   occurredAt: string;
   summary: string;
@@ -1221,14 +1372,156 @@ export interface CategoriesSelect<T extends boolean = true> {
   title?: T;
   slug?: T;
   status?: T;
+  nodeType?: T;
+  taxonomyAxis?: T;
   parent?: T;
   description?: T;
-  image?: T;
   order?: T;
+  menu?:
+    | T
+    | {
+        showInMenu?: T;
+        label?: T;
+        visibility?: T;
+        icon?: T;
+      };
+  listingMode?: T;
+  listingRules?:
+    | T
+    | {
+        availability?: T;
+        materials?:
+          | T
+          | {
+              value?: T;
+              id?: T;
+            };
+        productStatus?: T;
+        minPrice?: T;
+        maxPrice?: T;
+        publishedAfter?: T;
+        publishedBefore?: T;
+        sort?: T;
+      };
+  collectionPage?:
+    | T
+    | {
+        eyebrow?: T;
+        shortDescription?: T;
+        visibleFilters?: T;
+        defaultSort?: T;
+        productsPerPage?: T;
+        showProductCount?: T;
+        layout?: T;
+      };
+  externalURL?: T;
+  hubPath?: T;
+  image?: T;
   searchTerms?:
     | T
     | {
         term?: T;
+        id?: T;
+      };
+  contentBlocks?:
+    | T
+    | {
+        richText?:
+          | T
+          | {
+              placement?: T;
+              content?: T;
+              id?: T;
+              blockName?: T;
+            };
+        image?:
+          | T
+          | {
+              placement?: T;
+              image?: T;
+              alt?: T;
+              caption?: T;
+              id?: T;
+              blockName?: T;
+            };
+        imageText?:
+          | T
+          | {
+              placement?: T;
+              eyebrow?: T;
+              title?: T;
+              copy?: T;
+              image?: T;
+              imagePosition?: T;
+              id?: T;
+              blockName?: T;
+            };
+        manifesto?:
+          | T
+          | {
+              placement?: T;
+              eyebrow?: T;
+              title?: T;
+              copy?: T;
+              id?: T;
+              blockName?: T;
+            };
+        materialHighlight?:
+          | T
+          | {
+              placement?: T;
+              material?: T;
+              title?: T;
+              copy?: T;
+              image?: T;
+              id?: T;
+              blockName?: T;
+            };
+        cta?:
+          | T
+          | {
+              placement?: T;
+              title?: T;
+              copy?: T;
+              label?: T;
+              destination?: T;
+              externalURL?: T;
+              id?: T;
+              blockName?: T;
+            };
+        gallery?:
+          | T
+          | {
+              placement?: T;
+              items?:
+                | T
+                | {
+                    image?: T;
+                    alt?: T;
+                    id?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+        divider?:
+          | T
+          | {
+              placement?: T;
+              label?: T;
+              id?: T;
+              blockName?: T;
+            };
+      };
+  menuHighlights?:
+    | T
+    | {
+        title?: T;
+        eyebrow?: T;
+        description?: T;
+        image?: T;
+        linkLabel?: T;
+        destination?: T;
+        externalURL?: T;
         id?: T;
       };
   seo?:
@@ -1239,6 +1532,8 @@ export interface CategoriesSelect<T extends boolean = true> {
         socialImage?: T;
         noIndex?: T;
       };
+  publicationRevision?: T;
+  publicationContractVersion?: T;
   updatedAt?: T;
   createdAt?: T;
   deletedAt?: T;
@@ -1334,6 +1629,8 @@ export interface ProductsSelect<T extends boolean = true> {
         socialImage?: T;
         noIndex?: T;
       };
+  publicationRevision?: T;
+  publicationContractVersion?: T;
   publicationReady?: T;
   publicationIssues?:
     | T
@@ -1896,6 +2193,8 @@ export interface Home {
     socialImage?: (number | null) | Media;
     noIndex?: boolean | null;
   };
+  publicationRevision?: string | null;
+  publicationContractVersion?: string | null;
   _status?: ('draft' | 'published') | null;
   updatedAt?: string | null;
   createdAt?: string | null;
@@ -2134,12 +2433,27 @@ export interface CollectionPage {
  */
 export interface Navigation {
   id: number;
-  mainLinks: {
-    label: string;
-    path: string;
-    active?: boolean | null;
-    id?: string | null;
-  }[];
+  /**
+   * Selecione somente as categorias raiz. Títulos, slugs, filhos e destaques continuam vindo de Categorias.
+   */
+  roots?:
+    | {
+        category: number | Category;
+        order?: number | null;
+        desktopMode?: ('mega' | 'link') | null;
+        mobileMode?: ('drilldown' | 'link') | null;
+        highlightLimit?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  mainLinks?:
+    | {
+        label: string;
+        path: string;
+        active?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
   categoryLinks?: (number | Category)[] | null;
   utilityLinks?:
     | {
@@ -2345,6 +2659,8 @@ export interface HomeSelect<T extends boolean = true> {
         socialImage?: T;
         noIndex?: T;
       };
+  publicationRevision?: T;
+  publicationContractVersion?: T;
   _status?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2497,6 +2813,16 @@ export interface CollectionPageSelect<T extends boolean = true> {
  * via the `definition` "navigation_select".
  */
 export interface NavigationSelect<T extends boolean = true> {
+  roots?:
+    | T
+    | {
+        category?: T;
+        order?: T;
+        desktopMode?: T;
+        mobileMode?: T;
+        highlightLimit?: T;
+        id?: T;
+      };
   mainLinks?:
     | T
     | {

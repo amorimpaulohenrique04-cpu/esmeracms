@@ -559,7 +559,7 @@ function buildFacets(products: UnknownRecord[], visibleFilters: string[]) {
 
 function sanitizeBlock(value: UnknownRecord, categoryMap: Map<string, UnknownRecord>): PublicContentBlockV2 | null {
   const blockType = text(value.blockType)
-  const placement = value.placement === 'after' ? 'after' : 'before'
+  const placement: 'before' | 'after' = value.placement === 'after' ? 'after' : 'before'
   if (!blockType) return null
   const base = { id: nullableText(value.id), blockType, placement }
 
@@ -677,7 +677,7 @@ export async function buildCollectionV2(
   const rootID = String(category.id)
   let listingWhere: Where
   if (listingMode === 'descendants') {
-    listingWhere = { categories: { in: descendantIDs(rootID, categories) } }
+    listingWhere = relationshipFilter(descendantIDs(rootID, categories)) || { categories: { contains: rootID } }
   } else if (listingMode === 'rules') {
     const rulesWhere = buildRulesWhere(category)
     if (!rulesWhere) throw new StorefrontConfigurationError('A coleção automática não possui regras válidas.')
@@ -767,9 +767,10 @@ export async function buildCollectionV2(
     }),
   ])
 
-  if (page > Math.max(1, result.totalPages) && result.totalDocs > 0) throw new StorefrontNotFoundError('Página da coleção inexistente.')
+  if (page > Math.max(1, result.totalPages)) throw new StorefrontNotFoundError('Página da coleção inexistente.')
   const products = result.docs as unknown as UnknownRecord[]
-  const facetProducts = facetResult.docs as unknown as UnknownRecord[]
+  const facetsTruncated = facetResult.totalDocs > MAX_FACET_PRODUCTS
+  const facetProducts = facetsTruncated ? [] : facetResult.docs as unknown as UnknownRecord[]
   const categoryMap = mapByID(categories)
   const blocks = records(category.contentBlocks)
     .map((block) => sanitizeBlock(block, categoryMap))
@@ -806,7 +807,7 @@ export async function buildCollectionV2(
       hasPrevPage: Boolean(result.hasPrevPage),
       prevPage: result.hasPrevPage ? result.prevPage || Math.max(1, page - 1) : null,
     },
-    facets: buildFacets(facetProducts, visibleFilters),
+    facets: facetsTruncated ? {} : buildFacets(facetProducts, visibleFilters),
     applied: appliedFilters(q, categoryFilter, collectionFilter, environmentFilter, pieceTypeFilter, materialFilter, availabilityFilter, min, max, sort),
     ...((before.length || after.length) ? { editorial: { ...(before.length ? { before } : {}), ...(after.length ? { after } : {}) } } : {}),
   }

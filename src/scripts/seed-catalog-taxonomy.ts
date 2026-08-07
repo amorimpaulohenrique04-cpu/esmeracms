@@ -164,7 +164,9 @@ async function main() {
         description: node.description,
         menu: { showInMenu: true, label: node.title, visibility: 'all' },
         listingMode: node.listingMode || 'assigned',
-        listingRules: node.availability ? { availability: node.availability, productStatus: ['active'] } : undefined,
+        listingRules: node.availability || node.key === 'new'
+          ? { availability: node.availability || [], productStatus: ['active'], sort: node.key === 'new' ? 'newest' : 'editorial' }
+          : undefined,
         collectionPage: {
           visibleFilters: ['category', 'collection', 'environment', 'piece_type', 'material', 'availability', 'price'],
           defaultSort: node.key === 'new' ? 'newest' : 'editorial',

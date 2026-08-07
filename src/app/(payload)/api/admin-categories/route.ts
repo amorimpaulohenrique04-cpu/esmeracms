@@ -39,6 +39,17 @@ function relationID(value: unknown): string | number | null {
   return null
 }
 
+const CATEGORY_NODE_TYPES = new Set(['collection', 'editorial', 'external', 'group'])
+const CATEGORY_AXES = new Set(['navigation', 'piece_type', 'collection', 'environment', 'campaign', 'service'])
+const CATEGORY_LISTING_MODES = new Set(['assigned', 'descendants', 'rules', 'hybrid'])
+const CATEGORY_SORTS = new Set(['editorial', 'newest', 'price_asc', 'price_desc', 'name_asc'])
+const CATEGORY_FILTERS = new Set(['category', 'collection', 'environment', 'piece_type', 'material', 'availability', 'price'])
+const CATEGORY_AVAILABILITY = new Set(['unique', 'available', 'made_to_order', 'limited'])
+
+function controlledStrings(value: unknown, allowed: Set<string>) {
+  if (!Array.isArray(value)) return []
+  return Array.from(new Set(value.filter((item): item is string => typeof item === 'string' && allowed.has(item))))
+}
 
 function categoryDraftData(input: Record<string, unknown> | undefined) {
   const source = input || {}
@@ -52,6 +63,59 @@ function categoryDraftData(input: Record<string, unknown> | undefined) {
   if (typeof source.order === 'number' && Number.isInteger(source.order) && source.order >= 0) data.order = source.order
   if (source.parent === null || relationID(source.parent) !== null) data.parent = relationID(source.parent)
   if (source.image === null || relationID(source.image) !== null) data.image = relationID(source.image)
+  if (typeof source.nodeType === 'string' && CATEGORY_NODE_TYPES.has(source.nodeType)) data.nodeType = source.nodeType
+  if (typeof source.taxonomyAxis === 'string' && CATEGORY_AXES.has(source.taxonomyAxis)) data.taxonomyAxis = source.taxonomyAxis
+  if (typeof source.listingMode === 'string' && CATEGORY_LISTING_MODES.has(source.listingMode)) data.listingMode = source.listingMode
+  if (typeof source.externalURL === 'string' || source.externalURL === null) data.externalURL = source.externalURL
+  if (typeof source.hubPath === 'string' || source.hubPath === null) data.hubPath = source.hubPath
+
+  if (source.menu && typeof source.menu === 'object') {
+    const menuSource = source.menu as Record<string, unknown>
+    const menu: Record<string, unknown> = {}
+    if (typeof menuSource.showInMenu === 'boolean') menu.showInMenu = menuSource.showInMenu
+    if (typeof menuSource.label === 'string' || menuSource.label === null) menu.label = menuSource.label
+    if (menuSource.visibility === 'all' || menuSource.visibility === 'desktop' || menuSource.visibility === 'mobile') menu.visibility = menuSource.visibility
+    if (typeof menuSource.icon === 'string' || menuSource.icon === null) menu.icon = menuSource.icon
+    data.menu = menu
+  }
+
+  if (source.listingRules && typeof source.listingRules === 'object') {
+    const rulesSource = source.listingRules as Record<string, unknown>
+    const rules: Record<string, unknown> = {
+      availability: controlledStrings(rulesSource.availability, CATEGORY_AVAILABILITY),
+      productStatus: controlledStrings(rulesSource.productStatus, new Set(['active', 'archived'])),
+    }
+    if (Array.isArray(rulesSource.materials)) {
+      rules.materials = rulesSource.materials
+        .map((item) => item && typeof item === 'object' && 'value' in item ? String((item as { value?: unknown }).value || '').trim() : '')
+        .filter(Boolean)
+        .slice(0, 20)
+        .map((value) => ({ value }))
+    }
+    for (const field of ['minPrice', 'maxPrice'] as const) {
+      if (typeof rulesSource[field] === 'number' && Number.isFinite(rulesSource[field]) && rulesSource[field] >= 0) rules[field] = rulesSource[field]
+    }
+    for (const field of ['publishedAfter', 'publishedBefore'] as const) {
+      if (typeof rulesSource[field] === 'string' || rulesSource[field] === null) rules[field] = rulesSource[field]
+    }
+    if (typeof rulesSource.sort === 'string' && CATEGORY_SORTS.has(rulesSource.sort)) rules.sort = rulesSource.sort
+    data.listingRules = rules
+  }
+
+  if (source.collectionPage && typeof source.collectionPage === 'object') {
+    const pageSource = source.collectionPage as Record<string, unknown>
+    const page: Record<string, unknown> = {
+      visibleFilters: controlledStrings(pageSource.visibleFilters, CATEGORY_FILTERS),
+    }
+    for (const field of ['eyebrow', 'shortDescription'] as const) {
+      if (typeof pageSource[field] === 'string' || pageSource[field] === null) page[field] = pageSource[field]
+    }
+    if (typeof pageSource.defaultSort === 'string' && CATEGORY_SORTS.has(pageSource.defaultSort)) page.defaultSort = pageSource.defaultSort
+    if (typeof pageSource.productsPerPage === 'number' && Number.isInteger(pageSource.productsPerPage) && pageSource.productsPerPage >= 1 && pageSource.productsPerPage <= 48) page.productsPerPage = pageSource.productsPerPage
+    if (typeof pageSource.showProductCount === 'boolean') page.showProductCount = pageSource.showProductCount
+    if (pageSource.layout === 'grid' || pageSource.layout === 'editorial') page.layout = pageSource.layout
+    data.collectionPage = page
+  }
 
   if (Array.isArray(source.searchTerms)) {
     data.searchTerms = source.searchTerms

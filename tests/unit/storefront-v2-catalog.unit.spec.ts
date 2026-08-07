@@ -57,7 +57,7 @@ const root = {
   taxonomyAxis: 'navigation',
   listingMode: 'descendants',
   menu: { showInMenu: true, label: 'PEÇAS', visibility: 'all' },
-  collectionPage: { visibleFilters: ['category'], defaultSort: 'editorial', productsPerPage: 24, showProductCount: true, layout: 'grid' },
+  collectionPage: { visibleFilters: ['category', 'material', 'price'], defaultSort: 'editorial', productsPerPage: 24, showProductCount: true, layout: 'grid' },
   updatedAt: '2026-08-01T12:00:00.000Z',
 }
 

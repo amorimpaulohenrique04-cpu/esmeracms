@@ -220,7 +220,17 @@ export const Products: CollectionConfig = {
               type: 'relationship',
               relationTo: 'categories',
               hasMany: true,
-              label: 'Categorias',
+              label: 'Prateleiras e categorias',
+              filterOptions: {
+                and: [
+                  { status: { equals: 'active' } },
+                  { _status: { equals: 'published' } },
+                  { nodeType: { not_equals: 'group' } },
+                ],
+              },
+              admin: {
+                description: 'O produto pode aparecer em mais de uma prateleira. Agrupadores de menu não são selecionáveis.',
+              },
               validate: (value: unknown, { siblingData }: { siblingData?: { catalogStatus?: string } }) => {
                 const values = Array.isArray(value) ? value : []
                 return siblingData?.catalogStatus !== 'active' || values.length > 0 || 'Um produto ativo precisa ter categoria.'
