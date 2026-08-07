@@ -1,24 +1,51 @@
 import type { Payload } from 'payload'
 
 import {
-  availabilityLabelToValue,
-  catalogStatusLabelToValue,
   importColumns,
-  importColumnRequired,
   resolveHeaderColumn,
   type ImportColumn,
 } from '../../../businessRules/products/importSchema'
-import { parseTabularText } from './csv'
+import {
+  blockingIssueCount,
+  emptyImportValues,
+  foldKey,
+  isClearCell,
+  normalizeAvailability,
+  normalizeCatalogStatus,
+  normalizePriceMode,
+  parsePrice,
+  slugifyImportTitle,
+  splitMulti,
+  validateRowShape,
+  type ImportRowIssue,
+  type ImportRowValues,
+} from '../../../businessRules/products/importValidation'
+import { detectDelimiter, parseTabularText } from './csv'
+import { fetchRemoteImage } from './mediaFetch'
 import { textToRichText } from './textToRichText'
 
 type WorkflowUser = { id?: string | number } | null | undefined
 
-export type ImportRowValues = Record<ImportColumn, string>
+type ExistingProduct = {
+  id: string | number
+  code?: string | null
+  slug?: string | null
+  title?: string | null
+  catalogStatus?: string | null
+  availability?: string | null
+  categories?: unknown[] | null
+  material?: string | null
+  description?: unknown
+  priceMode?: string | null
+  basePriceCents?: number | null
+  gallery?: unknown[] | null
+}
 
-export type ImportRowIssue = { column: ImportColumn | 'general'; message: string }
+export type { ImportRowIssue, ImportRowValues }
 
 export type ImportRowPreview = {
   rowIndex: number
+  sourceLine: number
   values: ImportRowValues
   issues: ImportRowIssue[]
   isDuplicate: boolean
@@ -30,132 +57,91 @@ export type ImportPreviewResult = {
   rows: ImportRowPreview[]
   unknownHeaders: string[]
   blockingCount: number
+  delimiter: ReturnType<typeof detectDelimiter>
 }
 
-function emptyValues(): ImportRowValues {
-  const record = {} as ImportRowValues
-  importColumns.forEach((column) => { record[column] = '' })
-  return record
-}
+export function parseImportSheet(rawText: string): {
+  rows: Array<{ values: ImportRowValues; sourceLine: number }>
+  unknownHeaders: string[]
+  delimiter: ReturnType<typeof detectDelimiter>
+} {
+  const delimiter = detectDelimiter(rawText)
+  const table = parseTabularText(rawText, delimiter)
+  if (!table.length) return { rows: [], unknownHeaders: [], delimiter }
 
-export function parseImportSheet(rawText: string): { rows: ImportRowValues[]; unknownHeaders: string[] } {
-  const table = parseTabularText(rawText)
-  if (!table.length) return { rows: [], unknownHeaders: [] }
-  const [headerRow, ...dataRows] = table
-  const mapped = headerRow.map((header) => resolveHeaderColumn(header))
-  const unknownHeaders = headerRow.filter((header, index) => !mapped[index])
+  const [header, ...dataRows] = table
+  const mapped = header.cells.map((cell) => resolveHeaderColumn(cell))
+  if (!mapped.some(Boolean)) {
+    throw new Error('Cabeçalho não reconhecido. Use o modelo de importação para mapear as colunas corretamente.')
+  }
 
-  const rows = dataRows.map((cells) => {
-    const record = emptyValues()
+  const unknownHeaders = header.cells.filter((cell, index) => !mapped[index] && cell.trim())
+  const rows = dataRows.map(({ cells, sourceLine }) => {
+    const values = emptyImportValues()
     mapped.forEach((column, index) => {
-      if (column) record[column] = (cells[index] || '').trim()
+      if (column) values[column] = (cells[index] || '').trim()
     })
-    return record
+    return { values, sourceLine }
   })
 
-  return { rows, unknownHeaders }
+  return { rows, unknownHeaders, delimiter }
 }
 
-function splitMulti(value: string): string[] {
-  return value.split(';').map((item) => item.trim()).filter(Boolean)
+function codeVariants(code: string) {
+  const trimmed = code.trim()
+  return [...new Set([trimmed, trimmed.toUpperCase(), trimmed.toLowerCase()])]
 }
 
-/** Aceita tanto "1.490,00" (BR) quanto "1490.00" (US); retorna centavos ou null se vazio/inválido. */
-function parsePriceToCents(value: string): number | null {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  const lastComma = trimmed.lastIndexOf(',')
-  const lastDot = trimmed.lastIndexOf('.')
-  let normalized = trimmed
-  if (lastComma > lastDot) normalized = trimmed.replaceAll('.', '').replace(',', '.')
-  else normalized = trimmed.replaceAll(',', '')
-  const parsed = Number(normalized)
-  if (Number.isNaN(parsed) || parsed < 0) return null
-  return Math.round(parsed * 100)
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
-
-function validateRowShape(values: ImportRowValues): ImportRowIssue[] {
-  const issues: ImportRowIssue[] = []
-
-  for (const column of importColumns) {
-    if (importColumnRequired[column] && !values[column]) {
-      issues.push({ column, message: 'Campo obrigatório.' })
-    }
-  }
-
-  if (values.slug && !/^[a-z0-9-]+$/.test(values.slug)) {
-    issues.push({ column: 'slug', message: 'Use letras minúsculas, números e hífens.' })
-  }
-
-  let availability = 'available'
-  if (values.availability) {
-    const resolved = availabilityLabelToValue[values.availability.trim().toLocaleLowerCase('pt-BR')]
-    if (!resolved) issues.push({ column: 'availability', message: 'Use Peça única, Disponível, Sob encomenda ou Edição limitada.' })
-    else availability = resolved
-  }
-
-  let catalogStatus = 'active'
-  if (values.catalogStatus) {
-    const resolved = catalogStatusLabelToValue[values.catalogStatus.trim().toLocaleLowerCase('pt-BR')]
-    if (!resolved) issues.push({ column: 'catalogStatus', message: 'Use Ativo ou Arquivado.' })
-    else catalogStatus = resolved
-  }
-
-  if (values.price && parsePriceToCents(values.price) === null) {
-    issues.push({ column: 'price', message: 'Use um número, como 890.00 ou 890,00.' })
-  }
-
-  const imageUrls = splitMulti(values.imageUrls)
-  const invalidUrl = imageUrls.find((url) => !isHttpUrl(url))
-  if (invalidUrl) issues.push({ column: 'imageUrls', message: `URL inválida: ${invalidUrl}` })
-
-  if (catalogStatus === 'active' && imageUrls.length === 0) {
-    issues.push({ column: 'imageUrls', message: 'Produto ativo precisa de ao menos uma imagem (separe várias com ";").' })
-  }
-
-  if (catalogStatus === 'active' && splitMulti(values.categories).length === 0) {
-    issues.push({ column: 'categories', message: 'Produto ativo precisa de ao menos uma categoria (separe várias com ";").' })
-  }
-
-  void availability
-  return issues
-}
-
-export async function previewImport(payload: Payload, user: WorkflowUser, rawText: string): Promise<ImportPreviewResult> {
-  const { rows, unknownHeaders } = parseImportSheet(rawText)
-
-  const codes = rows.map((row) => row.code.trim().toUpperCase()).filter(Boolean)
-  const existing = codes.length ? await payload.find({
+async function findProductsByCodes(payload: Payload, user: WorkflowUser, codes: string[]) {
+  const variants = [...new Set(codes.flatMap(codeVariants).filter(Boolean))]
+  if (!variants.length) return [] as ExistingProduct[]
+  const result = await payload.find({
     collection: 'products',
-    where: { code: { in: codes } },
+    where: { code: { in: variants } },
     depth: 0,
-    limit: codes.length,
+    limit: Math.max(variants.length, 1),
     pagination: false,
     overrideAccess: false,
     user: user as never,
-    select: { code: true },
-  }) : { docs: [] as Array<{ id: string | number; code?: string | null }> }
-  const existingByCode = new Map(existing.docs.map((doc) => [String(doc.code || '').toUpperCase(), doc.id]))
+    select: {
+      code: true,
+      slug: true,
+      title: true,
+      catalogStatus: true,
+      availability: true,
+      categories: true,
+      material: true,
+      description: true,
+      priceMode: true,
+      basePriceCents: true,
+      gallery: true,
+    },
+  } as never)
+  return result.docs as unknown as ExistingProduct[]
+}
 
+export async function previewImport(payload: Payload, user: WorkflowUser, rawText: string): Promise<ImportPreviewResult> {
+  const { rows, unknownHeaders, delimiter } = parseImportSheet(rawText)
+  const existing = await findProductsByCodes(payload, user, rows.map((row) => row.values.code).filter(Boolean))
+  const existingByCode = new Map(existing.map((doc) => [foldKey(String(doc.code || '')), doc.id]))
   const seenCodes = new Set<string>()
-  const preview: ImportRowPreview[] = rows.map((values, index) => {
-    const issues = validateRowShape(values)
-    const code = values.code.trim().toUpperCase()
-    if (code && seenCodes.has(code)) issues.push({ column: 'code', message: 'Código repetido nesta importação.' })
+
+  const preview: ImportRowPreview[] = rows.map(({ values, sourceLine }, rowIndex) => {
+    const code = foldKey(values.code)
+    const existingId = code ? existingByCode.get(code) ?? null : null
+    const issues = validateRowShape(values, {
+      requireActiveAssets: existingId === null,
+      allowPartialUpdate: existingId !== null,
+    })
+
+    if (code && seenCodes.has(code)) {
+      issues.push({ column: 'code', code: 'duplicate_batch', message: 'Código repetido nesta importação.', severity: 'error' })
+    }
     if (code) seenCodes.add(code)
 
-    const existingId = code ? existingByCode.get(code) ?? null : null
     return {
-      rowIndex: index,
+      rowIndex,
+      sourceLine,
       values,
       issues,
       isDuplicate: existingId !== null,
@@ -164,41 +150,65 @@ export async function previewImport(payload: Payload, user: WorkflowUser, rawTex
     }
   })
 
-  return { rows: preview, unknownHeaders, blockingCount: preview.reduce((sum, row) => sum + row.issues.length, 0) }
+  return {
+    rows: preview,
+    unknownHeaders,
+    delimiter,
+    blockingCount: preview.reduce((sum, row) => sum + blockingIssueCount(row.issues), 0),
+  }
 }
 
-async function resolveCategoryIds(payload: Payload, user: WorkflowUser, names: string[]): Promise<{ ids: Array<string | number>; missing: string[] }> {
-  if (!names.length) return { ids: [], missing: [] }
+async function resolveCategoryIds(payload: Payload, user: WorkflowUser, names: string[]) {
+  if (!names.length) return { ids: [] as Array<string | number>, missing: [] as string[] }
+
+  // Categorias são uma taxonomia pequena. Ler títulos em lote elimina a comparação
+  // case/acento-sensitive do `IN` sem introduzir SQL cru ou migration nesta etapa.
   const result = await payload.find({
     collection: 'categories',
-    where: { title: { in: names } },
     depth: 0,
-    limit: names.length,
+    limit: 2000,
     pagination: false,
     overrideAccess: false,
     user: user as never,
     select: { title: true },
   })
-  const byTitle = new Map(result.docs.map((doc) => [String(doc.title || '').trim().toLocaleLowerCase('pt-BR'), doc.id]))
+  const byTitle = new Map(result.docs.map((doc) => [foldKey(String(doc.title || '')), doc.id]))
   const ids: Array<string | number> = []
   const missing: string[] = []
   for (const name of names) {
-    const id = byTitle.get(name.trim().toLocaleLowerCase('pt-BR'))
+    const id = byTitle.get(foldKey(name))
     if (id !== undefined) ids.push(id)
     else missing.push(name)
   }
   return { ids, missing }
 }
 
-async function fetchImageAsMedia(payload: Payload, user: WorkflowUser, url: string, altFallback: string) {
-  const response = await fetch(url, { redirect: 'follow' })
-  if (!response.ok) throw new Error(`Não foi possível baixar a imagem (${response.status}).`)
-  const contentType = response.headers.get('content-type') || ''
-  if (!contentType.startsWith('image/')) throw new Error('O link não aponta para uma imagem.')
-  const arrayBuffer = await response.arrayBuffer()
-  const maxBytes = 10 * 1024 * 1024
-  if (arrayBuffer.byteLength > maxBytes) throw new Error('Imagem maior que 10MB.')
-  const name = decodeURIComponent(url.split('/').pop() || 'imagem').split('?')[0] || 'imagem.jpg'
+type MediaDocument = { id: string | number }
+type MediaCache = {
+  byURL: Map<string, MediaDocument>
+  byHash: Map<string, MediaDocument>
+  downloads: number
+}
+
+async function fetchImageAsMedia(
+  payload: Payload,
+  user: WorkflowUser,
+  url: string,
+  altFallback: string,
+  cache: MediaCache,
+  createdThisRow: Array<string | number>,
+) {
+  const cachedURL = cache.byURL.get(url)
+  if (cachedURL) return cachedURL
+  if (cache.downloads >= 200) throw new Error('Limite de 200 downloads externos por importação excedido.')
+  cache.downloads += 1
+
+  const remote = await fetchRemoteImage(url)
+  const cachedHash = cache.byHash.get(remote.sha256)
+  if (cachedHash) {
+    cache.byURL.set(url, cachedHash)
+    return cachedHash
+  }
 
   const media = await payload.create({
     collection: 'media',
@@ -206,17 +216,35 @@ async function fetchImageAsMedia(payload: Payload, user: WorkflowUser, url: stri
     user: user as never,
     data: { alt: altFallback } as never,
     file: {
-      data: Buffer.from(arrayBuffer),
-      mimetype: contentType,
-      name,
-      size: arrayBuffer.byteLength,
+      data: remote.buffer,
+      mimetype: remote.mime,
+      name: remote.name,
+      size: remote.buffer.byteLength,
     },
-  })
+  }) as unknown as MediaDocument
+  cache.byURL.set(url, media)
+  cache.byHash.set(remote.sha256, media)
+  createdThisRow.push(media.id)
   return media
+}
+
+async function compensateMedia(payload: Payload, user: WorkflowUser, ids: Array<string | number>, cache: MediaCache) {
+  if (!ids.length) return
+  for (const id of ids) {
+    try {
+      await payload.delete({ collection: 'media', id, overrideAccess: false, user: user as never })
+    } catch (error) {
+      payload.logger.warn({ err: error, mediaId: id }, 'product import failed to compensate orphan media')
+    }
+  }
+  const deleted = new Set(ids.map(String))
+  for (const [key, media] of cache.byURL) if (deleted.has(String(media.id))) cache.byURL.delete(key)
+  for (const [key, media] of cache.byHash) if (deleted.has(String(media.id))) cache.byHash.delete(key)
 }
 
 export type ImportRowResult = {
   rowIndex: number
+  sourceLine: number
   status: 'created' | 'updated' | 'skipped' | 'error'
   productId?: string | number
   error?: string
@@ -232,88 +260,129 @@ export type ImportCommitReport = {
 
 export type ImportCommitInput = {
   rowIndex: number
+  sourceLine?: number
   values: ImportRowValues
   onConflict: 'skip' | 'update'
 }
 
+function setCell(data: Record<string, unknown>, key: string, raw: string, transform: (value: string) => unknown = (value) => value.trim()) {
+  if (!raw.trim()) return
+  data[key] = isClearCell(raw) ? null : transform(raw)
+}
+
+function relationshipCount(value: unknown) {
+  return Array.isArray(value) ? value.length : 0
+}
+
 export async function commitImport(payload: Payload, user: WorkflowUser, inputRows: ImportCommitInput[]): Promise<ImportCommitReport> {
+  const startedAt = Date.now()
   const report: ImportCommitReport = { created: 0, updated: 0, skipped: 0, errored: 0, rows: [] }
+  const cache: MediaCache = { byURL: new Map(), byHash: new Map(), downloads: 0 }
 
   for (const input of inputRows) {
     const { values } = input
-    try {
-      const issues = validateRowShape(values)
-      if (issues.length) throw new Error(issues.map((issue) => issue.message).join(' '))
+    const sourceLine = input.sourceLine ?? input.rowIndex + 2
+    const createdThisRow: Array<string | number> = []
 
-      const code = values.code.trim().toUpperCase()
-      const existing = await payload.find({
-        collection: 'products',
-        where: { code: { equals: code } },
-        depth: 0,
-        limit: 1,
-        overrideAccess: false,
-        user: user as never,
-      })
-      const existingId = existing.docs[0]?.id ?? null
+    try {
+      const matches = await findProductsByCodes(payload, user, [values.code])
+      const existing = matches.find((doc) => foldKey(String(doc.code || '')) === foldKey(values.code)) || null
+      const existingId = existing?.id ?? null
+      const issues = validateRowShape(values, {
+        requireActiveAssets: existingId === null,
+        allowPartialUpdate: existingId !== null,
+      }).filter((issue) => issue.severity !== 'warning')
+      if (issues.length) throw new Error(issues.map((issue) => issue.message).join(' '))
 
       if (existingId !== null && input.onConflict === 'skip') {
         report.skipped += 1
-        report.rows.push({ rowIndex: input.rowIndex, status: 'skipped', productId: existingId })
+        report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'skipped', productId: existingId })
         continue
       }
 
-      const categoryNames = splitMulti(values.categories)
-      const { ids: categoryIds, missing: missingCategories } = await resolveCategoryIds(payload, user, categoryNames)
-      if (missingCategories.length) throw new Error(`Categoria não encontrada: ${missingCategories.join(', ')}.`)
+      const data: Record<string, unknown> = {}
+      if (existingId === null || values.title.trim()) data.title = values.title.trim()
+      if (existingId === null || values.code.trim()) data.code = values.code.trim().toUpperCase()
 
-      const imageUrls = splitMulti(values.imageUrls)
-      const gallery: Array<{ image: string | number; mediaKey: string; role: string; alt: string }> = []
-      for (const [index, url] of imageUrls.entries()) {
-        const media = await fetchImageAsMedia(payload, user, url, values.title || 'Produto')
-        gallery.push({
-          image: media.id,
-          mediaKey: `img-${index + 1}`,
-          role: index === 0 ? 'cover' : 'detail',
-          alt: values.title || 'Produto',
-        })
+      if (existingId === null) {
+        data.slug = values.slug.trim() || slugifyImportTitle(values.title)
+      } else if (values.slug.trim()) {
+        if (isClearCell(values.slug)) throw new Error('Slug é obrigatório e não pode ser limpo.')
+        data.slug = values.slug.trim()
       }
 
-      const availability = values.availability
-        ? availabilityLabelToValue[values.availability.trim().toLocaleLowerCase('pt-BR')]
-        : 'available'
-      const catalogStatus = values.catalogStatus
-        ? catalogStatusLabelToValue[values.catalogStatus.trim().toLocaleLowerCase('pt-BR')]
-        : 'active'
-      const priceCents = parsePriceToCents(values.price)
-
-      const data = {
-        title: values.title.trim(),
-        code,
-        slug: values.slug.trim() || undefined,
-        catalogStatus,
-        availability,
-        categories: categoryIds,
-        material: values.material.trim() || undefined,
-        description: values.description ? textToRichText(values.description) : undefined,
-        priceMode: priceCents !== null ? 'fixed' : 'inquiry',
-        basePriceCents: priceCents ?? undefined,
-        gallery: gallery.length ? gallery : undefined,
+      if (values.categories.trim()) {
+        const categoryNames = isClearCell(values.categories) ? [] : splitMulti(values.categories)
+        const { ids, missing } = await resolveCategoryIds(payload, user, categoryNames)
+        if (missing.length) throw new Error(`Categoria não encontrada: ${missing.join(', ')}.`)
+        data.categories = ids
+      } else if (existingId === null) {
+        data.categories = []
       }
+
+      if (values.imageUrls.trim()) {
+        const imageUrls = isClearCell(values.imageUrls) ? [] : splitMulti(values.imageUrls)
+        const gallery: Array<{ image: string | number; mediaKey: string; role: string; alt: string }> = []
+        for (const [index, url] of imageUrls.entries()) {
+          const media = await fetchImageAsMedia(payload, user, url, values.title || existing?.title || 'Produto', cache, createdThisRow)
+          gallery.push({ image: media.id, mediaKey: `img-${index + 1}`, role: index === 0 ? 'cover' : 'detail', alt: values.title || existing?.title || 'Produto' })
+        }
+        data.gallery = gallery
+      } else if (existingId === null) {
+        data.gallery = []
+      }
+
+      setCell(data, 'material', values.material)
+      if (values.description.trim()) data.description = isClearCell(values.description) ? null : textToRichText(values.description)
+
+      if (values.availability.trim()) {
+        data.availability = isClearCell(values.availability) ? null : normalizeAvailability(values.availability)
+      } else if (existingId === null) data.availability = 'available'
+
+      if (values.catalogStatus.trim()) {
+        data.catalogStatus = isClearCell(values.catalogStatus) ? null : normalizeCatalogStatus(values.catalogStatus)
+      } else if (existingId === null) data.catalogStatus = 'active'
+
+      const parsedPrice = values.price.trim() && !isClearCell(values.price) ? parsePrice(values.price) : null
+      if (values.price.trim()) data.basePriceCents = isClearCell(values.price) ? null : parsedPrice?.ok ? parsedPrice.cents : null
+
+      if (values.priceMode.trim()) {
+        data.priceMode = isClearCell(values.priceMode) ? null : normalizePriceMode(values.priceMode)
+      } else if (existingId === null) {
+        data.priceMode = parsedPrice?.ok ? 'fixed' : 'inquiry'
+      }
+
+      const finalStatus = String(data.catalogStatus ?? existing?.catalogStatus ?? 'active')
+      const finalCategories = data.categories ?? existing?.categories ?? []
+      const finalGallery = data.gallery ?? existing?.gallery ?? []
+      if (finalStatus === 'active' && relationshipCount(finalCategories) === 0) throw new Error('Produto ativo precisa ter categoria no estado final.')
+      if (finalStatus === 'active' && relationshipCount(finalGallery) === 0) throw new Error('Produto ativo precisa ter ao menos uma imagem no estado final.')
 
       if (existingId !== null) {
         await payload.update({ collection: 'products', id: existingId, overrideAccess: false, user: user as never, data: data as never })
         report.updated += 1
-        report.rows.push({ rowIndex: input.rowIndex, status: 'updated', productId: existingId })
+        report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'updated', productId: existingId })
       } else {
         const created = await payload.create({ collection: 'products', overrideAccess: false, user: user as never, data: data as never })
         report.created += 1
-        report.rows.push({ rowIndex: input.rowIndex, status: 'created', productId: created.id })
+        report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'created', productId: created.id })
       }
     } catch (error) {
+      await compensateMedia(payload, user, createdThisRow, cache)
       report.errored += 1
-      report.rows.push({ rowIndex: input.rowIndex, status: 'error', error: error instanceof Error ? error.message : 'Falha desconhecida.' })
+      report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'error', error: error instanceof Error ? error.message : 'Falha desconhecida.' })
     }
   }
+
+  payload.logger.info({
+    rows: inputRows.length,
+    durationMs: Date.now() - startedAt,
+    downloads: cache.downloads,
+    created: report.created,
+    updated: report.updated,
+    skipped: report.skipped,
+    errored: report.errored,
+  }, 'product import completed')
 
   return report
 }
