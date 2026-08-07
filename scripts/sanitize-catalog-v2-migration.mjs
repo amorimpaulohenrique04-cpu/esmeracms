@@ -45,7 +45,7 @@ function shouldRemove(statement) {
 }
 
 let removed = 0
-const sanitized = source.replace(/await db\.execute\(sql`([\s\S]*?)`\)/g, (match, sqlBody) => {
+const sanitizedSql = source.replace(/await db\.execute\(sql`([\s\S]*?)`\)/g, (match, sqlBody) => {
   const statements = sqlBody
     .split(';')
     .map((statement) => statement.trim())
@@ -58,9 +58,19 @@ const sanitized = source.replace(/await db\.execute\(sql`([\s\S]*?)`\)/g, (match
   return `await db.execute(sql\`\n  ${kept.join(';\n  ')};\`)`
 })
 
-if (sanitized === source || removed === 0) {
-  throw new Error('A migration gerada não continha o drift conhecido para sanitização.')
-}
+const sanitized = sanitizedSql
+  .replace(
+    'export async function up({ db, payload, req }: MigrateUpArgs)',
+    'export async function up({ db }: MigrateUpArgs)',
+  )
+  .replace(
+    'export async function down({ db, payload, req }: MigrateDownArgs)',
+    'export async function down({ db }: MigrateDownArgs)',
+  )
 
-writeFileSync(migrationPath, sanitized)
-console.log(`Migration ${migrationName} sanitizada: ${removed} statement(s) redundante(s) removido(s).`)
+if (sanitized !== source) {
+  writeFileSync(migrationPath, sanitized)
+  console.log(`Migration ${migrationName} sanitizada: ${removed} statement(s) redundante(s) removido(s).`)
+} else {
+  console.log(`Migration ${migrationName} já estava sanitizada.`)
+}
