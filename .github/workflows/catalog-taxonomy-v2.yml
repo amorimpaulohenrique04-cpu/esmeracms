@@ -43,3 +43,12 @@ jobs:
       - run: pnpm lint --max-warnings=0
       - run: pnpm test:int
       - run: pnpm build
+      - name: Prepare workspace artifact
+        if: always()
+        run: tar --exclude=.git --exclude=node_modules --exclude=.next -czf /tmp/catalog-taxonomy-workspace.tgz .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: catalog-taxonomy-workspace
+          path: /tmp/catalog-taxonomy-workspace.tgz
+          retention-days: 2
