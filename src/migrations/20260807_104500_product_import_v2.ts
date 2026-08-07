@@ -63,7 +63,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
       "id" serial PRIMARY KEY NOT NULL,
       "status" "enum_product_imports_status" NOT NULL,
       "idempotency_key" varchar NOT NULL,
-      "requested_by_id" integer NOT NULL,
+      "requested_by_id" integer,
       "requested_by_name" varchar,
       "requested_by_email" varchar,
       "requested_at" timestamp(3) with time zone NOT NULL,
