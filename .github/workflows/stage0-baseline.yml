@@ -243,15 +243,20 @@ jobs:
           done
 
           if [ "${FOUND}" != "true" ]; then
-            echo "No approved reference exists for exact base ${VISUAL_BASE_SHA}; capturing the base commit deterministically."
+            echo "No approved reference exists for exact base ${VISUAL_BASE_SHA}; capturing the base commit deterministically in an isolated database."
             BASE_WORKTREE=/tmp/esmera-visual-base
+            BASE_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/esmera_stage0_base
             rm -rf "${BASE_WORKTREE}"
+            PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS esmera_stage0_base WITH (FORCE);'
+            PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE esmera_stage0_base;'
             git worktree add --detach "${BASE_WORKTREE}" "${VISUAL_BASE_SHA}"
             (
               cd "${BASE_WORKTREE}"
+              export DATABASE_URL="${BASE_DATABASE_URL}"
+              export GITHUB_SHA="${VISUAL_BASE_SHA}"
               pnpm install --frozen-lockfile
-              pnpm build
-              GITHUB_SHA="${VISUAL_BASE_SHA}" pnpm baseline:capture
+              timeout 8m pnpm build
+              timeout 10m pnpm baseline:capture
             )
             cp -a "${BASE_WORKTREE}/artifacts/admin-baseline/." artifacts/reference-baseline/
             git worktree remove --force "${BASE_WORKTREE}"
