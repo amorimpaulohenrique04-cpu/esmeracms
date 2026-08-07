@@ -30,6 +30,7 @@
     "db:backup": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/postgres-backup.ts",
     "db:restore:test": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/postgres-restore-test.ts",
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
+    "seed:catalog-taxonomy": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-catalog-taxonomy.ts",
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
     "typecheck": "tsc --noEmit",
     "validate": "pnpm generate:types && pnpm generate:importmap && pnpm typecheck && pnpm lint --max-warnings=0 && pnpm test:int && pnpm build && pnpm analyze:dead-code && pnpm analyze:bundle",

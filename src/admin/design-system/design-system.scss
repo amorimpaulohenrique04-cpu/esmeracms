@@ -523,11 +523,5 @@
   .esmera-funnel-stepper a { padding-right: 10px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .esmera-funnel-stepper { scroll-behavior: auto; }
-  .esmera-funnel-stepper a,
-  .esmera-funnel-stepper__connector { transition: none; }
-}
-
 /* A política de prefers-reduced-motion é compartilhada e vive em tokens.scss,
    importado por todos os entry points do admin. Não duplicar aqui. */

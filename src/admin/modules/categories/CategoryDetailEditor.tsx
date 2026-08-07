@@ -156,6 +156,20 @@ export function CategoryDetailEditor({
   const [seoDescription, setSeoDescription] = useState(category.seo?.description || '')
   const [socialImage, setSocialImage] = useState(String(relationId(category.seo?.socialImage) ?? ''))
   const [noIndex, setNoIndex] = useState(Boolean(category.seo?.noIndex))
+  const [nodeType, setNodeType] = useState(category.nodeType || 'collection')
+  const [taxonomyAxis, setTaxonomyAxis] = useState(category.taxonomyAxis || 'navigation')
+  const [showInMenu, setShowInMenu] = useState(Boolean(category.menu?.showInMenu))
+  const [menuLabel, setMenuLabel] = useState(category.menu?.label || '')
+  const [menuVisibility, setMenuVisibility] = useState(category.menu?.visibility || 'all')
+  const [listingMode, setListingMode] = useState(category.listingMode || 'assigned')
+  const [ruleAvailability, setRuleAvailability] = useState<string[]>(category.listingRules?.availability || [])
+  const [defaultSort, setDefaultSort] = useState(category.collectionPage?.defaultSort || 'editorial')
+  const [productsPerPage, setProductsPerPage] = useState(String(category.collectionPage?.productsPerPage ?? 24))
+  const [visibleFilters, setVisibleFilters] = useState<string[]>(category.collectionPage?.visibleFilters || ['category', 'material', 'availability', 'price'])
+  const [showProductCount, setShowProductCount] = useState(category.collectionPage?.showProductCount !== false)
+  const [collectionLayout, setCollectionLayout] = useState(category.collectionPage?.layout || 'grid')
+  const [externalURL, setExternalURL] = useState(category.externalURL || '')
+  const [hubPath, setHubPath] = useState(category.hubPath || '')
 
   const allTermItems = useMemo<TermItem[]>(() => {
     const values = [...termSuggestions, ...terms.map((item) => item.value)]
@@ -175,11 +189,30 @@ export function CategoryDetailEditor({
 
   function visibleData() {
     const parsedOrder = Number(order)
+    const parsedProductsPerPage = Number(productsPerPage)
     return {
       title: title.trim(),
       slug: slug.trim(),
       description,
       status,
+      nodeType,
+      taxonomyAxis,
+      menu: { showInMenu, label: menuLabel.trim(), visibility: menuVisibility },
+      listingMode,
+      listingRules: {
+        availability: ruleAvailability,
+        productStatus: ['active'],
+        sort: defaultSort,
+      },
+      collectionPage: {
+        visibleFilters,
+        defaultSort,
+        productsPerPage: Number.isInteger(parsedProductsPerPage) && parsedProductsPerPage >= 1 && parsedProductsPerPage <= 48 ? parsedProductsPerPage : 24,
+        showProductCount,
+        layout: collectionLayout,
+      },
+      externalURL: externalURL.trim() || null,
+      hubPath: hubPath.trim() || null,
       order: Number.isInteger(parsedOrder) && parsedOrder >= 0 ? parsedOrder : 100,
       parent: parent || null,
       image: image || null,
@@ -406,6 +439,110 @@ export function CategoryDetailEditor({
               <span className="esmera-category-advanced__tag">Opcional</span>
             </summary>
             <div className="esmera-category-advanced__body">
+              <FieldV2 path="nodeType" label="Tipo do nó" error={errorFor('nodeType')}>
+                {(control) => (
+                  <select {...control} className="esmera-input" value={nodeType} onChange={(event) => { setNodeType(event.target.value as typeof nodeType); edited() }}>
+                    <option value="collection">Coleção com produtos</option>
+                    <option value="editorial">Página editorial</option>
+                    <option value="external">Link externo</option>
+                    <option value="group">Agrupador de navegação</option>
+                  </select>
+                )}
+              </FieldV2>
+              <FieldV2 path="taxonomyAxis" label="Eixo taxonômico" error={errorFor('taxonomyAxis')}>
+                {(control) => (
+                  <select {...control} className="esmera-input" value={taxonomyAxis} onChange={(event) => { setTaxonomyAxis(event.target.value as typeof taxonomyAxis); edited() }}>
+                    <option value="navigation">Navegação</option>
+                    <option value="piece_type">Tipo de peça</option>
+                    <option value="collection">Coleção</option>
+                    <option value="environment">Ambiente</option>
+                    <option value="campaign">Campanha</option>
+                    <option value="service">Serviço</option>
+                  </select>
+                )}
+              </FieldV2>
+              <label className="esmera-category-checkbox"><input type="checkbox" checked={showInMenu} onChange={(event) => { setShowInMenu(event.target.checked); edited() }} /> Exibir no menu</label>
+              <FieldV2 path="menu.label" label="Rótulo no menu" optional error={errorFor('menu.label')}>
+                {(control) => <input {...control} className="esmera-input" value={menuLabel} onChange={(event) => { setMenuLabel(event.target.value); edited() }} />}
+              </FieldV2>
+              <FieldV2 path="menu.visibility" label="Visibilidade no menu" error={errorFor('menu.visibility')}>
+                {(control) => (
+                  <select {...control} className="esmera-input" value={menuVisibility} onChange={(event) => { setMenuVisibility(event.target.value as typeof menuVisibility); edited() }}>
+                    <option value="all">Desktop e mobile</option>
+                    <option value="desktop">Somente desktop</option>
+                    <option value="mobile">Somente mobile</option>
+                  </select>
+                )}
+              </FieldV2>
+              <FieldV2 path="listingMode" label="Modo de listagem" error={errorFor('listingMode')}>
+                {(control) => (
+                  <select {...control} className="esmera-input" value={listingMode} onChange={(event) => { setListingMode(event.target.value as typeof listingMode); edited() }}>
+                    <option value="assigned">Produtos atribuídos</option>
+                    <option value="descendants">Categoria e descendentes</option>
+                    <option value="rules">Regras automáticas</option>
+                    <option value="hybrid">Atribuídos + regras</option>
+                  </select>
+                )}
+              </FieldV2>
+              {(listingMode === 'rules' || listingMode === 'hybrid') ? (
+                <fieldset className="esmera-category-options esmera-category-field--wide">
+                  <legend>Disponibilidade usada pela regra</legend>
+                  {[
+                    ['available', 'Disponível'],
+                    ['unique', 'Peça única'],
+                    ['limited', 'Disponibilidade limitada'],
+                    ['made_to_order', 'Sob encomenda'],
+                  ].map(([value, label]) => (
+                    <label key={value} className="esmera-category-checkbox">
+                      <input type="checkbox" checked={ruleAvailability.includes(value)} onChange={(event) => { setRuleAvailability((current) => event.target.checked ? [...new Set([...current, value])] : current.filter((item) => item !== value)); edited() }} /> {label}
+                    </label>
+                  ))}
+                </fieldset>
+              ) : null}
+              <FieldV2 path="collectionPage.defaultSort" label="Ordenação padrão" error={errorFor('collectionPage.defaultSort')}>
+                {(control) => (
+                  <select {...control} className="esmera-input" value={defaultSort} onChange={(event) => { setDefaultSort(event.target.value as typeof defaultSort); edited() }}>
+                    <option value="editorial">Editorial</option>
+                    <option value="newest">Mais recentes</option>
+                    <option value="price_asc">Menor preço</option>
+                    <option value="price_desc">Maior preço</option>
+                    <option value="name_asc">Nome</option>
+                  </select>
+                )}
+              </FieldV2>
+              <FieldV2 path="collectionPage.productsPerPage" label="Produtos por página" hint="Use entre 1 e 48." error={errorFor('collectionPage.productsPerPage')}>
+                {(control) => <input {...control} className="esmera-input" type="number" min="1" max="48" step="1" value={productsPerPage} onChange={(event) => { setProductsPerPage(event.target.value); edited() }} />}
+              </FieldV2>
+              <FieldV2 path="collectionPage.layout" label="Layout da coleção" error={errorFor('collectionPage.layout')}>
+                {(control) => (
+                  <select {...control} className="esmera-input" value={collectionLayout} onChange={(event) => { setCollectionLayout(event.target.value as typeof collectionLayout); edited() }}>
+                    <option value="grid">Grade regular</option>
+                    <option value="editorial">Grade com inserções editoriais</option>
+                  </select>
+                )}
+              </FieldV2>
+              <label className="esmera-category-checkbox"><input type="checkbox" checked={showProductCount} onChange={(event) => { setShowProductCount(event.target.checked); edited() }} /> Exibir contagem de produtos</label>
+              <fieldset className="esmera-category-options esmera-category-field--wide">
+                <legend>Filtros disponíveis na página</legend>
+                {[
+                  ['category', 'Categoria'], ['collection', 'Coleção'], ['environment', 'Ambiente'], ['piece_type', 'Tipo de peça'],
+                  ['material', 'Material'], ['availability', 'Disponibilidade'], ['price', 'Preço'],
+                ].map(([value, label]) => (
+                  <label key={value} className="esmera-category-checkbox">
+                    <input type="checkbox" checked={visibleFilters.includes(value)} onChange={(event) => { setVisibleFilters((current) => event.target.checked ? [...new Set([...current, value])] : current.filter((item) => item !== value)); edited() }} /> {label}
+                  </label>
+                ))}
+              </fieldset>
+              {nodeType === 'external' ? (
+                <FieldV2 path="externalURL" label="URL externa" className="esmera-category-field--wide" error={errorFor('externalURL')}>
+                  {(control) => <input {...control} className="esmera-input" type="url" value={externalURL} onChange={(event) => { setExternalURL(event.target.value); edited() }} />}
+                </FieldV2>
+              ) : null}
+              {nodeType === 'group' ? (
+                <FieldV2 path="hubPath" label="Rota opcional do agrupador" className="esmera-category-field--wide" error={errorFor('hubPath')}>
+                  {(control) => <input {...control} className="esmera-input" placeholder="/colecao/pecas" value={hubPath} onChange={(event) => { setHubPath(event.target.value); edited() }} />}
+                </FieldV2>
+              ) : null}
               <FieldV2 id="category-order" path="order" label="Ordem editorial" hint="Normalmente controlada pela reordenação da lista." error={errorFor('order')}>
                 {(control) => <input {...control} className="esmera-input" type="number" min="0" step="1" value={order} onChange={(event) => { setOrder(event.target.value); edited() }} />}
               </FieldV2>
@@ -460,6 +597,14 @@ export function CategoryDetailEditor({
               </Combobox.Portal>
             </Combobox.Root>
             <span className="esmera-field-hint">Digite um termo e escolha “Adicionar” para criar um novo sinônimo. Os chips possuem remoção explícita por teclado.</span>
+          </div>
+
+          <div className="esmera-category-editorial-callout esmera-category-field--wide">
+            <div>
+              <strong>Conteúdo editorial e destaques do mega menu</strong>
+              <p>Os blocos são controlados pelo schema e permanecem nesta aba. Use o editor técnico para montar galerias, texto com imagem, manifestos, CTAs e destaques.</p>
+            </div>
+            <a className="esmera-button esmera-button--quiet" href={`/admin/collections/categories/${category.id}`}>Editar blocos</a>
           </div>
 
           <FieldV2 id="category-seo" path="seo" label="Título SEO" optional error={errorFor('seo')}>

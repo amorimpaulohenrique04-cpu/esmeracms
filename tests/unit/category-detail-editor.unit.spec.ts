@@ -325,7 +325,10 @@ describe('CategoryDetailEditor — FormSystem', () => {
     await waitFor(() => expect(bodies).toHaveLength(1))
 
     expect(Object.keys(bodies[0].data ?? {}).sort()).toEqual([
-      'description', 'image', 'order', 'parent', 'searchTerms', 'seo', 'slug', 'status', 'title',
+      'collectionPage', 'description', 'externalURL', 'hubPath', 'image', 'listingMode', 'listingRules',
+      'menu', 'nodeType', 'order', 'parent', 'searchTerms', 'seo', 'slug', 'status', 'taxonomyAxis', 'title',
     ])
+    expect(bodies[0].data).not.toHaveProperty('products')
+    expect(bodies[0].data).not.toHaveProperty('productCount')
   })
 })

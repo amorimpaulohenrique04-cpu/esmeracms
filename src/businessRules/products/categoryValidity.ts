@@ -13,19 +13,23 @@ async function getActiveProductCategoryIssues(
 ) {
   if (product.catalogStatus !== 'active') return []
 
-  const categoryIds = Array.from(new Set(
-    (product.categories || [])
-      .map((value) => relationshipID(value as never))
-      .filter((value): value is string | number => value !== null),
-  ))
+  const rawIds = (product.categories || [])
+    .map((value) => relationshipID(value as never))
+    .filter((value): value is string | number => value !== null)
+  const categoryIds = Array.from(new Set(rawIds.map(String)))
 
-  if (!categoryIds.length) return []
+  const issues: string[] = []
+  if (rawIds.length !== categoryIds.length) {
+    issues.push('A mesma prateleira ou categoria não pode ser selecionada duas vezes.')
+  }
+  if (!categoryIds.length) return issues
 
   const where: Where = {
     and: [
       { id: { in: categoryIds } },
       { status: { equals: 'active' } },
       { _status: { equals: 'published' } },
+      { nodeType: { not_equals: 'group' } },
     ],
   }
 
@@ -38,12 +42,14 @@ async function getActiveProductCategoryIssues(
     overrideAccess: true,
     req,
     where,
+    select: { id: true, nodeType: true },
   })
 
   const validIds = new Set(valid.docs.map((category) => String(category.id)))
-  return categoryIds.some((id) => !validIds.has(String(id)))
-    ? ['Todo produto ativo precisa apontar somente para categorias ativas e publicadas.']
-    : []
+  if (categoryIds.some((id) => !validIds.has(String(id)))) {
+    issues.push('Todo produto ativo precisa apontar somente para categorias ativas, publicadas e selecionáveis; agrupadores de menu não são prateleiras.')
+  }
+  return issues
 }
 
 /**

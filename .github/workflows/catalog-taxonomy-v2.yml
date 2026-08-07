@@ -1,0 +1,111 @@
+name: Validate Catalog Taxonomy V2
+
+on:
+  push:
+    branches: [agent/catalog-taxonomy-v2-20260806]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: esmera
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/esmera
+      PAYLOAD_SECRET: ci-only-payload-secret-change-me
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Normalize seed for deterministic execution
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+          const path = 'src/scripts/seed-catalog-taxonomy.ts'
+          let source = fs.readFileSync(path, 'utf8')
+          const beforeTail = `main().catch((error) => {
+            console.error(error)
+            process.exitCode = 1
+          })`.replace(/^          /gm, '')
+          const afterTail = `main()
+            .then(() => process.exit(0))
+            .catch((error) => {
+              console.error(error)
+              process.exit(1)
+            })`.replace(/^          /gm, '')
+          if (source.includes(beforeTail)) source = source.replace(beforeTail, afterTail)
+          else if (!source.includes(afterTail)) throw new Error('Seed tail not found')
+          source = source.replace(
+            "{ key: 'crystals-lavabo', title: 'Porta-cristais',",
+            "{ key: 'crystals-lavabo', title: 'Porta-cristais para lavabo',",
+          )
+          fs.writeFileSync(path, source)
+          NODE
+      - name: Generate and sanitize catalog migration
+        run: |
+          set -o pipefail
+          if ! compgen -G "src/migrations/*catalog_taxonomy_v2*" > /dev/null; then
+            pnpm payload migrate:create catalog_taxonomy_v2 --skip-empty 2>&1 | tee migration-create.log
+          fi
+          node scripts/sanitize-catalog-v2-migration.mjs
+      - name: Validate migrations from an empty database
+        run: |
+          set -o pipefail
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d esmera -v ON_ERROR_STOP=1 \
+            -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          pnpm payload migrate 2>&1 | tee migration-run.log
+      - name: Validate idempotent taxonomy seed
+        run: |
+          set -o pipefail
+          pnpm seed:catalog-taxonomy 2>&1 | tee seed-first.log
+          pnpm seed:catalog-taxonomy 2>&1 | tee seed-second.log
+      - run: pnpm generate:types
+      - run: pnpm generate:importmap
+      - run: pnpm typecheck
+      - run: pnpm lint --max-warnings=0
+      - run: pnpm test:int
+      - run: pnpm build
+      - name: Commit generated migration and artifacts
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/migrations src/payload-types.ts src/app/\(payload\)/admin/importMap.js src/scripts/seed-catalog-taxonomy.ts
+            git commit -m "chore(catalog): generate and validate taxonomy V2 migration"
+            git push origin HEAD:agent/catalog-taxonomy-v2-20260806
+          fi
+      - name: Prepare workspace artifact
+        if: always()
+        run: tar --exclude=.git --exclude=node_modules --exclude=.next -czf /tmp/catalog-taxonomy-workspace.tgz .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: catalog-taxonomy-workspace
+          path: /tmp/catalog-taxonomy-workspace.tgz
+          retention-days: 2
