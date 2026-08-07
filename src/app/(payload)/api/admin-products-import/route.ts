@@ -15,6 +15,7 @@ import {
   type ImportCommitInput,
   type ImportRowResult,
 } from '../../../../server/domain/products/importOperations'
+import { createProductImportXlsxTemplate } from '../../../../server/domain/products/xlsxTemplate'
 import { PRODUCT_IMPORT_JOB, PRODUCT_IMPORT_QUEUE } from '../../../../server/jobs/productImport'
 
 export const dynamic = 'force-dynamic'
@@ -195,6 +196,17 @@ export async function GET(request: Request) {
   const importId = url.searchParams.get('importId')
 
   if (!importId) {
+    if (url.searchParams.get('template') === 'xlsx') {
+      const workbook = createProductImportXlsxTemplate()
+      return new NextResponse(new Uint8Array(workbook), {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': 'attachment; filename="modelo-importacao-produtos.xlsx"',
+          'Cache-Control': 'no-store',
+        },
+      })
+    }
+
     const csv = toCsv(templateRows())
     return new NextResponse(`\uFEFF${csv}`, {
       headers: {
