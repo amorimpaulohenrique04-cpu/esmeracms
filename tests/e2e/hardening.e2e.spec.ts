@@ -97,10 +97,13 @@ test.describe('Stages 16–20 hardening', () => {
     await expect(editorNav.getByRole('link', { name: 'Categorias', exact: true })).toBeVisible()
     await expect(editorNav.getByRole('link', { name: 'Configurações', exact: true })).toBeVisible()
     await expect(editorNav.getByRole('link', { name: 'Clientes', exact: true })).toHaveCount(0)
+    await expect(editorNav.getByRole('link', { name: 'Oportunidades', exact: true })).toHaveCount(0)
     await expect(editorNav.getByRole('link', { name: 'Vendas', exact: true })).toHaveCount(0)
-    await expect(editorNav.getByRole('link', { name: 'Admin técnico', exact: true })).toBeVisible()
+    await expect(editorNav.getByRole('link', { name: 'Configurações avançadas', exact: true })).toHaveCount(0)
 
     const commercialNav = commercialPage.getByTestId('esmera-nav')
+    await expect(commercialNav.getByRole('link', { name: 'Captação', exact: true })).toBeVisible()
+    await expect(commercialNav.getByRole('link', { name: 'Oportunidades', exact: true })).toBeVisible()
     await expect(commercialNav.getByRole('link', { name: 'Clientes', exact: true })).toBeVisible()
     await expect(commercialNav.getByRole('link', { name: 'Privacidade', exact: true })).toBeVisible()
     await expect(commercialNav.getByRole('link', { name: 'Vendas', exact: true })).toBeVisible()
@@ -108,10 +111,10 @@ test.describe('Stages 16–20 hardening', () => {
     await expect(commercialNav.getByRole('link', { name: 'Relatórios', exact: true })).toBeVisible()
     await expect(commercialNav.getByRole('link', { name: 'Produtos', exact: true })).toHaveCount(0)
     await expect(commercialNav.getByRole('link', { name: 'Categorias', exact: true })).toHaveCount(0)
-    await expect(commercialNav.getByRole('link', { name: 'Admin técnico', exact: true })).toBeVisible()
+    await expect(commercialNav.getByRole('link', { name: 'Configurações avançadas', exact: true })).toHaveCount(0)
 
     const adminNav = adminPage.getByTestId('esmera-nav')
-    for (const label of ['Produtos', 'Categorias', 'Clientes', 'Privacidade', 'Vendas', 'Pós-venda', 'Relatórios', 'Configurações', 'Admin técnico']) {
+    for (const label of ['Captação', 'Oportunidades', 'Vendas', 'Pós-venda', 'Clientes', 'Privacidade', 'Produtos', 'Categorias', 'Relatórios', 'Configurações', 'Configurações avançadas', 'Usuários']) {
       await expect(adminNav.getByRole('link', { name: label, exact: true })).toBeVisible()
     }
   })
