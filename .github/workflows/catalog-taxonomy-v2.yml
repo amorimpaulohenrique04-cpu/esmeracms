@@ -62,12 +62,13 @@ jobs:
           if (source.includes(before)) fs.writeFileSync(path, source.replace(before, after))
           else if (!source.includes(after)) throw new Error('Seed tail not found')
           NODE
-      - name: Generate catalog migration once
+      - name: Generate and sanitize catalog migration
         run: |
           set -o pipefail
           if ! compgen -G "src/migrations/*catalog_taxonomy_v2*" > /dev/null; then
             pnpm payload migrate:create catalog_taxonomy_v2 --skip-empty 2>&1 | tee migration-create.log
           fi
+          node scripts/sanitize-catalog-v2-migration.mjs
       - name: Validate migrations from an empty database
         run: |
           set -o pipefail
