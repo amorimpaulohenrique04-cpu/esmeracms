@@ -26,7 +26,7 @@ export async function GET(request: Request, context: RouteContext) {
   const filterCount = Array.from(url.searchParams.keys()).filter((key) => !['page', 'limit', 'sort'].includes(key)).length
 
   try {
-    const result = await measureServerOperation('navigation', 'storefront.collection.v2', () =>
+    const result = await measureServerOperation('operational', 'storefront.collection.v2', () =>
       buildCollectionV2(payload, slug, url.searchParams))
     payload.logger.info({
       event: 'storefront.collection.v2.served',
@@ -35,7 +35,6 @@ export async function GET(request: Request, context: RouteContext) {
       limit,
       filterCount,
       returned: result.body.items.length,
-      listingMode: result.body.category.nodeType,
     })
     return publicJSON(request, result.body, {
       revision: result.body.revision,
