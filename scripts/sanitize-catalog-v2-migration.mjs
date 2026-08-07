@@ -32,7 +32,7 @@ const duplicatePublicationIndexes = new Set([
 ])
 
 function shouldRemove(statement) {
-  if (duplicateSchemaTokens.some((token) => statement.includes(`"${token}"`))) return true
+  if (duplicateSchemaTokens.some((token) => statement.includes(token))) return true
 
   const publicationColumnChange = /ALTER TABLE .*\b(?:ADD|DROP) COLUMN\b/.test(statement)
     && /"(?:publication_revision|publication_contract_version|version_publication_revision|version_publication_contract_version)"/.test(statement)
