@@ -5,15 +5,35 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useMemo, useRef, useState } from 'react'
 
-import { importColumnLabels, importColumnRequired, importColumns, type ImportColumn } from '../../../businessRules/products/importSchema'
-import { blockingIssueCount, parsePrice, validateRowShape } from '../../../businessRules/products/importValidation'
+import {
+  importColumnLabels,
+  importColumnRequired,
+  importColumns,
+  type ImportColumn,
+} from '../../../businessRules/products/importSchema'
+import {
+  blockingIssueCount,
+  parsePrice,
+  validateRowShape,
+} from '../../../businessRules/products/importValidation'
 import { Button } from '../../design-system'
+import {
+  applyImportMapping,
+  inspectImportHeaders,
+  type ImportHeaderInspection,
+} from './importMapping'
 import { parseXlsxWorkbook, type ParsedXlsxSheet } from './xlsx'
 
 const PREVIEW_WINDOW = 40
 const DB_ISSUE_CODES = new Set(['category_missing', 'slug_conflict', 'duplicate_batch'])
 
-type PreviewIssue = { column: ImportColumn | 'general'; message: string; code?: string; severity?: 'error' | 'warning' }
+type PreviewIssue = {
+  column: ImportColumn | 'general'
+  message: string
+  code?: string
+  severity?: 'error' | 'warning'
+}
+
 type PreviewRow = {
   rowIndex: number
   sourceLine: number
@@ -22,10 +42,36 @@ type PreviewRow = {
   isDuplicate: boolean
   action: 'create' | 'update' | 'skip'
 }
-type PreviewResponse = { rows: PreviewRow[]; unknownHeaders: string[]; delimiter: ',' | ';' | '\t' | '|' }
-type CommitRowResult = { rowIndex: number; sourceLine: number; status: 'created' | 'updated' | 'skipped' | 'error'; error?: string }
-type CommitResponse = { created: number; updated: number; skipped: number; errored: number; rows: CommitRowResult[] }
-type QueuedResponse = { importId: string; status: string; totalRows: number; processedRows: number; pollUrl: string }
+
+type PreviewResponse = {
+  rows: PreviewRow[]
+  unknownHeaders: string[]
+  delimiter: ',' | ';' | '\t' | '|'
+}
+
+type CommitRowResult = {
+  rowIndex: number
+  sourceLine: number
+  status: 'created' | 'updated' | 'skipped' | 'error'
+  error?: string
+}
+
+type CommitResponse = {
+  created: number
+  updated: number
+  skipped: number
+  errored: number
+  rows: CommitRowResult[]
+}
+
+type QueuedResponse = {
+  importId: string
+  status: string
+  totalRows: number
+  processedRows: number
+  pollUrl: string
+}
+
 type ImportStatusResponse = {
   importId: string
   status: 'queued' | 'processing' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled'
@@ -39,13 +85,16 @@ type ImportStatusResponse = {
   error?: string | null
   errorCsvUrl?: string | null
 }
+
 type RowFilter = 'all' | 'pending' | 'new' | 'conflicts'
+
 type ProgressState = {
   importId: string
   status: ImportStatusResponse['status']
   processedRows: number
   totalRows: number
 }
+
 type WorkerResponse = {
   id: string
   ok: boolean
@@ -139,7 +188,10 @@ function downloadErrorCsv(result: CommitResponse) {
 }
 
 function terminalStatus(status: ImportStatusResponse['status']) {
-  return status === 'completed' || status === 'completed_with_errors' || status === 'failed' || status === 'cancelled'
+  return status === 'completed' ||
+    status === 'completed_with_errors' ||
+    status === 'failed' ||
+    status === 'cancelled'
 }
 
 function affectsDatabaseResolution(column: ImportColumn) {
@@ -149,7 +201,7 @@ function affectsDatabaseResolution(column: ImportColumn) {
 export function ProductImportDialog() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [step, setStep] = useState<'input' | 'preview' | 'result'>('input')
+  const [step, setStep] = useState<'input' | 'mapping' | 'preview' | 'result'>('input')
   const [rawText, setRawText] = useState('')
   const [rows, setRows] = useState<PreviewRow[]>([])
   const [unknownHeaders, setUnknownHeaders] = useState<string[]>([])
@@ -168,6 +220,8 @@ export function ProductImportDialog() {
   const [finalStatus, setFinalStatus] = useState<ImportStatusResponse['status'] | null>(null)
   const [xlsxSheets, setXlsxSheets] = useState<ParsedXlsxSheet[]>([])
   const [selectedSheet, setSelectedSheet] = useState(0)
+  const [mappingInspection, setMappingInspection] = useState<ImportHeaderInspection | null>(null)
+  const [mappingValues, setMappingValues] = useState<Array<ImportColumn | null>>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const idempotencyRef = useRef<string | null>(null)
   const pollAbortRef = useRef<AbortController | null>(null)
@@ -194,6 +248,8 @@ export function ProductImportDialog() {
     setSelectedSheet(0)
     setResolving(false)
     setNeedsDbRevalidation(false)
+    setMappingInspection(null)
+    setMappingValues([])
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -207,6 +263,8 @@ export function ProductImportDialog() {
     setFilter('all')
     setPage(0)
     setActivePendingRow(null)
+    setMappingInspection(null)
+    setMappingValues([])
     setStep('preview')
   }
 
@@ -232,6 +290,35 @@ export function ProductImportDialog() {
     }
   }
 
+  async function beginPreview(text: string) {
+    setError(null)
+    const inspection = inspectImportHeaders(text)
+    if (inspection.needsMapping) {
+      setRawText(text)
+      setMappingInspection(inspection)
+      setMappingValues(inspection.mapping)
+      setStep('mapping')
+      setBusy(false)
+      return
+    }
+    await runPreview(text)
+  }
+
+  async function confirmMapping() {
+    if (!mappingInspection) return
+    setBusy(true)
+    setError(null)
+    try {
+      const mapped = applyImportMapping(rawText, mappingInspection.delimiter, mappingValues)
+      setRawText(mapped)
+      await runPreview(mapped)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível aplicar o mapeamento.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function consumeFile(file: File) {
     setError(null)
     if (file.size > 4 * 1024 * 1024) {
@@ -250,7 +337,7 @@ export function ProductImportDialog() {
         setSelectedSheet(0)
         setEncoding('XLSX')
         setRawText(first.text)
-        await runPreview(first.text)
+        await beginPreview(first.text)
         return
       }
 
@@ -259,7 +346,7 @@ export function ProductImportDialog() {
       const decoded = decodeSheet(buffer)
       setEncoding(decoded.encoding)
       setRawText(decoded.text)
-      await runPreview(decoded.text)
+      await beginPreview(decoded.text)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível ler o arquivo.')
     } finally {
@@ -277,7 +364,7 @@ export function ProductImportDialog() {
     if (!sheet) return
     setSelectedSheet(index)
     setRawText(sheet.text)
-    await runPreview(sheet.text)
+    await beginPreview(sheet.text)
   }
 
   function updateCell(rowIndex: number, column: ImportColumn, value: string) {
@@ -338,7 +425,9 @@ export function ProductImportDialog() {
 
   function focusPending(direction: 1 | -1) {
     if (!pendingRows.length) return
-    const currentIndex = activePendingRow === null ? -1 : pendingRows.findIndex((row) => row.rowIndex === activePendingRow)
+    const currentIndex = activePendingRow === null
+      ? -1
+      : pendingRows.findIndex((row) => row.rowIndex === activePendingRow)
     const nextIndex = direction === 1
       ? (currentIndex + 1 + pendingRows.length) % pendingRows.length
       : (currentIndex <= 0 ? pendingRows.length : currentIndex) - 1
@@ -347,7 +436,9 @@ export function ProductImportDialog() {
     setPage(Math.floor(nextIndex / PREVIEW_WINDOW))
     setActivePendingRow(target.rowIndex)
     window.setTimeout(() => {
-      const element = document.querySelector<HTMLElement>(`[data-import-row="${target.rowIndex}"] [aria-invalid="true"]`)
+      const element = document.querySelector<HTMLElement>(
+        `[data-import-row="${target.rowIndex}"] [aria-invalid="true"]`,
+      )
       element?.focus()
     }, 0)
   }
@@ -357,16 +448,34 @@ export function ProductImportDialog() {
     pollAbortRef.current?.abort()
     pollAbortRef.current = controller
     let pollUrl = initial.pollUrl
-    setProgress({ importId: initial.importId, status: initial.status as ImportStatusResponse['status'], processedRows: initial.processedRows, totalRows: initial.totalRows })
+    setProgress({
+      importId: initial.importId,
+      status: initial.status as ImportStatusResponse['status'],
+      processedRows: initial.processedRows,
+      totalRows: initial.totalRows,
+    })
 
     while (!controller.signal.aborted) {
       const status = await fetchImportStatus(pollUrl, controller.signal)
-      setProgress({ importId: status.importId, status: status.status, processedRows: status.processedRows, totalRows: status.totalRows })
+      setProgress({
+        importId: status.importId,
+        status: status.status,
+        processedRows: status.processedRows,
+        totalRows: status.totalRows,
+      })
       if (terminalStatus(status.status)) {
         setFinalStatus(status.status)
         setRemoteErrorCsv(status.errorCsvUrl || null)
-        setResult({ created: status.created, updated: status.updated, skipped: status.skipped, errored: status.errored, rows: status.results || [] })
-        if (status.status === 'failed') setError(status.error || 'A importação falhou durante o processamento.')
+        setResult({
+          created: status.created,
+          updated: status.updated,
+          skipped: status.skipped,
+          errored: status.errored,
+          rows: status.results || [],
+        })
+        if (status.status === 'failed') {
+          setError(status.error || 'A importação falhou durante o processamento.')
+        }
         setStep('result')
         setProgress(null)
         router.refresh()
@@ -391,9 +500,14 @@ export function ProductImportDialog() {
         onConflict: row.isDuplicate && row.action === 'update' ? 'update' : 'skip',
       }))
       idempotencyRef.current ||= crypto.randomUUID()
-      const data = await callImportApi<CommitResponse | QueuedResponse>({ action: 'commit', rows: payload, idempotencyKey: idempotencyRef.current })
-      if ('importId' in data) await pollImport(data)
-      else {
+      const data = await callImportApi<CommitResponse | QueuedResponse>({
+        action: 'commit',
+        rows: payload,
+        idempotencyKey: idempotencyRef.current,
+      })
+      if ('importId' in data) {
+        await pollImport(data)
+      } else {
         setResult(data)
         setFinalStatus(data.errored ? 'completed_with_errors' : 'completed')
         setStep('result')
@@ -417,13 +531,38 @@ export function ProductImportDialog() {
     }
   }
 
+  function reimportErrors() {
+    if (!result) return
+    const failedIndexes = new Set(
+      result.rows.filter((item) => item.status === 'error').map((item) => item.rowIndex),
+    )
+    const failedRows = rows.filter((row) => failedIndexes.has(row.rowIndex))
+    if (!failedRows.length) return
+    setRows(failedRows)
+    setResult(null)
+    setRemoteErrorCsv(null)
+    setFinalStatus(null)
+    setFilter('all')
+    setPage(0)
+    setNeedsDbRevalidation(false)
+    idempotencyRef.current = null
+    setStep('preview')
+  }
+
   function changeOpen(next: boolean) {
-    if (!next && step === 'preview' && rows.length > 0 && !window.confirm(busy ? 'A importação está em andamento. Fechar esta janela não interrompe o job. Fechar mesmo assim?' : 'Fechar e descartar as correções desta importação?')) return
+    if (!next && (step === 'mapping' || step === 'preview') && (rows.length > 0 || rawText.trim())) {
+      const message = busy
+        ? 'A importação está em andamento. Fechar esta janela não interrompe o job. Fechar mesmo assim?'
+        : 'Fechar e descartar as correções desta importação?'
+      if (!window.confirm(message)) return
+    }
     setOpen(next)
     if (!next) reset()
   }
 
-  const progressPercent = progress?.totalRows ? Math.round((progress.processedRows / progress.totalRows) * 100) : 0
+  const progressPercent = progress?.totalRows
+    ? Math.round((progress.processedRows / progress.totalRows) * 100)
+    : 0
   const confirmBlocked = busy || resolving || !rows.length || blockingCount > 0 || needsDbRevalidation
 
   return <Dialog.Root open={open} onOpenChange={changeOpen}>
@@ -433,41 +572,155 @@ export function ProductImportDialog() {
       <Dialog.Viewport className="esmera-dialog-viewport">
         <Dialog.Popup className="esmera-dialog esmera-products-import-dialog">
           <div className="esmera-overlay-header">
-            <div><Dialog.Title>Importar produtos</Dialog.Title><Dialog.Description>Envie Excel, CSV ou TSV. Célula vazia preserva o valor em atualizações; use -- para limpar um campo opcional.</Dialog.Description></div>
+            <div>
+              <Dialog.Title>Importar produtos</Dialog.Title>
+              <Dialog.Description>
+                Envie Excel, CSV ou TSV. Célula vazia preserva o valor em atualizações; use -- para limpar um campo opcional.
+              </Dialog.Description>
+            </div>
             <Dialog.Close className="esmera-icon-button" aria-label="Fechar">×</Dialog.Close>
           </div>
+
           <div className="esmera-overlay-body esmera-products-import">
             {error ? <p className="esmera-quick-create-feedback" role="alert" aria-live="assertive">{error}</p> : null}
 
             {step === 'input' ? <div className="esmera-products-import__input">
-              <Link className="esmera-button esmera-button--quiet" href="/api/admin-products-import" download>Baixar modelo (.csv)</Link>
-              <label className="esmera-products-import__dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
-                event.preventDefault()
-                const file = event.dataTransfer.files?.[0]
-                if (file) void consumeFile(file)
-              }}>
+              <div className="esmera-products-import__templates">
+                <Link className="esmera-button esmera-button--quiet" href="/api/admin-products-import?template=xlsx" download>
+                  Baixar modelo (.xlsx)
+                </Link>
+                <Link className="esmera-button esmera-button--quiet" href="/api/admin-products-import" download>
+                  Baixar modelo (.csv)
+                </Link>
+              </div>
+              <label
+                className="esmera-products-import__dropzone"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  const file = event.dataTransfer.files?.[0]
+                  if (file) void consumeFile(file)
+                }}
+              >
                 <strong>Solte Excel, CSV ou TSV aqui</strong>
                 <span>.xlsx direto ou arquivos exportados pelo Excel/Google Sheets</span>
-                <input ref={fileRef} type="file" accept=".xlsx,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/tab-separated-values" onChange={onFile} />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/tab-separated-values"
+                  onChange={onFile}
+                />
               </label>
-              <label className="esmera-products-import__field"><span>Ou cole os dados copiados da planilha (com cabeçalho)</span><textarea className="esmera-input" rows={10} value={rawText} onChange={(event) => { setRawText(event.target.value); setEncoding('texto colado'); setXlsxSheets([]) }} placeholder="nome\tcodigo\tcategoria\tpreco\t..." /></label>
-              <div className="esmera-actions"><Button type="button" onClick={() => void runPreview(rawText)} disabled={busy || !rawText.trim()}>{busy ? 'Lendo…' : 'Pré-visualizar'}</Button></div>
+              <label className="esmera-products-import__field">
+                <span>Ou cole os dados copiados da planilha (com cabeçalho)</span>
+                <textarea
+                  className="esmera-input"
+                  rows={10}
+                  value={rawText}
+                  onChange={(event) => {
+                    setRawText(event.target.value)
+                    setEncoding('texto colado')
+                    setXlsxSheets([])
+                  }}
+                  placeholder="nome\tcodigo\tcategoria\tpreco\t..."
+                />
+              </label>
+              <div className="esmera-actions">
+                <Button type="button" onClick={() => void beginPreview(rawText)} disabled={busy || !rawText.trim()}>
+                  {busy ? 'Lendo…' : 'Pré-visualizar'}
+                </Button>
+              </div>
+            </div> : null}
+
+            {step === 'mapping' && mappingInspection ? <div className="esmera-products-import__mapping">
+              <div>
+                <strong>Mapear colunas</strong>
+                <p>Associe cada coluna recebida a um campo do produto. Colunas sem uso podem ficar como “Ignorar”.</p>
+              </div>
+              {xlsxSheets.length > 1 ? <label className="esmera-products-import__sheet">
+                <span>Aba</span>
+                <select
+                  className="esmera-input"
+                  value={selectedSheet}
+                  disabled={busy}
+                  onChange={(event) => void changeXlsxSheet(Number(event.target.value))}
+                >
+                  {xlsxSheets.map((sheet, index) => <option value={index} key={`${sheet.name}-${index}`}>{sheet.name}</option>)}
+                </select>
+              </label> : null}
+              <div className="esmera-products-import__mapping-list">
+                {mappingInspection.headers.map((header, index) => {
+                  const current = mappingValues[index]
+                  return <label key={`${header}-${index}`}>
+                    <span>{header || `Coluna ${index + 1}`}</span>
+                    <select
+                      className="esmera-input"
+                      value={current || ''}
+                      onChange={(event) => {
+                        const value = event.target.value ? event.target.value as ImportColumn : null
+                        setMappingValues((items) => items.map((item, itemIndex) => itemIndex === index ? value : item))
+                      }}
+                    >
+                      <option value="">Ignorar</option>
+                      {importColumns.map((column) => {
+                        const usedElsewhere = mappingValues.some((item, itemIndex) => item === column && itemIndex !== index)
+                        return <option key={column} value={column} disabled={usedElsewhere}>
+                          {importColumnLabels[column]}{importColumnRequired[column] ? ' *' : ''}
+                        </option>
+                      })}
+                    </select>
+                  </label>
+                })}
+              </div>
+              <small>* campos obrigatórios</small>
+              <div className="esmera-actions">
+                <button type="button" className="esmera-button" onClick={() => setStep('input')} disabled={busy}>Voltar</button>
+                <Button type="button" onClick={() => void confirmMapping()} disabled={busy}>
+                  {busy ? 'Aplicando…' : 'Aplicar mapeamento'}
+                </Button>
+              </div>
             </div> : null}
 
             {step === 'preview' ? <div className="esmera-products-import__preview">
               <div className="esmera-products-import__meta" aria-live="polite">
                 <span>Formato: <strong>{encoding || 'texto'}</strong></span>
                 <span>Delimitador: <strong>{delimiterLabel(delimiter)}</strong></span>
-                {xlsxSheets.length > 1 ? <label className="esmera-products-import__sheet"><span>Aba</span><select className="esmera-input" value={selectedSheet} disabled={busy} onChange={(event) => void changeXlsxSheet(Number(event.target.value))}>{xlsxSheets.map((sheet, index) => <option value={index} key={`${sheet.name}-${index}`}>{sheet.name}</option>)}</select></label> : null}
+                {xlsxSheets.length > 1 ? <label className="esmera-products-import__sheet">
+                  <span>Aba</span>
+                  <select
+                    className="esmera-input"
+                    value={selectedSheet}
+                    disabled={busy}
+                    onChange={(event) => void changeXlsxSheet(Number(event.target.value))}
+                  >
+                    {xlsxSheets.map((sheet, index) => <option value={index} key={`${sheet.name}-${index}`}>{sheet.name}</option>)}
+                  </select>
+                </label> : null}
               </div>
-              {resolving ? <p className="esmera-products-import__resolving" aria-live="polite">Preview local pronto. Conferindo duplicatas, categorias e slugs no catálogo…</p> : null}
-              {unknownHeaders.length ? <p className="esmera-products-import__warning">Colunas não reconhecidas (ignoradas): {unknownHeaders.join(', ')}</p> : null}
-              {needsDbRevalidation ? <p className="esmera-products-import__warning">Você alterou código, categoria, nome ou slug. Revalide as referências do catálogo antes de confirmar.</p> : null}
+
+              {resolving ? <p className="esmera-products-import__resolving" aria-live="polite">
+                Preview local pronto. Conferindo duplicatas, categorias e slugs no catálogo…
+              </p> : null}
+              {unknownHeaders.length ? <p className="esmera-products-import__warning">
+                Colunas não reconhecidas (ignoradas): {unknownHeaders.join(', ')}
+              </p> : null}
+              {needsDbRevalidation ? <p className="esmera-products-import__warning">
+                Você alterou código, categoria, nome ou slug. Revalide as referências do catálogo antes de confirmar.
+              </p> : null}
 
               {progress ? <div className="esmera-products-import__progress" aria-live="polite">
-                <div><strong>{progress.status === 'queued' ? 'Na fila' : progress.status === 'processing' ? 'Importando produtos' : 'Finalizando'}</strong><span>{progress.processedRows} de {progress.totalRows} linhas · {progressPercent}%</span></div>
-                <progress max={progress.totalRows || 1} value={progress.processedRows} aria-label={`Importação ${progressPercent}% concluída`} />
-                {progress.status !== 'cancelled' ? <button type="button" className="esmera-button esmera-button--quiet" onClick={() => void cancelImport()}>Cancelar importação</button> : <span>Cancelamento solicitado.</span>}
+                <div>
+                  <strong>{progress.status === 'queued' ? 'Na fila' : progress.status === 'processing' ? 'Importando produtos' : 'Finalizando'}</strong>
+                  <span>{progress.processedRows} de {progress.totalRows} linhas · {progressPercent}%</span>
+                </div>
+                <progress
+                  max={progress.totalRows || 1}
+                  value={progress.processedRows}
+                  aria-label={`Importação ${progressPercent}% concluída`}
+                />
+                {progress.status !== 'cancelled'
+                  ? <button type="button" className="esmera-button esmera-button--quiet" onClick={() => void cancelImport()}>Cancelar importação</button>
+                  : <span>Cancelamento solicitado.</span>}
               </div> : null}
 
               <div className="esmera-products-import__filters" aria-label="Filtrar linhas da importação">
@@ -475,54 +728,211 @@ export function ProductImportDialog() {
                 <button type="button" className={filter === 'pending' ? 'is-active' : ''} onClick={() => selectFilter('pending')}>Só pendências ({pendingRows.length})</button>
                 <button type="button" className={filter === 'new' ? 'is-active' : ''} onClick={() => selectFilter('new')}>Só novas ({rows.filter((row) => !row.isDuplicate).length})</button>
                 <button type="button" className={filter === 'conflicts' ? 'is-active' : ''} onClick={() => selectFilter('conflicts')}>Só conflitos ({rows.filter((row) => row.isDuplicate).length})</button>
-                {pendingRows.length ? <><button type="button" onClick={() => focusPending(-1)} aria-label="Pendência anterior">↑ anterior</button><button type="button" onClick={() => focusPending(1)} aria-label="Próxima pendência">↓ próxima</button></> : null}
+                {pendingRows.length ? <>
+                  <button type="button" onClick={() => focusPending(-1)} aria-label="Pendência anterior">↑ anterior</button>
+                  <button type="button" onClick={() => focusPending(1)} aria-label="Próxima pendência">↓ próxima</button>
+                </> : null}
               </div>
 
               <div className="esmera-products-import__windowbar">
                 <span>{visibleRows.length ? `Mostrando ${windowStart}–${windowEnd} de ${visibleRows.length}` : 'Nenhuma linha neste filtro'}</span>
-                {pageCount > 1 ? <div><button type="button" className="esmera-icon-button" disabled={safePage === 0} onClick={() => setPage(Math.max(0, safePage - 1))} aria-label="Página anterior">←</button><span>{safePage + 1} / {pageCount}</span><button type="button" className="esmera-icon-button" disabled={safePage >= pageCount - 1} onClick={() => setPage(Math.min(pageCount - 1, safePage + 1))} aria-label="Próxima página">→</button></div> : null}
+                {pageCount > 1 ? <div>
+                  <button
+                    type="button"
+                    className="esmera-icon-button"
+                    disabled={safePage === 0}
+                    onClick={() => setPage(Math.max(0, safePage - 1))}
+                    aria-label="Página anterior"
+                  >←</button>
+                  <span>{safePage + 1} / {pageCount}</span>
+                  <button
+                    type="button"
+                    className="esmera-icon-button"
+                    disabled={safePage >= pageCount - 1}
+                    onClick={() => setPage(Math.min(pageCount - 1, safePage + 1))}
+                    aria-label="Próxima página"
+                  >→</button>
+                </div> : null}
               </div>
 
               <div className="esmera-products-import__grid esmera-data-table-wrap">
                 <table className="esmera-data-table esmera-products-import-table" role="grid" aria-rowcount={visibleRows.length + 1}>
-                  <thead><tr><th>#</th>{importColumns.map((column) => <th key={column} data-col={column}>{importColumnLabels[column]}{importColumnRequired[column] ? ' *' : ''}</th>)}<th>Conflito</th><th /></tr></thead>
-                  <tbody>{windowRows.map((row, windowIndex) => <tr key={row.rowIndex} data-import-row={row.rowIndex} aria-rowindex={safePage * PREVIEW_WINDOW + windowIndex + 2} className={blockingIssueCount(row.issues) ? 'has-error' : ''}>
+                  <thead><tr>
+                    <th>#</th>
+                    {importColumns.map((column) => <th key={column} data-col={column}>
+                      {importColumnLabels[column]}{importColumnRequired[column] ? ' *' : ''}
+                    </th>)}
+                    <th>Conflito</th>
+                    <th />
+                  </tr></thead>
+                  <tbody>{windowRows.map((row, windowIndex) => <tr
+                    key={row.rowIndex}
+                    data-import-row={row.rowIndex}
+                    aria-rowindex={safePage * PREVIEW_WINDOW + windowIndex + 2}
+                    className={blockingIssueCount(row.issues) ? 'has-error' : ''}
+                  >
                     <td>{row.sourceLine}</td>
                     {importColumns.map((column) => {
                       const issue = row.issues.find((item) => item.column === column)
                       const errorID = `import-error-${row.rowIndex}-${column}`
                       const price = column === 'price' && row.values.price ? parsePrice(row.values.price) : null
-                      return <td key={column} className={issue?.severity === 'error' ? 'has-error' : issue ? 'has-warning' : ''} data-col={column}>
-                        <input className="esmera-input" defaultValue={row.values[column] || ''} aria-label={`${importColumnLabels[column]}, linha ${row.sourceLine}`} aria-invalid={issue?.severity === 'error' ? 'true' : undefined} aria-describedby={issue ? errorID : undefined} inputMode={column === 'price' ? 'decimal' : undefined} disabled={busy} onBlur={(event) => updateCell(row.rowIndex, column, event.target.value)} />
+                      return <td
+                        key={column}
+                        className={issue?.severity === 'error' ? 'has-error' : issue ? 'has-warning' : ''}
+                        data-col={column}
+                      >
+                        <input
+                          className="esmera-input"
+                          defaultValue={row.values[column] || ''}
+                          aria-label={`${importColumnLabels[column]}, linha ${row.sourceLine}`}
+                          aria-invalid={issue?.severity === 'error' ? 'true' : undefined}
+                          aria-describedby={issue ? errorID : undefined}
+                          inputMode={column === 'price' ? 'decimal' : undefined}
+                          disabled={busy}
+                          onBlur={(event) => updateCell(row.rowIndex, column, event.target.value)}
+                        />
                         {price?.ok ? <small className="esmera-products-import-table__normalized">{price.normalized}</small> : null}
                         {issue ? <small id={errorID} className="esmera-products-import-table__error">{issue.message}</small> : null}
                       </td>
                     })}
-                    <td>{row.isDuplicate ? <select className="esmera-input" aria-label={`Conflito, linha ${row.sourceLine}`} value={row.action} disabled={busy} onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}><option value="skip">Ignorar</option><option value="update">Atualizar</option></select> : <span>Novo</span>}</td>
-                    <td><button type="button" className="esmera-icon-button" aria-label={`Remover linha ${row.sourceLine}`} disabled={busy} onClick={() => removeRow(row.rowIndex)}>×</button></td>
+                    <td>{row.isDuplicate ? <select
+                      className="esmera-input"
+                      aria-label={`Conflito, linha ${row.sourceLine}`}
+                      value={row.action}
+                      disabled={busy}
+                      onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}
+                    >
+                      <option value="skip">Ignorar</option>
+                      <option value="update">Atualizar</option>
+                    </select> : <span>Novo</span>}</td>
+                    <td><button
+                      type="button"
+                      className="esmera-icon-button"
+                      aria-label={`Remover linha ${row.sourceLine}`}
+                      disabled={busy}
+                      onClick={() => removeRow(row.rowIndex)}
+                    >×</button></td>
                   </tr>)}</tbody>
                 </table>
               </div>
 
-              <div className="esmera-products-import__cards">{windowRows.map((row) => <details key={row.rowIndex} data-import-row={row.rowIndex} className={blockingIssueCount(row.issues) ? 'has-error' : ''}>
-                <summary><span><strong>Linha {row.sourceLine}</strong><small>{row.values.title || 'Sem nome'} · {row.values.code || 'sem código'}</small></span><span>{blockingIssueCount(row.issues) ? `${blockingIssueCount(row.issues)} pendência(s)` : row.isDuplicate ? 'Conflito' : 'Novo'}</span></summary>
-                <div className="esmera-products-import__card-fields">{importColumns.map((column) => {
-                  const issue = row.issues.find((item) => item.column === column)
-                  const errorID = `import-mobile-error-${row.rowIndex}-${column}`
-                  return <label key={column}><span>{importColumnLabels[column]}{importColumnRequired[column] ? ' *' : ''}</span><input className="esmera-input" defaultValue={row.values[column] || ''} disabled={busy} aria-invalid={issue?.severity === 'error' ? 'true' : undefined} aria-describedby={issue ? errorID : undefined} inputMode={column === 'price' ? 'decimal' : undefined} onBlur={(event) => updateCell(row.rowIndex, column, event.target.value)} />{issue ? <small id={errorID}>{issue.message}</small> : null}</label>
-                })}{row.isDuplicate ? <label><span>Conflito</span><select className="esmera-input" value={row.action} disabled={busy} onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}><option value="skip">Ignorar</option><option value="update">Atualizar</option></select></label> : null}<button type="button" className="esmera-button esmera-button--quiet" disabled={busy} onClick={() => removeRow(row.rowIndex)}>Remover linha</button></div>
-              </details>)}</div>
+              <div className="esmera-products-import__cards">
+                {windowRows.map((row) => <details
+                  key={row.rowIndex}
+                  data-import-row={row.rowIndex}
+                  className={blockingIssueCount(row.issues) ? 'has-error' : ''}
+                >
+                  <summary>
+                    <span><strong>Linha {row.sourceLine}</strong><small>{row.values.title || 'Sem nome'} · {row.values.code || 'sem código'}</small></span>
+                    <span>{blockingIssueCount(row.issues) ? `${blockingIssueCount(row.issues)} pendência(s)` : row.isDuplicate ? 'Conflito' : 'Novo'}</span>
+                  </summary>
+                  <div className="esmera-products-import__card-fields">
+                    {importColumns.map((column) => {
+                      const issue = row.issues.find((item) => item.column === column)
+                      const errorID = `import-mobile-error-${row.rowIndex}-${column}`
+                      return <label key={column}>
+                        <span>{importColumnLabels[column]}{importColumnRequired[column] ? ' *' : ''}</span>
+                        <input
+                          className="esmera-input"
+                          defaultValue={row.values[column] || ''}
+                          disabled={busy}
+                          aria-invalid={issue?.severity === 'error' ? 'true' : undefined}
+                          aria-describedby={issue ? errorID : undefined}
+                          inputMode={column === 'price' ? 'decimal' : undefined}
+                          onBlur={(event) => updateCell(row.rowIndex, column, event.target.value)}
+                        />
+                        {issue ? <small id={errorID}>{issue.message}</small> : null}
+                      </label>
+                    })}
+                    {row.isDuplicate ? <label>
+                      <span>Conflito</span>
+                      <select
+                        className="esmera-input"
+                        value={row.action}
+                        disabled={busy}
+                        onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}
+                      >
+                        <option value="skip">Ignorar</option>
+                        <option value="update">Atualizar</option>
+                      </select>
+                    </label> : null}
+                    <button type="button" className="esmera-button esmera-button--quiet" disabled={busy} onClick={() => removeRow(row.rowIndex)}>
+                      Remover linha
+                    </button>
+                  </div>
+                </details>)}
+              </div>
 
-              <div className="esmera-products-import__summary" aria-live="polite"><span>{rows.length} linha{rows.length === 1 ? '' : 's'}</span><span className={blockingCount || needsDbRevalidation ? 'is-danger' : 'is-success'}>{needsDbRevalidation ? 'Revalidação do catálogo necessária' : blockingCount ? `${blockingCount} pendência(s) bloqueando` : 'Sem pendências'}</span></div>
-              <div className="esmera-actions"><button className="esmera-button" type="button" onClick={() => setStep('input')} disabled={busy}>Voltar</button><Button type="button" onClick={() => void revalidate()} disabled={busy || !rows.length}>{busy && !progress ? 'Validando…' : 'Revalidar catálogo'}</Button><Button type="button" aria-describedby={confirmBlocked ? 'import-blocking-reason' : undefined} onClick={() => void confirmImport()} disabled={confirmBlocked}>{busy ? (progress ? `Importando ${progressPercent}%` : 'Preparando…') : `Confirmar importação (${rows.length})`}</Button></div>
-              {confirmBlocked ? <span id="import-blocking-reason" className="esmera-products-import__sr-note">Corrija as pendências e revalide referências alteradas antes de confirmar.</span> : null}
+              <div className="esmera-products-import__summary" aria-live="polite">
+                <span>{rows.length} linha{rows.length === 1 ? '' : 's'}</span>
+                <span className={blockingCount || needsDbRevalidation ? 'is-danger' : 'is-success'}>
+                  {needsDbRevalidation
+                    ? 'Revalidação do catálogo necessária'
+                    : blockingCount
+                      ? `${blockingCount} pendência(s) bloqueando`
+                      : 'Sem pendências'}
+                </span>
+              </div>
+              <div className="esmera-actions">
+                <button className="esmera-button" type="button" onClick={() => setStep('input')} disabled={busy}>Voltar</button>
+                <Button type="button" onClick={() => void revalidate()} disabled={busy || !rows.length}>
+                  {busy && !progress ? 'Validando…' : 'Revalidar catálogo'}
+                </Button>
+                <Button
+                  type="button"
+                  aria-describedby={confirmBlocked ? 'import-blocking-reason' : undefined}
+                  onClick={() => void confirmImport()}
+                  disabled={confirmBlocked}
+                >
+                  {busy ? (progress ? `Importando ${progressPercent}%` : 'Preparando…') : `Confirmar importação (${rows.length})`}
+                </Button>
+              </div>
+              {confirmBlocked ? <span id="import-blocking-reason" className="esmera-products-import__sr-note">
+                Corrija as pendências e revalide referências alteradas antes de confirmar.
+              </span> : null}
             </div> : null}
 
             {step === 'result' && result ? <div className="esmera-products-import__result">
-              {finalStatus ? <p className="esmera-products-import__result-status">{finalStatus === 'completed' ? 'Importação concluída.' : finalStatus === 'completed_with_errors' ? 'Importação concluída com algumas linhas rejeitadas.' : finalStatus === 'cancelled' ? 'Importação cancelada.' : finalStatus === 'failed' ? 'A importação falhou.' : ''}</p> : null}
-              <dl className="esmera-leads-facts"><div><dt>Criados</dt><dd>{result.created}</dd></div><div><dt>Atualizados</dt><dd>{result.updated}</dd></div><div><dt>Ignorados</dt><dd>{result.skipped}</dd></div><div><dt>Com erro</dt><dd>{result.errored}</dd></div></dl>
-              {result.errored ? <><div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Linha da planilha</th><th>Erro</th></tr></thead><tbody>{result.rows.filter((item) => item.status === 'error').map((item) => <tr key={item.rowIndex}><td>{item.sourceLine}</td><td>{item.error}</td></tr>)}</tbody></table></div>{remoteErrorCsv ? <a href={remoteErrorCsv} className="esmera-button esmera-button--quiet">Baixar relatório de erros (.csv)</a> : <button type="button" className="esmera-button esmera-button--quiet" onClick={() => downloadErrorCsv(result)}>Baixar relatório de erros (.csv)</button>}</> : null}
-              <div className="esmera-actions"><Dialog.Close className="esmera-button esmera-button--primary" type="button">Concluir</Dialog.Close></div>
+              {finalStatus ? <p className="esmera-products-import__result-status">
+                {finalStatus === 'completed'
+                  ? 'Importação concluída.'
+                  : finalStatus === 'completed_with_errors'
+                    ? 'Importação concluída com algumas linhas rejeitadas.'
+                    : finalStatus === 'cancelled'
+                      ? 'Importação cancelada.'
+                      : finalStatus === 'failed'
+                        ? 'A importação falhou.'
+                        : ''}
+              </p> : null}
+              <dl className="esmera-leads-facts">
+                <div><dt>Criados</dt><dd>{result.created}</dd></div>
+                <div><dt>Atualizados</dt><dd>{result.updated}</dd></div>
+                <div><dt>Ignorados</dt><dd>{result.skipped}</dd></div>
+                <div><dt>Com erro</dt><dd>{result.errored}</dd></div>
+              </dl>
+              {result.errored ? <>
+                <div className="esmera-data-table-wrap">
+                  <table className="esmera-data-table">
+                    <thead><tr><th>Linha da planilha</th><th>Erro</th></tr></thead>
+                    <tbody>{result.rows.filter((item) => item.status === 'error').map((item) => <tr key={item.rowIndex}>
+                      <td>{item.sourceLine}</td><td>{item.error}</td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+                <div className="esmera-actions">
+                  {remoteErrorCsv
+                    ? <a href={remoteErrorCsv} className="esmera-button esmera-button--quiet">Baixar relatório de erros (.csv)</a>
+                    : <button type="button" className="esmera-button esmera-button--quiet" onClick={() => downloadErrorCsv(result)}>
+                      Baixar relatório de erros (.csv)
+                    </button>}
+                  <button type="button" className="esmera-button esmera-button--quiet" onClick={reimportErrors}>
+                    Reimportar apenas linhas com erro
+                  </button>
+                </div>
+              </> : null}
+              <div className="esmera-actions">
+                <Dialog.Close className="esmera-button esmera-button--primary" type="button">Concluir</Dialog.Close>
+              </div>
             </div> : null}
           </div>
         </Dialog.Popup>
