@@ -1,6 +1,6 @@
 import { expect, Page, test } from '@playwright/test'
 
-import { createDraftProduct } from '../helpers/createDraftEntities'
+import { createDraftProduct, fetchProductUpdatedAt } from '../helpers/createDraftEntities'
 import { login } from '../helpers/login'
 import { cleanupTestUser, seedTestUser, testUser } from '../helpers/seedUser'
 
@@ -51,6 +51,12 @@ test.describe('Popups de criação dos workspaces', () => {
       },
     })
     expect(productResponse.ok(), `product update failed: ${productResponse.status()} ${await productResponse.text()}`).toBeTruthy()
+
+    const expectedUpdatedAt = await fetchProductUpdatedAt(page, productID)
+    const publishProduct = await page.request.post('http://localhost:3000/api/admin-products', {
+      data: { action: 'publish', items: [{ id: productID, expectedUpdatedAt }] },
+    })
+    expect(publishProduct.ok(), `product publish failed: ${publishProduct.status()} ${await publishProduct.text()}`).toBeTruthy()
 
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('http://localhost:3000/admin/opportunities')
