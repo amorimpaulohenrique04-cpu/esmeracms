@@ -1,5 +1,6 @@
 import { expect, Page, test } from '@playwright/test'
 
+import { createDraftProduct } from '../helpers/createDraftEntities'
 import { cleanupTestUser, seedTestUser, testUser } from '../helpers/seedUser'
 import { login } from '../helpers/login'
 
@@ -38,22 +39,16 @@ test.describe('Stage 9 operational Sales workspace', () => {
     const customer = await customerResponse.json() as { id?: string | number }
     expect(customer.id).toBeTruthy()
 
-    const productResponse = await page.request.post('http://localhost:3000/api/products?draft=true', {
+    const productId = await createDraftProduct(page, `pipeline-${stamp}`)
+    const productResponse = await page.request.patch(`http://localhost:3000/api/products/${productId}?draft=true`, {
       data: {
         title: productTitle,
         code: `PIPE-${stamp}`,
         slug: `objeto-pipeline-${stamp}`,
-        catalogStatus: 'active',
-        availability: 'available',
-        priceMode: 'fixed',
         basePriceCents: 320_000,
-        _status: 'draft',
       },
     })
     expect(productResponse.ok(), await productResponse.text()).toBeTruthy()
-    const productBody = await productResponse.json() as { id?: string | number; doc?: { id?: string | number } }
-    const productId = productBody.id ?? productBody.doc?.id
-    expect(productId).toBeTruthy()
 
     const opportunityResponse = await page.request.post('http://localhost:3000/api/opportunities', {
       data: {
@@ -76,7 +71,7 @@ test.describe('Stage 9 operational Sales workspace', () => {
     const code = opportunityCode || ''
 
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto(`http://localhost:3000/admin/sales?view=pipeline&q=${encodeURIComponent(code)}`)
+    await page.goto(`http://localhost:3000/admin/opportunities?view=pipeline&q=${encodeURIComponent(code)}`)
 
     const card = page.locator('article.esmera-opportunity-card').filter({ hasText: code })
     await expect(card).toBeVisible()
@@ -124,7 +119,7 @@ test.describe('Stage 9 operational Sales workspace', () => {
     expect(sales.docs?.[0]?.items?.[0]?.snapshotTitle).toBe(productTitle)
     expect(sales.docs?.[0]?.items?.[0]?.unitPriceCents).toBe(320_000)
 
-    await page.goto(`http://localhost:3000/admin/sales?view=list&stage=won&q=${encodeURIComponent(code)}`)
+    await page.goto(`http://localhost:3000/admin/opportunities?view=list&stage=won&q=${encodeURIComponent(code)}`)
     const row = page.getByRole('row').filter({ hasText: code })
     await expect(row).toBeVisible()
     await expect(row).toContainText('Ganho')
@@ -165,7 +160,7 @@ test.describe('Stage 9 operational Sales workspace', () => {
     const opportunityCode = body.code ?? body.doc?.code
     const code = opportunityCode || ''
 
-    await page.goto(`http://localhost:3000/admin/sales?view=pipeline&q=${encodeURIComponent(code)}`)
+    await page.goto(`http://localhost:3000/admin/opportunities?view=pipeline&q=${encodeURIComponent(code)}`)
     const card = page.locator('article.esmera-opportunity-card').filter({ hasText: code })
     await expect(card).toBeVisible()
     await card.getByLabel(`Mover ${code} para etapa`).selectOption('lost')
