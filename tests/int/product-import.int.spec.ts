@@ -115,4 +115,31 @@ describe('product import against Payload', () => {
     expect(updated.catalogStatus).toBe('archived')
     expect(updated.priceMode).toBe('fixed')
   })
+
+  it('publica automaticamente a mídia criada pelo importador', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    )
+    const media = await payload.create({
+      collection: 'media',
+      overrideAccess: true,
+      data: {
+        alt: `Imagem importada ${suffix}`,
+        sourceSha256: `import-test-${suffix}`,
+      },
+      file: {
+        data: png,
+        mimetype: 'image/png',
+        name: `import-test-${suffix}.png`,
+        size: png.byteLength,
+      },
+    })
+
+    try {
+      expect(media._status).toBe('published')
+    } finally {
+      await payload.delete({ collection: 'media', id: media.id, overrideAccess: true }).catch(() => undefined)
+    }
+  })
 })
