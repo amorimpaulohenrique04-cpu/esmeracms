@@ -25,6 +25,7 @@ type WorkflowUser = { id?: string | number; collection?: string; role?: string }
 type ExistingProduct = {
   id: string | number
   code?: string | null
+  codeNormalized?: string | null
   slug?: string | null
   title?: string | null
   catalogStatus?: string | null
@@ -37,7 +38,12 @@ type ExistingProduct = {
   gallery?: unknown[] | null
 }
 
-type CategoryRecord = { id: string | number; title?: string | null }
+type CategoryRecord = {
+  id: string | number
+  title?: string | null
+  titleNormalized?: string | null
+}
+
 type ExistingMedia = { id: string | number; sourceSha256?: string | null }
 
 export type { ImportRowIssue, ImportRowValues }
@@ -86,17 +92,55 @@ export function parseImportSheet(rawText: string): {
   return { rows, unknownHeaders, delimiter }
 }
 
-async function findImportProducts(payload: Payload, user: WorkflowUser, req?: PayloadRequest) {
+function uniqueNonEmpty(values: string[]) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+}
+
+function codeVariants(codes: string[]) {
+  return uniqueNonEmpty(codes.flatMap((code) => [code, code.toUpperCase(), code.toLowerCase()]))
+}
+
+function proposedSlug(values: ImportRowValues) {
+  return values.slug.trim() || (values.title.trim() ? slugifyImportTitle(values.title) : '')
+}
+
+function slugLookupCandidates(slugs: string[]) {
+  const result = new Set<string>()
+  for (const slug of uniqueNonEmpty(slugs)) {
+    result.add(slug)
+    for (let suffix = 2; suffix <= 20; suffix += 1) result.add(`${slug}-${suffix}`)
+  }
+  return [...result]
+}
+
+async function findImportProducts(
+  payload: Payload,
+  user: WorkflowUser,
+  codes: string[],
+  slugs: string[],
+  req?: PayloadRequest,
+) {
+  const normalizedCodes = uniqueNonEmpty(codes.map(foldKey))
+  const legacyCodes = codeVariants(codes)
+  const slugCandidates = slugLookupCandidates(slugs)
+  const or: Array<Record<string, unknown>> = []
+  if (normalizedCodes.length) or.push({ codeNormalized: { in: normalizedCodes } })
+  if (legacyCodes.length) or.push({ code: { in: legacyCodes } })
+  if (slugCandidates.length) or.push({ slug: { in: slugCandidates } })
+  if (!or.length) return [] as ExistingProduct[]
+
   const result = await payload.find({
     collection: 'products',
+    where: { or },
     depth: 0,
-    limit: 10_000,
+    limit: Math.min(10_000, Math.max(100, normalizedCodes.length + legacyCodes.length + slugCandidates.length + 20)),
     pagination: false,
     overrideAccess: false,
     user: user as never,
     req,
     select: {
       code: true,
+      codeNormalized: true,
       slug: true,
       title: true,
       catalogStatus: true,
@@ -112,18 +156,37 @@ async function findImportProducts(payload: Payload, user: WorkflowUser, req?: Pa
   return result.docs as unknown as ExistingProduct[]
 }
 
-async function loadCategoryMap(payload: Payload, user: WorkflowUser, req?: PayloadRequest) {
+async function loadCategoryMap(
+  payload: Payload,
+  user: WorkflowUser,
+  names: string[],
+  req?: PayloadRequest,
+) {
+  const normalizedNames = uniqueNonEmpty(names.map(foldKey))
+  const legacyNames = uniqueNonEmpty(names)
+  if (!normalizedNames.length) return new Map<string, string | number>()
+
   const result = await payload.find({
     collection: 'categories',
+    where: {
+      or: [
+        { titleNormalized: { in: normalizedNames } },
+        { title: { in: legacyNames } },
+      ],
+    },
     depth: 0,
-    limit: 10_000,
+    limit: Math.min(10_000, Math.max(100, normalizedNames.length * 2 + 20)),
     pagination: false,
     overrideAccess: false,
     user: user as never,
     req,
-    select: { title: true },
+    select: { title: true, titleNormalized: true },
   } as never)
-  return new Map((result.docs as unknown as CategoryRecord[]).map((doc) => [foldKey(String(doc.title || '')), doc.id]))
+
+  return new Map((result.docs as unknown as CategoryRecord[]).map((doc) => [
+    doc.titleNormalized || foldKey(String(doc.title || '')),
+    doc.id,
+  ]))
 }
 
 function slugSuggestion(base: string, occupied: Set<string>) {
@@ -136,13 +199,25 @@ function slugSuggestion(base: string, occupied: Set<string>) {
   return candidate
 }
 
-export async function previewImport(payload: Payload, user: WorkflowUser, rawText: string, req?: PayloadRequest): Promise<ImportPreviewResult> {
+export async function previewImport(
+  payload: Payload,
+  user: WorkflowUser,
+  rawText: string,
+  req?: PayloadRequest,
+): Promise<ImportPreviewResult> {
   const { rows, unknownHeaders, delimiter } = parseImportSheet(rawText)
+  const codes = rows.map((row) => row.values.code)
+  const slugs = rows.map((row) => proposedSlug(row.values)).filter(Boolean)
+  const categoryNames = rows.flatMap((row) => isClearCell(row.values.categories) ? [] : splitMulti(row.values.categories))
+
   const [existing, categoryByTitle] = await Promise.all([
-    findImportProducts(payload, user, req),
-    loadCategoryMap(payload, user, req),
+    findImportProducts(payload, user, codes, slugs, req),
+    loadCategoryMap(payload, user, categoryNames, req),
   ])
-  const existingByCode = new Map(existing.map((doc) => [foldKey(String(doc.code || '')), doc]))
+  const existingByCode = new Map(existing.filter((doc) => doc.code).map((doc) => [
+    doc.codeNormalized || foldKey(String(doc.code || '')),
+    doc,
+  ]))
   const existingBySlug = new Map(existing.filter((doc) => doc.slug).map((doc) => [String(doc.slug), doc.id]))
   const occupiedSlugs = new Set(existingBySlug.keys())
   const seenCodes = new Set<string>()
@@ -169,16 +244,16 @@ export async function previewImport(payload: Payload, user: WorkflowUser, rawTex
       }
     }
 
-    const proposedSlug = values.slug.trim() || (values.title.trim() ? slugifyImportTitle(values.title) : '')
-    if (proposedSlug) {
-      const owner = existingBySlug.get(proposedSlug)
+    const nextSlug = proposedSlug(values)
+    if (nextSlug) {
+      const owner = existingBySlug.get(nextSlug)
       const clashesWithExisting = owner !== undefined && String(owner) !== String(existingId ?? '')
-      const clashesInBatch = seenSlugs.has(proposedSlug)
+      const clashesInBatch = seenSlugs.has(nextSlug)
       if (clashesWithExisting || clashesInBatch) {
-        const suggestion = slugSuggestion(proposedSlug, new Set([...occupiedSlugs, ...seenSlugs]))
+        const suggestion = slugSuggestion(nextSlug, new Set([...occupiedSlugs, ...seenSlugs]))
         issues.push({ column: 'slug', code: 'slug_conflict', message: `Slug já existe. Sugestão: ${suggestion}.`, severity: 'error' })
       }
-      seenSlugs.add(proposedSlug)
+      seenSlugs.add(nextSlug)
     }
 
     return {
@@ -260,7 +335,13 @@ async function prefetchChunkImages(rows: ImportCommitInput[], cache: MediaCache)
   return result
 }
 
-async function seedExistingMedia(payload: Payload, user: WorkflowUser, prefetched: Map<string, PrefetchedImage>, cache: MediaCache, req?: PayloadRequest) {
+async function seedExistingMedia(
+  payload: Payload,
+  user: WorkflowUser,
+  prefetched: Map<string, PrefetchedImage>,
+  cache: MediaCache,
+  req?: PayloadRequest,
+) {
   const hashes = [...new Set([...prefetched.values()].flatMap((item) => item.ok ? [item.remote.sha256] : []).filter((hash) => !cache.byHash.has(hash)))]
   if (!hashes.length) return
   const found = await payload.find({
@@ -321,7 +402,13 @@ async function imageAsMedia(
   return media
 }
 
-async function compensateMedia(payload: Payload, user: WorkflowUser, ids: Array<string | number>, cache: MediaCache, req?: PayloadRequest) {
+async function compensateMedia(
+  payload: Payload,
+  user: WorkflowUser,
+  ids: Array<string | number>,
+  cache: MediaCache,
+  req?: PayloadRequest,
+) {
   if (!ids.length) return
   for (const id of ids) {
     try {
@@ -375,7 +462,12 @@ export type ImportCommitOptions = {
   shouldCancel?: () => boolean | Promise<boolean>
 }
 
-function setCell(data: Record<string, unknown>, key: string, raw: string, transform: (value: string) => unknown = (value) => value.trim()) {
+function setCell(
+  data: Record<string, unknown>,
+  key: string,
+  raw: string,
+  transform: (value: string) => unknown = (value) => value.trim(),
+) {
   if (!raw.trim()) return
   data[key] = isClearCell(raw) ? null : transform(raw)
 }
@@ -404,11 +496,17 @@ export async function commitImport(
   const startedAt = Date.now()
   const report: ImportCommitReport = { created: 0, updated: 0, skipped: 0, errored: 0, rows: [] }
   const cache: MediaCache = { byURL: new Map(), byHash: new Map(), downloads: 0 }
+  const codes = inputRows.map((row) => row.values.code)
+  const slugs = inputRows.map((row) => proposedSlug(row.values)).filter(Boolean)
+  const categoryNames = inputRows.flatMap((row) => isClearCell(row.values.categories) ? [] : splitMulti(row.values.categories))
   const [existingProducts, categoryByTitle] = await Promise.all([
-    findImportProducts(payload, user, options.req),
-    loadCategoryMap(payload, user, options.req),
+    findImportProducts(payload, user, codes, slugs, options.req),
+    loadCategoryMap(payload, user, categoryNames, options.req),
   ])
-  const existingByCode = new Map(existingProducts.map((doc) => [foldKey(String(doc.code || '')), doc]))
+  const existingByCode = new Map(existingProducts.filter((doc) => doc.code).map((doc) => [
+    doc.codeNormalized || foldKey(String(doc.code || '')),
+    doc,
+  ]))
   const existingBySlug = new Map(existingProducts.filter((doc) => doc.slug).map((doc) => [String(doc.slug), doc.id]))
   const seenCodes = new Set<string>()
   const chunkSize = Math.max(1, options.chunkSize || 25)
@@ -461,8 +559,8 @@ export async function commitImport(
         if (existingId === null || values.slug.trim()) data.slug = nextSlug
 
         if (values.categories.trim()) {
-          const categoryNames = isClearCell(values.categories) ? [] : splitMulti(values.categories)
-          const { ids, missing } = resolveCategoryIds(categoryNames, categoryByTitle)
+          const names = isClearCell(values.categories) ? [] : splitMulti(values.categories)
+          const { ids, missing } = resolveCategoryIds(names, categoryByTitle)
           if (missing.length) throw new Error(`Categoria não encontrada: ${missing.join(', ')}.`)
           data.categories = ids
         } else if (existingId === null) {
@@ -473,8 +571,22 @@ export async function commitImport(
           const imageUrls = isClearCell(values.imageUrls) ? [] : splitMulti(values.imageUrls)
           const gallery: Array<{ image: string | number; mediaKey: string; role: string; alt: string }> = []
           for (const [index, url] of imageUrls.entries()) {
-            const media = await imageAsMedia(payload, user, url, values.title || existing?.title || 'Produto', cache, createdThisRow, prefetched, options.req)
-            gallery.push({ image: media.id, mediaKey: `img-${index + 1}`, role: index === 0 ? 'cover' : 'detail', alt: values.title || existing?.title || 'Produto' })
+            const media = await imageAsMedia(
+              payload,
+              user,
+              url,
+              values.title || existing?.title || 'Produto',
+              cache,
+              createdThisRow,
+              prefetched,
+              options.req,
+            )
+            gallery.push({
+              image: media.id,
+              mediaKey: `img-${index + 1}`,
+              role: index === 0 ? 'cover' : 'detail',
+              alt: values.title || existing?.title || 'Produto',
+            })
           }
           data.gallery = gallery
         } else if (existingId === null) {
@@ -482,18 +594,26 @@ export async function commitImport(
         }
 
         setCell(data, 'material', values.material)
-        if (values.description.trim()) data.description = isClearCell(values.description) ? null : textToRichText(values.description)
+        if (values.description.trim()) {
+          data.description = isClearCell(values.description) ? null : textToRichText(values.description)
+        }
 
         if (values.availability.trim()) {
           data.availability = isClearCell(values.availability) ? null : normalizeAvailability(values.availability)
-        } else if (existingId === null) data.availability = 'available'
+        } else if (existingId === null) {
+          data.availability = 'available'
+        }
 
         if (values.catalogStatus.trim()) {
           data.catalogStatus = isClearCell(values.catalogStatus) ? null : normalizeCatalogStatus(values.catalogStatus)
-        } else if (existingId === null) data.catalogStatus = 'active'
+        } else if (existingId === null) {
+          data.catalogStatus = 'active'
+        }
 
         const parsedPrice = values.price.trim() && !isClearCell(values.price) ? parsePrice(values.price) : null
-        if (values.price.trim()) data.basePriceCents = isClearCell(values.price) ? null : parsedPrice?.ok ? parsedPrice.cents : null
+        if (values.price.trim()) {
+          data.basePriceCents = isClearCell(values.price) ? null : parsedPrice?.ok ? parsedPrice.cents : null
+        }
 
         if (values.priceMode.trim()) {
           data.priceMode = isClearCell(values.priceMode) ? null : normalizePriceMode(values.priceMode)
@@ -504,26 +624,51 @@ export async function commitImport(
         const finalStatus = String(data.catalogStatus ?? existing?.catalogStatus ?? 'active')
         const finalCategories = data.categories ?? existing?.categories ?? []
         const finalGallery = data.gallery ?? existing?.gallery ?? []
-        if (finalStatus === 'active' && relationshipCount(finalCategories) === 0) throw new Error('Produto ativo precisa ter categoria no estado final.')
-        if (finalStatus === 'active' && relationshipCount(finalGallery) === 0) throw new Error('Produto ativo precisa ter ao menos uma imagem no estado final.')
+        if (finalStatus === 'active' && relationshipCount(finalCategories) === 0) {
+          throw new Error('Produto ativo precisa ter categoria no estado final.')
+        }
+        if (finalStatus === 'active' && relationshipCount(finalGallery) === 0) {
+          throw new Error('Produto ativo precisa ter ao menos uma imagem no estado final.')
+        }
 
         const transactionID = await payload.db.beginTransaction()
         if (transactionID === null) throw new Error('Não foi possível iniciar a transação desta linha.')
         const rowReq = { ...(options.req || {}), payload, user: user as never, transactionID } as PayloadRequest
         try {
           if (existingId !== null) {
-            await payload.update({ collection: 'products', id: existingId, overrideAccess: false, user: user as never, req: rowReq, data: data as never } as never)
+            await payload.update({
+              collection: 'products',
+              id: existingId,
+              overrideAccess: false,
+              user: user as never,
+              req: rowReq,
+              data: data as never,
+            } as never)
             await payload.db.commitTransaction(transactionID)
             report.updated += 1
             report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'updated', productId: existingId })
-            existingByCode.set(codeKey, { ...existing, ...data, id: existingId } as ExistingProduct)
+            existingByCode.set(codeKey, {
+              ...existing,
+              ...data,
+              id: existingId,
+              codeNormalized: codeKey,
+            } as ExistingProduct)
           } else {
-            const created = await payload.create({ collection: 'products', overrideAccess: false, user: user as never, req: rowReq, data: data as never } as never)
+            const created = await payload.create({
+              collection: 'products',
+              overrideAccess: false,
+              user: user as never,
+              req: rowReq,
+              data: data as never,
+            } as never)
             await payload.db.commitTransaction(transactionID)
             report.created += 1
             report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'created', productId: created.id })
-            const createdSnapshot = { ...(data as ExistingProduct), id: created.id }
-            existingByCode.set(codeKey, createdSnapshot)
+            existingByCode.set(codeKey, {
+              ...(data as ExistingProduct),
+              id: created.id,
+              codeNormalized: codeKey,
+            })
           }
           if (nextSlug) existingBySlug.set(nextSlug, existingId ?? report.rows.at(-1)?.productId ?? '')
         } catch (error) {
@@ -533,7 +678,12 @@ export async function commitImport(
       } catch (error) {
         await compensateMedia(payload, user, createdThisRow, cache, options.req)
         report.errored += 1
-        report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'error', error: error instanceof Error ? error.message : 'Falha desconhecida.' })
+        report.rows.push({
+          rowIndex: input.rowIndex,
+          sourceLine,
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Falha desconhecida.',
+        })
       }
     }
 
