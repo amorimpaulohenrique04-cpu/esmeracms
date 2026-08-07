@@ -175,7 +175,7 @@ describe('product import against Payload', () => {
       id: trashed.id,
       trash: true,
       overrideAccess: true,
-    } as never)
+    } as never) as unknown as { deletedAt?: string | null; basePriceCents?: number | null }
     expect(restored.deletedAt).toBeNull()
     expect(restored.basePriceCents).toBe(25000)
 
