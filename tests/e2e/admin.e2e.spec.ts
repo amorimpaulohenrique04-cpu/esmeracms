@@ -38,10 +38,10 @@ test.describe('Admin Panel', () => {
     await expect(page.getByTestId('esmera-command-palette')).toBeHidden()
   })
 
-  test('keeps pipeline as a view inside Sales and redirects the legacy route', async () => {
+  test('keeps pipeline as a view inside Opportunities and redirects the legacy route', async () => {
     await page.goto('http://localhost:3000/admin/pipeline')
-    await expect(page).toHaveURL(/\/admin\/sales\?view=pipeline$/)
-    await expect(page.getByRole('heading', { name: 'Vendas' }).first()).toBeVisible()
+    await expect(page).toHaveURL(/\/admin\/opportunities\?view=pipeline$/)
+    await expect(page.getByRole('heading', { name: 'Oportunidades' }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Pipeline', exact: true })).toHaveAttribute('aria-current', 'page')
   })
 
@@ -106,8 +106,9 @@ test.describe('Admin Panel', () => {
       '/admin/products',
       '/admin/categories',
       '/admin/customers',
-      '/admin/sales?view=list',
-      '/admin/sales?view=pipeline',
+      '/admin/opportunities?view=list',
+      '/admin/opportunities?view=pipeline',
+      '/admin/sales',
       '/admin/after-sales',
       '/admin/reports',
       '/admin/settings',
