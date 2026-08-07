@@ -74,6 +74,7 @@ test.describe('Opportunity commercial source', () => {
     const searchResponse = await page.request.get(`http://localhost:3000/api/admin-search?q=${encodeURIComponent(opportunityCode || '')}`)
     expect(searchResponse.ok()).toBeTruthy()
     const search = await searchResponse.json() as { results?: Array<{ id?: string; href?: string; group?: string }> }
-    expect(search.results?.some((item) => item.group === 'Oportunidades' && item.href === `/admin/collections/opportunities/${opportunityId}`)).toBe(true)
+    const expectedSearchHref = `/admin/opportunities?view=list&q=${encodeURIComponent(opportunityCode || String(opportunityId))}`
+    expect(search.results?.some((item) => item.group === 'Oportunidades' && item.href === expectedSearchHref)).toBe(true)
   })
 })
