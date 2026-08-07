@@ -37,7 +37,9 @@ export const ProductImports: CollectionConfig = {
       ],
     },
     { name: 'idempotencyKey', type: 'text', required: true, unique: true, index: true },
-    { name: 'requestedBy', type: 'relationship', relationTo: 'users', required: true, index: true },
+    // O snapshot de nome/e-mail preserva a trilha de auditoria mesmo se a conta
+    // do solicitante for removida no futuro; por isso a relação pode ficar nula.
+    { name: 'requestedBy', type: 'relationship', relationTo: 'users', index: true },
     { name: 'requestedByName', type: 'text' },
     { name: 'requestedByEmail', type: 'email' },
     { name: 'requestedAt', type: 'date', required: true, index: true },
