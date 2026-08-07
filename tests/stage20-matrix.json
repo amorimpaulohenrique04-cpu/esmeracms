@@ -20,6 +20,6 @@
   { "id": "reload-preserving-filters", "file": "tests/e2e/reports.e2e.spec.ts", "evidence": "await page.reload({ waitUntil: 'domcontentloaded' })" },
   { "id": "share-report-url", "file": "tests/e2e/reports.e2e.spec.ts", "evidence": "URL exata copiada." },
   { "id": "open-shared-url", "file": "tests/e2e/reports.e2e.spec.ts", "evidence": "await page.goto(clipboard" },
-  { "id": "enter-technical-admin", "file": "tests/e2e/stage20-context.e2e.spec.ts", "evidence": "getByRole('link', { name: 'Admin técnico'" },
+  { "id": "enter-technical-admin", "file": "tests/e2e/stage20-context.e2e.spec.ts", "evidence": "getByRole('link', { name: 'Configurações avançadas'" },
   { "id": "return-with-context", "file": "tests/e2e/stage20-context.e2e.spec.ts", "evidence": "await page.goBack" }
 ]

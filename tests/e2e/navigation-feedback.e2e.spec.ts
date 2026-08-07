@@ -108,10 +108,13 @@ test.describe('Feedback de navegação do Admin (F12)', () => {
   })
 
   test('header e sidebar permanecem estáveis durante navegação lenta', async () => {
-    await page.goto('http://localhost:3000/admin')
+    // Em build de produção, Next.js pode prefetchar Links visíveis. A rota deve
+    // estar registrada antes de a página renderizar o link para que o atraso
+    // continue determinístico e teste a navegação, não o estado do cache.
     await delayRoute(page, '/admin/sales', 600)
+    await page.goto('http://localhost:3000/admin')
 
-    await page.getByTestId('esmera-nav').getByRole('link', { name: 'Vendas', exact: true }).click()
+    await page.getByTestId('esmera-nav').locator('a[href="/admin/sales"]').click()
     await page.waitForTimeout(250)
     await expect(page.getByTestId('esmera-route-skeleton')).toBeVisible()
     await assertShellStatic(page)

@@ -98,9 +98,6 @@ test.describe('PR-11 — Shell: geometria e navegação', () => {
     await page.setViewportSize({ width: 1180, height: 800 })
     await page.goto('http://localhost:3000/admin')
     const nav = page.getByTestId('esmera-nav')
-    // Dois links casam com o nome acessível "Dashboard" por substring: a marca
-    // ("Esméra CMS — Dashboard") e o item de navegação. Locator exato, sem
-    // tocar na UI.
     const dashboardLink = nav.getByRole('link', { name: 'Dashboard', exact: true })
 
     await dashboardLink.focus()
@@ -112,7 +109,7 @@ test.describe('PR-11 — Shell: geometria e navegação', () => {
     await expect(dashboardLink).toBeFocused()
 
     await page.keyboard.press('Tab')
-    await expect(nav.getByRole('link', { name: 'Produtos' })).toBeFocused()
+    await expect(nav.locator('a[href="/admin/leads"]')).toBeFocused()
   })
 
   test('1023px: usa o drawer móvel e não reflui o workspace', async () => {

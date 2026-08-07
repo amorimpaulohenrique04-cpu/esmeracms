@@ -49,16 +49,16 @@ test.describe('Admin motion — navegação de rota sem snapshot animado', () =>
     await page.goto('http://localhost:3000/admin')
     await expect(page.getByRole('heading', { name: /Olá, Esméra/i })).toBeVisible()
 
-    const steps: Array<{ link: string; url: RegExp; heading: string; staleHeading: string }> = [
-      { link: 'Produtos', url: /\/admin\/products$/, heading: 'Produtos', staleHeading: 'Olá, Esméra' },
-      { link: 'Categorias', url: /\/admin\/categories$/, heading: 'Categorias', staleHeading: 'Produtos' },
-      { link: 'Clientes', url: /\/admin\/customers$/, heading: 'Clientes', staleHeading: 'Categorias' },
-      { link: 'Vendas', url: /\/admin\/sales$/, heading: 'Vendas', staleHeading: 'Clientes' },
-      { link: 'Dashboard', url: /\/admin\/?$/, heading: 'Olá, Esméra', staleHeading: 'Vendas' },
+    const steps: Array<{ href: string; url: RegExp; heading: string; staleHeading: string }> = [
+      { href: '/admin/products', url: /\/admin\/products$/, heading: 'Produtos', staleHeading: 'Olá, Esméra' },
+      { href: '/admin/categories', url: /\/admin\/categories$/, heading: 'Categorias', staleHeading: 'Produtos' },
+      { href: '/admin/customers', url: /\/admin\/customers$/, heading: 'Clientes', staleHeading: 'Categorias' },
+      { href: '/admin/sales', url: /\/admin\/sales$/, heading: 'Vendas', staleHeading: 'Clientes' },
+      { href: '/admin', url: /\/admin\/?$/, heading: 'Olá, Esméra', staleHeading: 'Vendas' },
     ]
 
     for (const step of steps) {
-      await page.getByTestId('esmera-nav').getByRole('link', { name: step.link, exact: true }).click()
+      await page.getByTestId('esmera-nav').locator(`a.esmera-nav-link[href="${step.href}"]`).click()
       await expect(page).toHaveURL(step.url)
       await expect(page.getByRole('heading', { name: new RegExp(step.heading, 'i') }).first()).toBeVisible()
       await expect(page.getByTestId('esmera-nav')).toBeVisible()
@@ -76,7 +76,7 @@ test.describe('Admin motion — navegação de rota sem snapshot animado', () =>
     await page.goto('http://localhost:3000/admin')
     await expect(page.getByRole('heading', { name: /Olá, Esméra/i })).toBeVisible()
 
-    await page.getByTestId('esmera-nav').getByRole('link', { name: 'Produtos', exact: true }).click()
+    await page.getByTestId('esmera-nav').locator('a.esmera-nav-link[href="/admin/products"]').click()
     await expect(page).toHaveURL(/\/admin\/products$/)
     await expect(page.getByRole('heading', { name: 'Produtos' }).first()).toBeVisible()
     await assertShellStatic(page)
@@ -85,7 +85,7 @@ test.describe('Admin motion — navegação de rota sem snapshot animado', () =>
     const inspectorAnimationCount = await page.evaluate(() => document.getAnimations().length)
     expect(inspectorAnimationCount).toBeLessThanOrEqual(4)
 
-    await page.getByTestId('esmera-nav').getByRole('link', { name: 'Dashboard', exact: true }).click()
+    await page.getByTestId('esmera-nav').locator('a.esmera-nav-link[href="/admin"]').click()
     await expect(page).toHaveURL(/\/admin\/?$/)
     await expect(page.getByRole('heading', { name: /Olá, Esméra/i })).toBeVisible()
 

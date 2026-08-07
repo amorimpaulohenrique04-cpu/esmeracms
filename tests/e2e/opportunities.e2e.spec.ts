@@ -57,7 +57,7 @@ test.describe('Opportunity commercial source', () => {
     expect(opportunityCode).toMatch(/^OPP-/)
 
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('http://localhost:3000/admin/sales?view=pipeline')
+    await page.goto('http://localhost:3000/admin/opportunities?view=pipeline')
     const opportunityLink = page.locator(`a[href="/admin/collections/opportunities/${opportunityId}"]`)
     const card = page.locator('article.esmera-opportunity-card').filter({ has: opportunityLink })
     await expect(card).toBeVisible()
@@ -74,6 +74,7 @@ test.describe('Opportunity commercial source', () => {
     const searchResponse = await page.request.get(`http://localhost:3000/api/admin-search?q=${encodeURIComponent(opportunityCode || '')}`)
     expect(searchResponse.ok()).toBeTruthy()
     const search = await searchResponse.json() as { results?: Array<{ id?: string; href?: string; group?: string }> }
-    expect(search.results?.some((item) => item.group === 'Oportunidades' && item.href === `/admin/collections/opportunities/${opportunityId}`)).toBe(true)
+    const expectedSearchHref = `/admin/opportunities?view=list&q=${encodeURIComponent(opportunityCode || String(opportunityId))}`
+    expect(search.results?.some((item) => item.group === 'Oportunidades' && item.href === expectedSearchHref)).toBe(true)
   })
 })

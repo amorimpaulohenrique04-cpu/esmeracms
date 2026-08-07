@@ -4,6 +4,14 @@ type WorkflowUser = { id?: string | number } | null | undefined
 
 export type ClientInterestSource = 'manual' | 'lead' | 'sale' | 'after_sale'
 
+function canonicalRelationshipID(value: string | number) {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  if (!/^\d+$/.test(trimmed)) return trimmed
+  const parsed = Number(trimmed)
+  return Number.isSafeInteger(parsed) ? parsed : trimmed
+}
+
 /**
  * Upsert-style sync: reuses an existing open interest for the same customer/product
  * instead of creating a duplicate row, since Leads/Opportunities/Sales can all
@@ -15,13 +23,15 @@ export async function syncClientInterest(
   input: { customerId: string | number; productId: string | number; source: ClientInterestSource; status?: string },
   req?: PayloadRequest,
 ) {
+  const customerId = canonicalRelationshipID(input.customerId)
+  const productId = canonicalRelationshipID(input.productId)
   const existing = await payload.find({
     collection: 'client-interests',
     depth: 0,
     limit: 1,
     pagination: false,
     overrideAccess: true,
-    where: { and: [{ customer: { equals: input.customerId } }, { product: { equals: input.productId } }] },
+    where: { and: [{ customer: { equals: customerId } }, { product: { equals: productId } }] },
     req,
   })
 
@@ -43,8 +53,8 @@ export async function syncClientInterest(
     collection: 'client-interests',
     overrideAccess: true,
     data: {
-      customer: input.customerId,
-      product: input.productId,
+      customer: customerId,
+      product: productId,
       status: input.status || 'active',
       source: input.source,
       owner: user?.id || undefined,

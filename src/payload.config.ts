@@ -9,6 +9,7 @@ import sharp from 'sharp'
 
 import { isAdmin } from './access/roles'
 import { withActiveProductCategoryValidity } from './businessRules/products/categoryValidity'
+import { foldKey } from './businessRules/products/importValidation'
 import { Activities } from './collections/Activities'
 import { AfterSales } from './collections/AfterSales'
 import { Categories } from './collections/Categories'
@@ -18,6 +19,7 @@ import { Leads } from './collections/Leads'
 import { Media } from './collections/Media'
 import { Occurrences } from './collections/Occurrences'
 import { Opportunities } from './collections/Opportunities'
+import { ProductImports } from './collections/ProductImports'
 import { Products } from './collections/Products'
 import { ReportExportFiles } from './collections/ReportExportFiles'
 import { ReportExports } from './collections/ReportExports'
@@ -32,10 +34,11 @@ import { Contact } from './globals/Contact'
 import { Home } from './globals/Home'
 import { Navigation } from './globals/Navigation'
 import { SiteSettings } from './globals/SiteSettings'
-import { canRunEsmeraJobs, esmeraJobTasks } from './server/jobs'
-import { GenerateReportExportJob } from './server/jobs/reportExport'
 import { parseDecoCorsOrigins } from './server/env/cors'
 import { requireDatabaseURL } from './server/env/postgres'
+import { canRunEsmeraJobs, esmeraJobTasks } from './server/jobs'
+import { ProductImportJob } from './server/jobs/productImport'
+import { GenerateReportExportJob } from './server/jobs/reportExport'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -46,12 +49,57 @@ if (process.env.NODE_ENV === 'production' && payloadSecret.length < 24) {
   throw new Error('PAYLOAD_SECRET deve possuir pelo menos 24 caracteres em produção.')
 }
 
+const validateActiveProductCategories = withActiveProductCategoryValidity(Products.hooks?.beforeValidate || [])
+
 const OperationalProducts = {
   ...Products,
   hooks: {
     ...Products.hooks,
-    beforeValidate: [withActiveProductCategoryValidity(Products.hooks?.beforeValidate || [])],
+    beforeValidate: [
+      async (args) => {
+        const data = await validateActiveProductCategories(args)
+        if (!data) return data
+        const code = data.code ?? args.originalDoc?.code
+        if (code) data.codeNormalized = foldKey(String(code))
+        return data
+      },
+    ],
   },
+  fields: [
+    ...Products.fields,
+    {
+      name: 'codeNormalized',
+      type: 'text',
+      unique: true,
+      index: true,
+      admin: { hidden: true },
+    },
+  ],
+} satisfies CollectionConfig
+
+const OperationalCategories = {
+  ...Categories,
+  hooks: {
+    ...Categories.hooks,
+    beforeValidate: [
+      ...(Categories.hooks?.beforeValidate || []),
+      ({ data, originalDoc }) => {
+        if (!data) return data
+        const title = data.title ?? originalDoc?.title
+        if (title) data.titleNormalized = foldKey(String(title))
+        return data
+      },
+    ],
+  },
+  fields: [
+    ...Categories.fields,
+    {
+      name: 'titleNormalized',
+      type: 'text',
+      index: true,
+      admin: { hidden: true },
+    },
+  ],
 } satisfies CollectionConfig
 
 export default buildConfig({
@@ -143,7 +191,7 @@ export default buildConfig({
       run: canRunEsmeraJobs,
       cancel: ({ req }) => isAdmin(req.user),
     },
-    tasks: [...esmeraJobTasks, GenerateReportExportJob],
+    tasks: [...esmeraJobTasks, GenerateReportExportJob, ProductImportJob],
     enableConcurrencyControl: true,
     shouldAutoRun: async () => process.env.PAYLOAD_JOBS_AUTORUN === 'true',
     autoRun: [
@@ -163,8 +211,9 @@ export default buildConfig({
     Users,
     Media,
     ReportExportFiles,
-    Categories,
+    OperationalCategories,
     OperationalProducts,
+    ProductImports,
     Leads,
     Customers,
     ClientInterests,

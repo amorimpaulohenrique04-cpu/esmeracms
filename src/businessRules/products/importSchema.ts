@@ -7,11 +7,12 @@ export type ImportColumn =
   | 'description'
   | 'availability'
   | 'price'
+  | 'priceMode'
   | 'catalogStatus'
   | 'imageUrls'
 
 export const importColumns: ImportColumn[] = [
-  'title', 'code', 'categories', 'price', 'availability', 'catalogStatus', 'imageUrls', 'material', 'description', 'slug',
+  'title', 'code', 'categories', 'price', 'priceMode', 'availability', 'catalogStatus', 'imageUrls', 'material', 'description', 'slug',
 ]
 
 export const importColumnLabels: Record<ImportColumn, string> = {
@@ -23,6 +24,7 @@ export const importColumnLabels: Record<ImportColumn, string> = {
   description: 'descricao',
   availability: 'disponibilidade',
   price: 'preco',
+  priceMode: 'modo_preco',
   catalogStatus: 'status',
   imageUrls: 'imagens',
 }
@@ -36,6 +38,7 @@ export const importColumnRequired: Record<ImportColumn, boolean> = {
   description: false,
   availability: false,
   price: false,
+  priceMode: false,
   catalogStatus: false,
   imageUrls: false,
 }
@@ -50,8 +53,9 @@ const headerAliases: Record<string, ImportColumn> = {
   descricao: 'description', descrição: 'description', description: 'description',
   disponibilidade: 'availability', availability: 'availability',
   preco: 'price', preço: 'price', price: 'price', valor: 'price',
+  modo_preco: 'priceMode', 'modo preço': 'priceMode', 'modo de preço': 'priceMode', 'modo de preco': 'priceMode', pricemode: 'priceMode', 'price mode': 'priceMode',
   status: 'catalogStatus', 'status de publicação': 'catalogStatus', 'status de publicacao': 'catalogStatus', catalogstatus: 'catalogStatus',
-  imagens: 'imageUrls', imagem: 'imageUrls', 'imagem_url': 'imageUrls', 'image_urls': 'imageUrls', images: 'imageUrls', 'image urls': 'imageUrls',
+  imagens: 'imageUrls', imagem: 'imageUrls', imagem_url: 'imageUrls', image_urls: 'imageUrls', images: 'imageUrls', 'image urls': 'imageUrls',
 }
 
 function normalizeHeader(value: string) {
@@ -74,10 +78,15 @@ export const catalogStatusLabelToValue: Record<string, string> = {
   arquivado: 'archived', archived: 'archived',
 }
 
+export const priceModeLabelToValue: Record<string, string> = {
+  fixo: 'fixed', fixed: 'fixed',
+  'sob consulta': 'inquiry', consulta: 'inquiry', inquiry: 'inquiry',
+}
+
 export function templateRows(): string[][] {
   const header = importColumns.map((column) => importColumnLabels[column])
   const example = [
-    'Vaso Terracota', 'OBJ-101', 'Cerâmica', '890.00', 'Disponível', 'Ativo',
+    'Vaso Terracota', 'OBJ-101', 'Cerâmica', '890,00', 'Fixo', 'Disponível', 'Ativo',
     'https://exemplo.com/imagens/vaso-1.jpg;https://exemplo.com/imagens/vaso-2.jpg',
     'Cerâmica esmaltada', 'Peça torneada à mão, acabamento fosco.', 'vaso-terracota',
   ]

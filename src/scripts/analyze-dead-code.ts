@@ -39,6 +39,17 @@ function resolveImport(fromFile: string, specifier: string, fileSet: Set<string>
   return candidates.find((candidate) => fileSet.has(candidate)) || null
 }
 
+function isImportMetaUrl(node: ts.Node | undefined) {
+  return Boolean(
+    node &&
+    ts.isPropertyAccessExpression(node) &&
+    node.name.text === 'url' &&
+    ts.isMetaProperty(node.expression) &&
+    node.expression.keywordToken === ts.SyntaxKind.ImportKeyword &&
+    node.expression.name.text === 'meta',
+  )
+}
+
 function importSpecifiers(source: ts.SourceFile) {
   const values: string[] = []
   const visit = (node: ts.Node) => {
@@ -51,6 +62,17 @@ function importSpecifiers(source: ts.SourceFile) {
       && node.expression.kind === ts.SyntaxKind.ImportKeyword
       && node.arguments.length === 1
       && ts.isStringLiteralLike(node.arguments[0])) {
+      values.push(node.arguments[0].text)
+    }
+    // Bundlers resolve workers and other colocated resources through
+    // `new URL('./worker.ts', import.meta.url)`. Treat that URL exactly like a
+    // static import so the dead-code graph follows real runtime dependencies.
+    if (ts.isNewExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'URL'
+      && node.arguments?.length === 2
+      && ts.isStringLiteralLike(node.arguments[0])
+      && isImportMetaUrl(node.arguments[1])) {
       values.push(node.arguments[0].text)
     }
     ts.forEachChild(node, visit)
