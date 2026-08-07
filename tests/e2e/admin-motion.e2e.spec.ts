@@ -58,7 +58,7 @@ test.describe('Admin motion — navegação de rota sem snapshot animado', () =>
     ]
 
     for (const step of steps) {
-      await page.getByTestId('esmera-nav').locator(`a[href="${step.href}"]`).click()
+      await page.getByTestId('esmera-nav').locator(`a.esmera-nav-link[href="${step.href}"]`).click()
       await expect(page).toHaveURL(step.url)
       await expect(page.getByRole('heading', { name: new RegExp(step.heading, 'i') }).first()).toBeVisible()
       await expect(page.getByTestId('esmera-nav')).toBeVisible()
@@ -76,7 +76,7 @@ test.describe('Admin motion — navegação de rota sem snapshot animado', () =>
     await page.goto('http://localhost:3000/admin')
     await expect(page.getByRole('heading', { name: /Olá, Esméra/i })).toBeVisible()
 
-    await page.getByTestId('esmera-nav').locator('a[href="/admin/products"]').click()
+    await page.getByTestId('esmera-nav').locator('a.esmera-nav-link[href="/admin/products"]').click()
     await expect(page).toHaveURL(/\/admin\/products$/)
     await expect(page.getByRole('heading', { name: 'Produtos' }).first()).toBeVisible()
     await assertShellStatic(page)
@@ -85,7 +85,7 @@ test.describe('Admin motion — navegação de rota sem snapshot animado', () =>
     const inspectorAnimationCount = await page.evaluate(() => document.getAnimations().length)
     expect(inspectorAnimationCount).toBeLessThanOrEqual(4)
 
-    await page.getByTestId('esmera-nav').locator('a[href="/admin"]').first().click()
+    await page.getByTestId('esmera-nav').locator('a.esmera-nav-link[href="/admin"]').click()
     await expect(page).toHaveURL(/\/admin\/?$/)
     await expect(page.getByRole('heading', { name: /Olá, Esméra/i })).toBeVisible()
 
