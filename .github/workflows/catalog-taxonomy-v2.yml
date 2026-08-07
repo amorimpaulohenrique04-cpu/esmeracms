@@ -1,0 +1,45 @@
+name: Validate Catalog Taxonomy V2
+
+on:
+  push:
+    branches: [agent/catalog-taxonomy-v2-20260806]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: esmera
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/esmera
+      PAYLOAD_SECRET: ci-only-payload-secret-change-me
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm generate:types
+      - run: pnpm generate:importmap
+      - run: pnpm typecheck
+      - run: pnpm lint --max-warnings=0
+      - run: pnpm test:int
+      - run: pnpm build
