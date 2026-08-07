@@ -59,6 +59,7 @@ describe('product import against Payload', () => {
   })
 
   afterAll(async () => {
+    if (!payload) return
     await payload.delete({ collection: 'products', id: productId, overrideAccess: true }).catch(() => undefined)
     await payload.delete({ collection: 'categories', id: categoryId, overrideAccess: true }).catch(() => undefined)
     await payload.delete({ collection: 'users', id: userId, overrideAccess: true }).catch(() => undefined)
