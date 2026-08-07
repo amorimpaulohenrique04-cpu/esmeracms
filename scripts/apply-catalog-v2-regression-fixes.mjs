@@ -7,8 +7,11 @@ function edit(path, transform) {
 }
 
 function replaceOnce(source, before, after, label) {
-  if (source.includes(after)) return source
-  if (!source.includes(before)) throw new Error(`Patch não encontrado: ${label}`)
+  if (after && source.includes(after)) return source
+  if (!source.includes(before)) {
+    if (!after) return source
+    throw new Error(`Patch não encontrado: ${label}`)
+  }
   return source.replace(before, after)
 }
 
