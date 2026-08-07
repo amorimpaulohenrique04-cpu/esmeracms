@@ -147,7 +147,12 @@ describe('product import against Payload', () => {
         },
       })
 
-      await payload.delete({ collection: 'products', id: trashed.id, overrideAccess: true })
+      await payload.update({
+        collection: 'products',
+        id: trashed.id,
+        overrideAccess: true,
+        data: { deletedAt: new Date().toISOString() } as never,
+      })
 
       const text = [
         'nome;codigo;categoria;preco;modo_preco;disponibilidade;status;imagens;material;descricao;slug',
