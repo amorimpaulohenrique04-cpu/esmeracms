@@ -1,5 +1,11 @@
 export type RelationshipLike<T = unknown> = string | number | T | null | undefined
 
+export type CategoryNodeType = 'collection' | 'editorial' | 'external' | 'group'
+export type CategoryTaxonomyAxis = 'navigation' | 'piece_type' | 'collection' | 'environment' | 'campaign' | 'service'
+export type CategoryListingMode = 'assigned' | 'descendants' | 'rules' | 'hybrid'
+export type CategorySort = 'editorial' | 'newest' | 'price_asc' | 'price_desc' | 'name_asc'
+export type CategoryFilter = 'category' | 'collection' | 'environment' | 'piece_type' | 'material' | 'availability' | 'price'
+
 export type CategoryMedia = {
   id: string | number
   filename?: string | null
@@ -12,6 +18,8 @@ export type CategoryParent = {
   title?: string | null
   slug?: string | null
   status?: string | null
+  nodeType?: CategoryNodeType | null
+  taxonomyAxis?: CategoryTaxonomyAxis | null
   order?: number | null
   parent?: RelationshipLike<CategoryParent>
 }
@@ -28,11 +36,41 @@ export type CategorySeo = {
   noIndex?: boolean | null
 }
 
+export type CategoryMenu = {
+  showInMenu?: boolean | null
+  label?: string | null
+  visibility?: 'all' | 'desktop' | 'mobile' | null
+  icon?: string | null
+}
+
+export type CategoryListingRules = {
+  availability?: Array<'unique' | 'available' | 'made_to_order' | 'limited'> | null
+  materials?: Array<{ id?: string | null; value?: string | null }> | null
+  productStatus?: Array<'active' | 'archived'> | null
+  minPrice?: number | null
+  maxPrice?: number | null
+  publishedAfter?: string | null
+  publishedBefore?: string | null
+  sort?: CategorySort | null
+}
+
+export type CategoryCollectionPage = {
+  eyebrow?: string | null
+  shortDescription?: string | null
+  visibleFilters?: CategoryFilter[] | null
+  defaultSort?: CategorySort | null
+  productsPerPage?: number | null
+  showProductCount?: boolean | null
+  layout?: 'grid' | 'editorial' | null
+}
+
 export type CategoryListItem = {
   id: string | number
   title?: string | null
   slug?: string | null
   status?: string | null
+  nodeType?: CategoryNodeType | null
+  taxonomyAxis?: CategoryTaxonomyAxis | null
   order?: number | null
   parent?: RelationshipLike<CategoryParent>
   image?: RelationshipLike<CategoryMedia>
@@ -46,6 +84,14 @@ export type CategoryListItem = {
 export type CategoryDetail = CategoryListItem & {
   revision?: string | null
   description?: string | null
+  menu?: CategoryMenu | null
+  listingMode?: CategoryListingMode | null
+  listingRules?: CategoryListingRules | null
+  collectionPage?: CategoryCollectionPage | null
+  externalURL?: string | null
+  hubPath?: string | null
+  contentBlocks?: Array<Record<string, unknown>> | null
+  menuHighlights?: Array<Record<string, unknown>> | null
   seo?: CategorySeo | null
 }
 
