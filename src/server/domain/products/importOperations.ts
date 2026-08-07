@@ -1,10 +1,6 @@
 import type { Payload } from 'payload'
 
-import {
-  importColumns,
-  resolveHeaderColumn,
-  type ImportColumn,
-} from '../../../businessRules/products/importSchema'
+import { resolveHeaderColumn } from '../../../businessRules/products/importSchema'
 import {
   blockingIssueCount,
   emptyImportValues,
