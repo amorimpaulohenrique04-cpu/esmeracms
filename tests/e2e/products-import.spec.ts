@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
 const adminEmail = process.env.E2E_ADMIN_EMAIL || process.env.PAYLOAD_ADMIN_EMAIL
@@ -91,7 +92,7 @@ test.describe('importação de produtos', () => {
     await expect(mappingRow.getByRole('combobox')).toHaveValue('')
   })
 
-  test('mobile usa cartões e não expõe a tabela larga', async ({ page }) => {
+  test('mobile usa cartões, mantém o layout contido e não introduz violações graves de acessibilidade', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await openImporter(page)
 
@@ -104,5 +105,13 @@ test.describe('importação de produtos', () => {
     await expect(page.locator('.esmera-products-import__cards')).toBeVisible()
     await expect(page.locator('.esmera-products-import__cards details')).toHaveCount(5)
     await expect(page.locator('.esmera-products-import-dialog')).toHaveCSS('max-width', '375px')
+
+    const accessibility = await new AxeBuilder({ page })
+      .include('.esmera-products-import-dialog')
+      .analyze()
+    const seriousViolations = accessibility.violations.filter((violation) =>
+      violation.impact === 'critical' || violation.impact === 'serious',
+    )
+    expect(seriousViolations).toEqual([])
   })
 })
