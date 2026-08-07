@@ -1,5 +1,6 @@
 import { expect, Page, test } from '@playwright/test'
 
+import { createDraftProduct } from '../helpers/createDraftEntities'
 import { login } from '../helpers/login'
 import { cleanupTestUser, seedTestUser, testUser } from '../helpers/seedUser'
 
@@ -39,25 +40,20 @@ test.describe('Popups de criação dos workspaces', () => {
     const customer = await customerResponse.json() as { id?: string | number }
     expect(customer.id).toBeTruthy()
 
-    const productResponse = await page.request.post('http://localhost:3000/api/products?draft=true', {
+    const productID = await createDraftProduct(page, `popup-${stamp}`)
+    const productResponse = await page.request.patch(`http://localhost:3000/api/products/${productID}?draft=true`, {
       data: {
         title: productTitle,
         slug: `produto-popup-e2e-${stamp}`,
         code: `POP-${stamp}`,
-        catalogStatus: 'active',
         availability: 'unique',
-        priceMode: 'fixed',
         basePriceCents: 12_345,
-        _status: 'draft',
       },
     })
-    expect(productResponse.ok(), `product create failed: ${productResponse.status()} ${await productResponse.text()}`).toBeTruthy()
-    const product = await productResponse.json() as { id?: string | number; doc?: { id?: string | number } }
-    const productID = product.id ?? product.doc?.id
-    expect(productID).toBeTruthy()
+    expect(productResponse.ok(), `product update failed: ${productResponse.status()} ${await productResponse.text()}`).toBeTruthy()
 
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('http://localhost:3000/admin/sales')
+    await page.goto('http://localhost:3000/admin/opportunities')
     await page.getByRole('button', { name: 'Nova venda' }).click()
     await expect(page.getByRole('heading', { name: 'Nova venda' })).toBeVisible()
 
