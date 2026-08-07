@@ -112,7 +112,7 @@ test.describe('PR-11 — Shell: geometria e navegação', () => {
     await expect(dashboardLink).toBeFocused()
 
     await page.keyboard.press('Tab')
-    await expect(nav.getByRole('link', { name: 'Produtos' })).toBeFocused()
+    await expect(nav.getByRole('link', { name: 'Captação', exact: true })).toBeFocused()
   })
 
   test('1023px: usa o drawer móvel e não reflui o workspace', async () => {
