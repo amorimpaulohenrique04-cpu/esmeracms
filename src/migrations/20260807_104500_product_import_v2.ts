@@ -19,7 +19,9 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
     ALTER TYPE "public"."enum_payload_jobs_log_task_slug" ADD VALUE IF NOT EXISTS 'productImport';
 
     ALTER TABLE "media" ADD COLUMN IF NOT EXISTS "source_sha256" varchar;
+    ALTER TABLE "_media_v" ADD COLUMN IF NOT EXISTS "version_source_sha256" varchar;
     CREATE INDEX IF NOT EXISTS "media_source_sha256_idx" ON "media" USING btree ("source_sha256");
+    CREATE INDEX IF NOT EXISTS "media_versions_source_sha256_idx" ON "_media_v" USING btree ("version_source_sha256");
 
     -- Chaves normalizadas usadas pelo preview/commit para resolver duplicatas e
     -- categorias em consultas indexadas, sem varrer o catálogo inteiro.
@@ -135,7 +137,9 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
     ALTER TABLE "_products_v" DROP COLUMN IF EXISTS "version_code_normalized";
     ALTER TABLE "products" DROP COLUMN IF EXISTS "code_normalized";
 
+    DROP INDEX IF EXISTS "media_versions_source_sha256_idx";
     DROP INDEX IF EXISTS "media_source_sha256_idx";
+    ALTER TABLE "_media_v" DROP COLUMN IF EXISTS "version_source_sha256";
     ALTER TABLE "media" DROP COLUMN IF EXISTS "source_sha256";
 
     -- PostgreSQL não remove valores individuais de ENUM com segurança. Os valores
