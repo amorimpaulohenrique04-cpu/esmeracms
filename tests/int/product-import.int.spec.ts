@@ -116,6 +116,72 @@ describe('product import against Payload', () => {
     expect(updated.priceMode).toBe('fixed')
   })
 
+  it('encontra produto na lixeira, restaura e atualiza em vez de tentar criar duplicata', async () => {
+    const user = await payload.findByID({ collection: 'users', id: userId, overrideAccess: true })
+    const trashedCode = `TRASH-${suffix}`
+    const trashed = await payload.create({
+      collection: 'products',
+      overrideAccess: true,
+      data: {
+        title: `Produto na lixeira ${suffix}`,
+        slug: `produto-na-lixeira-${suffix}`,
+        code: trashedCode,
+        catalogStatus: 'archived',
+        availability: 'available',
+        priceMode: 'fixed',
+        basePriceCents: 10000,
+      },
+    })
+
+    await payload.delete({ collection: 'products', id: trashed.id, overrideAccess: true })
+
+    const text = [
+      'nome;codigo;categoria;preco;modo_preco;disponibilidade;status;imagens;material;descricao;slug',
+      `;${trashedCode};;250;;;;;;;`,
+    ].join('\n')
+    const preview = await previewImport(payload, user, text)
+
+    expect(preview.rows[0]?.isDuplicate).toBe(true)
+    expect(preview.rows[0]?.existingProductId).toBe(trashed.id)
+    expect(preview.rows[0]?.action).toBe('update')
+    expect(preview.blockingCount).toBe(0)
+
+    const values: ImportCommitInput['values'] = {
+      title: '',
+      code: trashedCode,
+      categories: '',
+      price: '250',
+      priceMode: '',
+      availability: '',
+      catalogStatus: '',
+      imageUrls: '',
+      material: '',
+      description: '',
+      slug: '',
+    }
+    const report = await commitImport(payload, user, [{
+      rowIndex: 0,
+      sourceLine: 2,
+      values,
+      onConflict: 'update',
+    }])
+
+    expect(report.created).toBe(0)
+    expect(report.updated).toBe(1)
+    expect(report.errored).toBe(0)
+
+    const restored = await payload.findByID({
+      collection: 'products',
+      id: trashed.id,
+      trash: true,
+      overrideAccess: true,
+    } as never)
+    expect(restored.deletedAt).toBeNull()
+    expect(restored.basePriceCents).toBe(25000)
+
+    await payload.delete({ collection: 'products', id: trashed.id, overrideAccess: true }).catch(() => undefined)
+  })
+
   it('publica automaticamente a mídia criada pelo importador', async () => {
     const png = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
