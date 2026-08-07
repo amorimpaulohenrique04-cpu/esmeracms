@@ -114,7 +114,7 @@ test.describe('Feedback de navegação do Admin (F12)', () => {
     await delayRoute(page, '/admin/sales', 600)
     await page.goto('http://localhost:3000/admin')
 
-    await page.getByTestId('esmera-nav').getByRole('link', { name: 'Vendas', exact: true }).click()
+    await page.getByTestId('esmera-nav').locator('a[href="/admin/sales"]').click()
     await page.waitForTimeout(250)
     await expect(page.getByTestId('esmera-route-skeleton')).toBeVisible()
     await assertShellStatic(page)
