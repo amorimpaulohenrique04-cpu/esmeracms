@@ -43,24 +43,29 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Ensure seed process exits cleanly
+      - name: Normalize seed for deterministic execution
         run: |
           node <<'NODE'
           const fs = require('node:fs')
           const path = 'src/scripts/seed-catalog-taxonomy.ts'
-          const source = fs.readFileSync(path, 'utf8')
-          const before = `main().catch((error) => {
+          let source = fs.readFileSync(path, 'utf8')
+          const beforeTail = `main().catch((error) => {
             console.error(error)
             process.exitCode = 1
           })`.replace(/^          /gm, '')
-          const after = `main()
+          const afterTail = `main()
             .then(() => process.exit(0))
             .catch((error) => {
               console.error(error)
               process.exit(1)
             })`.replace(/^          /gm, '')
-          if (source.includes(before)) fs.writeFileSync(path, source.replace(before, after))
-          else if (!source.includes(after)) throw new Error('Seed tail not found')
+          if (source.includes(beforeTail)) source = source.replace(beforeTail, afterTail)
+          else if (!source.includes(afterTail)) throw new Error('Seed tail not found')
+          source = source.replace(
+            "{ key: 'crystals-lavabo', title: 'Porta-cristais',",
+            "{ key: 'crystals-lavabo', title: 'Porta-cristais para lavabo',",
+          )
+          fs.writeFileSync(path, source)
           NODE
       - name: Generate and sanitize catalog migration
         run: |
