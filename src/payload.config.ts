@@ -9,6 +9,7 @@ import sharp from 'sharp'
 
 import { isAdmin } from './access/roles'
 import { withActiveProductCategoryValidity } from './businessRules/products/categoryValidity'
+import { foldKey } from './businessRules/products/importValidation'
 import { Activities } from './collections/Activities'
 import { AfterSales } from './collections/AfterSales'
 import { Categories } from './collections/Categories'
@@ -48,12 +49,59 @@ if (process.env.NODE_ENV === 'production' && payloadSecret.length < 24) {
   throw new Error('PAYLOAD_SECRET deve possuir pelo menos 24 caracteres em produção.')
 }
 
+const validateActiveProductCategories = withActiveProductCategoryValidity(Products.hooks?.beforeValidate || [])
+
 const OperationalProducts = {
   ...Products,
   hooks: {
     ...Products.hooks,
-    beforeValidate: [withActiveProductCategoryValidity(Products.hooks?.beforeValidate || [])],
+    beforeValidate: [
+      async (args) => {
+        const data = await validateActiveProductCategories(args)
+        if (!data) return data
+        const code = data.code ?? args.originalDoc?.code
+        if (code) data.codeNormalized = foldKey(String(code))
+        return data
+      },
+    ],
   },
+  fields: [
+    ...Products.fields,
+    {
+      name: 'codeNormalized',
+      type: 'text',
+      required: true,
+      unique: true,
+      index: true,
+      admin: { hidden: true },
+    },
+  ],
+} satisfies CollectionConfig
+
+const OperationalCategories = {
+  ...Categories,
+  hooks: {
+    ...Categories.hooks,
+    beforeValidate: [
+      ...(Categories.hooks?.beforeValidate || []),
+      ({ data, originalDoc }) => {
+        if (!data) return data
+        const title = data.title ?? originalDoc?.title
+        if (title) data.titleNormalized = foldKey(String(title))
+        return data
+      },
+    ],
+  },
+  fields: [
+    ...Categories.fields,
+    {
+      name: 'titleNormalized',
+      type: 'text',
+      required: true,
+      index: true,
+      admin: { hidden: true },
+    },
+  ],
 } satisfies CollectionConfig
 
 export default buildConfig({
@@ -165,7 +213,7 @@ export default buildConfig({
     Users,
     Media,
     ReportExportFiles,
-    Categories,
+    OperationalCategories,
     OperationalProducts,
     ProductImports,
     Leads,
