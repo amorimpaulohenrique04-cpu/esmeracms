@@ -73,6 +73,7 @@ export interface Config {
     categories: Category;
     products: Product;
     'product-imports': ProductImport;
+    reservations: Reservation;
     leads: Lead;
     customers: Customer;
     'client-interests': ClientInterest;
@@ -98,6 +99,7 @@ export interface Config {
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
     'product-imports': ProductImportsSelect<false> | ProductImportsSelect<true>;
+    reservations: ReservationsSelect<false> | ReservationsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
     'client-interests': ClientInterestsSelect<false> | ClientInterestsSelect<true>;
@@ -661,6 +663,30 @@ export interface ProductImport {
     | boolean
     | null;
   error?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reservations".
+ */
+export interface Reservation {
+  id: number;
+  productId: number;
+  productSlug: string;
+  variantSku?: string | null;
+  /**
+   * Peça única: no máximo uma reserva ativa.
+   */
+  uniquePiece?: boolean | null;
+  status: 'held' | 'confirmed' | 'released' | 'expired';
+  idempotencyKey: string;
+  reservedUntil?: string | null;
+  priceCents?: number | null;
+  /**
+   * Referência do comprador (sessão/e-mail).
+   */
+  buyerRef?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1260,6 +1286,10 @@ export interface PayloadLockedDocument {
         value: number | ProductImport;
       } | null)
     | ({
+        relationTo: 'reservations';
+        value: number | Reservation;
+      } | null)
+    | ({
         relationTo: 'leads';
         value: number | Lead;
       } | null)
@@ -1765,6 +1795,23 @@ export interface ProductImportsSelect<T extends boolean = true> {
   payloadSnapshot?: T;
   results?: T;
   error?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reservations_select".
+ */
+export interface ReservationsSelect<T extends boolean = true> {
+  productId?: T;
+  productSlug?: T;
+  variantSku?: T;
+  uniquePiece?: T;
+  status?: T;
+  idempotencyKey?: T;
+  reservedUntil?: T;
+  priceCents?: T;
+  buyerRef?: T;
   updatedAt?: T;
   createdAt?: T;
 }
