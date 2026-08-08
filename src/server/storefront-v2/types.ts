@@ -192,6 +192,19 @@ export type StorefrontCollectionV2 = {
   }
 }
 
+/** Paginated catalog root used by clients that are not scoped to one collection. */
+export type StorefrontProductsV2 = Omit<StorefrontCollectionV2, 'category' | 'editorial'> & {
+  catalog: {
+    title: string
+    introduction?: unknown
+    visibleFilters: string[]
+    emptyStateTitle?: string | null
+    emptyStateCopy?: string | null
+    callToAction?: { label: string; href: string } | null
+    seo?: PublicSEOV2 | null
+  }
+}
+
 export type StorefrontEditorialPageV2 = {
   version: typeof STOREFRONT_CONTRACT_V2
   revision: string
