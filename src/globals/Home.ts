@@ -1,4 +1,4 @@
-import type { GlobalConfig } from 'payload'
+import type { GlobalConfig, Where } from 'payload'
 
 import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
 import { callToActionFields, imageWithAltFields, seoField } from '../fields/common'
@@ -15,6 +15,14 @@ export const HOME_DISABLED_SECTIONS = [
   'provenance',
   'privateInvitation',
 ] as const
+
+const PUBLIC_HOME_PRODUCT_FILTER: Where = {
+  and: [
+    { catalogStatus: { equals: 'active' } },
+    { _status: { equals: 'published' } },
+    { publicationReady: { equals: true } },
+  ],
+}
 
 export const Home: GlobalConfig = {
   slug: 'home',
@@ -138,7 +146,10 @@ export const Home: GlobalConfig = {
               required: false,
               minRows: 0,
               maxRows: 4,
-              admin: { description: 'Selecione até 4 produtos. Nenhum dado do produto é copiado aqui.' },
+              filterOptions: PUBLIC_HOME_PRODUCT_FILTER,
+              admin: {
+                description: 'Selecione até 4 produtos ativos, publicados e prontos para o storefront. Nenhum dado do produto é copiado aqui.',
+              },
             },
           ],
         },
@@ -172,7 +183,14 @@ export const Home: GlobalConfig = {
               minRows: 0,
               maxRows: 6,
               fields: [
-                { name: 'product', type: 'relationship', relationTo: 'products', label: 'Produto', required: true },
+                {
+                  name: 'product',
+                  type: 'relationship',
+                  relationTo: 'products',
+                  label: 'Produto',
+                  required: true,
+                  filterOptions: PUBLIC_HOME_PRODUCT_FILTER,
+                },
                 { name: 'eyebrow', type: 'text', label: 'Sobretítulo' },
                 { name: 'headline', type: 'text', label: 'Título editorial' },
                 { name: 'copy', type: 'textarea', label: 'Texto editorial' },
