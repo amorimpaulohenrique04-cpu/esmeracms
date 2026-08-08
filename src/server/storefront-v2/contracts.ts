@@ -5,11 +5,12 @@ import {
   type StorefrontCollectionV2,
   type StorefrontEditorialPageV2,
   type StorefrontNavigationV2,
+  type StorefrontProductsV2,
 } from './types'
 
 type UnknownRecord = Record<string, unknown>
 
-export type ContractV2Kind = 'navigation' | 'collection' | 'editorial' | 'product'
+export type ContractV2Kind = 'navigation' | 'collection' | 'products' | 'editorial' | 'product'
 
 export class StorefrontContractV2Error extends Error {
   constructor(
@@ -132,6 +133,19 @@ export function validateCollectionV2(value: unknown): string[] {
   return issues
 }
 
+export function validateProductsV2(value: unknown): string[] {
+  const syntheticCollection = {
+    ...record(value),
+    category: {
+      id: 'catalog',
+      slug: 'catalog',
+      title: 'Catálogo',
+      visibleFilters: [],
+    },
+  }
+  return validateCollectionV2(syntheticCollection).map((issue) => issue.replace(/^collection/, 'products'))
+}
+
 export function validateEditorialPageV2(value: unknown): string[] {
   const issues: string[] = []
   const data = record(value)
@@ -180,6 +194,11 @@ export function assertNavigationV2(value: unknown): asserts value is StorefrontN
 export function assertCollectionV2(value: unknown): asserts value is StorefrontCollectionV2 {
   const issues = validateCollectionV2(value)
   if (issues.length) throw new StorefrontContractV2Error('collection', issues)
+}
+
+export function assertProductsV2(value: unknown): asserts value is StorefrontProductsV2 {
+  const issues = validateProductsV2(value)
+  if (issues.length) throw new StorefrontContractV2Error('products', issues)
 }
 
 export function assertEditorialPageV2(value: unknown): asserts value is StorefrontEditorialPageV2 {

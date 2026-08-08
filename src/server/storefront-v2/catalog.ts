@@ -1,6 +1,6 @@
 import type { Payload, Where } from 'payload'
 
-import { assertCollectionV2, assertEditorialPageV2, assertNavigationV2, assertProductDetailV2 } from './contracts'
+import { assertCollectionV2, assertEditorialPageV2, assertNavigationV2, assertProductDetailV2, assertProductsV2 } from './contracts'
 import { deterministicRevision } from './http'
 import {
   STOREFRONT_CONTRACT_V2,
@@ -18,6 +18,7 @@ import {
   type StorefrontCollectionV2,
   type StorefrontEditorialPageV2,
   type StorefrontNavigationV2,
+  type StorefrontProductsV2,
 } from './types'
 
 type UnknownRecord = Record<string, unknown>
@@ -924,6 +925,118 @@ export async function buildCollectionV2(
   const body: StorefrontCollectionV2 = { ...base, revision: deterministicRevision(base) }
   assertCollectionV2(body)
   return { body, lastModified: latestModified([category, collectionDefaults, ...products]) }
+}
+
+export async function buildProductsV2(
+  payload: Payload,
+  searchParams: URLSearchParams,
+): Promise<BuiltResponse<StorefrontProductsV2>> {
+  const [categories, siteSettings] = await Promise.all([
+    loadPublicCategories(payload, 1),
+    payload.findGlobal({ slug: 'site-settings', depth: 0, draft: false, overrideAccess: true }).catch(() => ({})),
+  ])
+  const paymentTerms = resolvePaymentTerms(record(siteSettings)?.paymentTerms)
+  const visibleFilters = ['category', 'collection', 'environment', 'piece_type', 'material', 'availability', 'price']
+  const page = parseInteger(searchParams, 'page', 1, 1, 1_000_000)
+  const limit = parseInteger(searchParams, 'limit', DEFAULT_LIMIT, 1, MAX_LIMIT)
+  const sort = text(searchParams.get('sort')) || 'editorial'
+  if (!SORTS.has(sort)) throw new StorefrontInputError('Ordenação não suportada.')
+  const rawQuery = text(searchParams.get('q'))
+  if (rawQuery.length > 100) throw new StorefrontInputError('A busca aceita no máximo 100 caracteres.')
+  const q = rawQuery.slice(0, 100)
+
+  const categoryFilter = parseList(searchParams, ['category'])
+  const collectionFilter = parseList(searchParams, ['collection'])
+  const environmentFilter = parseList(searchParams, ['environment'])
+  const pieceTypeFilter = parseList(searchParams, ['piece_type', 'type'])
+  const materialFilter = parseList(searchParams, ['material'])
+  const availabilityFilter = parseList(searchParams, ['availability'], AVAILABILITY)
+  const min = parseOptionalPrice(searchParams, 'min')
+  const max = parseOptionalPrice(searchParams, 'max')
+  if (min !== undefined && max !== undefined && min > max) {
+    throw new StorefrontInputError('O preço mínimo não pode ser maior que o máximo.')
+  }
+
+  const and: Where[] = [
+    { catalogStatus: { equals: 'active' } },
+    { _status: { equals: 'published' } },
+  ]
+  if (q) {
+    and.push({
+      or: [
+        { title: { like: q } },
+        { subtitle: { like: q } },
+        { code: { like: q } },
+        { material: { like: q } },
+        { 'searchTerms.term': { like: q } },
+      ],
+    })
+  }
+  and.push(...[
+    relationshipFilter(categoryIDsForSlugs(categories, categoryFilter)),
+    relationshipFilter(categoryIDsForSlugs(categories, collectionFilter, 'collection')),
+    relationshipFilter(categoryIDsForSlugs(categories, environmentFilter, 'environment')),
+    relationshipFilter(categoryIDsForSlugs(categories, pieceTypeFilter, 'piece_type')),
+  ].filter((entry): entry is Where => Boolean(entry)))
+  if (materialFilter.length) and.push({ material: { in: materialFilter } })
+  if (availabilityFilter.length) and.push({ availability: { in: availabilityFilter } })
+  if (min !== undefined) and.push({ basePriceCents: { greater_than_equal: min } })
+  if (max !== undefined) and.push({ basePriceCents: { less_than_equal: max } })
+
+  const where: Where = { and }
+  const productSelect = {
+    id: true,
+    slug: true,
+    code: true,
+    title: true,
+    subtitle: true,
+    material: true,
+    edition: true,
+    availability: true,
+    priceMode: true,
+    basePriceCents: true,
+    physicalSpecs: true,
+    variants: true,
+    gallery: true,
+    categories: true,
+    createdAt: true,
+    updatedAt: true,
+  } as const
+  const [result, facetResult] = await Promise.all([
+    payload.find({
+      collection: 'products', depth: 1, draft: false, page, limit, pagination: true,
+      overrideAccess: true, sort: sortForPayload(sort), where, select: productSelect,
+    }),
+    payload.find({
+      collection: 'products', depth: 1, draft: false, page: 1, limit: MAX_FACET_PRODUCTS,
+      pagination: true, overrideAccess: true, sort: 'id', where,
+      select: { id: true, material: true, availability: true, basePriceCents: true, categories: true },
+    }),
+  ])
+  if (page > Math.max(1, result.totalPages)) throw new StorefrontNotFoundError('Página do catálogo inexistente.')
+
+  const products = result.docs as unknown as UnknownRecord[]
+  const facetsTruncated = facetResult.totalDocs > MAX_FACET_PRODUCTS
+  const facetProducts = facetsTruncated ? [] : facetResult.docs as unknown as UnknownRecord[]
+  const base = {
+    version: STOREFRONT_CONTRACT_V2,
+    items: products.map((product) => publicProduct(product, paymentTerms)),
+    pagination: {
+      page: result.page || page,
+      limit,
+      totalDocs: result.totalDocs,
+      totalPages: result.totalPages,
+      hasNextPage: Boolean(result.hasNextPage),
+      nextPage: result.hasNextPage ? result.nextPage || page + 1 : null,
+      hasPrevPage: Boolean(result.hasPrevPage),
+      prevPage: result.hasPrevPage ? result.prevPage || Math.max(1, page - 1) : null,
+    },
+    facets: facetsTruncated ? {} : buildFacets(facetProducts, visibleFilters),
+    applied: appliedFilters(q, categoryFilter, collectionFilter, environmentFilter, pieceTypeFilter, materialFilter, availabilityFilter, min, max, sort),
+  }
+  const body: StorefrontProductsV2 = { ...base, revision: deterministicRevision(base) }
+  assertProductsV2(body)
+  return { body, lastModified: latestModified([siteSettings, ...products]) }
 }
 
 export async function buildEditorialPageV2(payload: Payload, slug: string): Promise<BuiltResponse<StorefrontEditorialPageV2>> {

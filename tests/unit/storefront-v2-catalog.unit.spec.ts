@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 
-import { buildCollectionV2, buildNavigationV2 } from '../../src/server/storefront-v2/catalog'
+import { buildCollectionV2, buildNavigationV2, buildProductsV2 } from '../../src/server/storefront-v2/catalog'
 
 type RecordValue = Record<string, unknown>
 
@@ -144,6 +144,39 @@ describe('storefront V2 catalog builders', () => {
         { catalogStatus: { equals: 'active' } },
         { _status: { equals: 'published' } },
       ]),
+    })
+  })
+
+  it('lists the catalog root with enriched card fields and payment terms', async () => {
+    const product = {
+      id: 11,
+      slug: 'pulseira-esmera',
+      title: 'Aurora',
+      material: 'Esmeralda',
+      availability: 'unique',
+      priceMode: 'fixed',
+      basePriceCents: 49000,
+      physicalSpecs: { widthMm: 180, weightGrams: 1200 },
+      gallery: [{ role: 'cover', image: { id: 52, url: '/media/aurora.jpg', alt: 'Aurora' } }],
+      categories: [{ ...child, title: 'Pulseira' }],
+      updatedAt: '2026-08-05T12:00:00.000Z',
+    }
+    const { payload, find } = payloadStub({
+      categories: [root, child],
+      products: [product],
+      siteSettings: { paymentTerms: { enabled: true, maxInstallments: 12, minimumInstallmentCents: 1000, interestFree: true } },
+    })
+
+    const result = await buildProductsV2(payload, new URLSearchParams('page=1&limit=24&piece_type=vasos'))
+
+    expect(result.body.items[0]).toMatchObject({
+      identity: { name: 'Aurora', pieceType: 'Pulseira', material: 'Esmeralda' },
+      specs: { widthMm: 180, weightGrams: 1200 },
+      pricing: { mode: 'fixed', installment: { count: 12, amountCents: 4083, interestFree: true } },
+    })
+    expect(result.body).not.toHaveProperty('category')
+    expect(find.mock.calls.find(([args]) => args.collection === 'products')?.[0].where).toMatchObject({
+      and: expect.arrayContaining([{ categories: { contains: '2' } }]),
     })
   })
 })
