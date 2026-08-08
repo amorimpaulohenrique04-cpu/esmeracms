@@ -81,6 +81,16 @@ function draftData(input: Record<string, unknown> | undefined) {
   if (typeof source.availability === 'string') data.availability = source.availability
   if (typeof source.priceMode === 'string') data.priceMode = source.priceMode
   if (typeof source.basePriceCents === 'number' || source.basePriceCents === null) data.basePriceCents = source.basePriceCents
+  const specs = source.physicalSpecs
+  if (specs && typeof specs === 'object' && !Array.isArray(specs)) {
+    const specsRecord = specs as Record<string, unknown>
+    const physicalSpecs: Record<string, number | null> = {}
+    for (const field of ['heightMm', 'widthMm', 'depthMm', 'weightGrams'] as const) {
+      const value = specsRecord[field]
+      if (typeof value === 'number' || value === null) physicalSpecs[field] = value
+    }
+    data.physicalSpecs = physicalSpecs
+  }
   data._status = 'draft'
   return data
 }

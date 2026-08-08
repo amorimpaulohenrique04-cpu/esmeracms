@@ -45,5 +45,46 @@ export const SiteSettings: GlobalConfig = {
     { name: 'termsLabel', type: 'text', label: 'Rótulo dos termos' },
     { name: 'termsHref', type: 'text', label: 'Link dos termos' },
     { name: 'analyticsConfigured', type: 'checkbox', label: 'Analytics configurado', defaultValue: false, admin: { description: 'Apenas sinaliza integração real. O CMS não inventa métricas de tráfego.' } },
+    {
+      name: 'paymentTerms',
+      type: 'group',
+      label: 'Política de parcelamento',
+      admin: {
+        description: 'Regra central de parcelamento. O storefront calcula as parcelas a partir daqui — nunca escreva o parcelamento à mão em cada produto.',
+      },
+      fields: [
+        {
+          type: 'row',
+          fields: [
+            {
+              name: 'maxInstallments',
+              type: 'number',
+              label: 'Máximo de parcelas',
+              min: 1,
+              max: 48,
+              defaultValue: 12,
+              admin: { width: '33%' },
+            },
+            {
+              name: 'interestFreeInstallments',
+              type: 'number',
+              label: 'Parcelas sem juros',
+              min: 0,
+              max: 48,
+              defaultValue: 12,
+              admin: { width: '33%', description: 'Até quantas parcelas ficam sem juros.' },
+            },
+            {
+              name: 'minimumInstallmentCents',
+              type: 'number',
+              label: 'Parcela mínima (centavos)',
+              min: 0,
+              defaultValue: 0,
+              admin: { width: '33%', description: 'Ex.: 5000 = R$ 50,00. 0 desativa o piso.' },
+            },
+          ],
+        },
+      ],
+    },
   ],
 }
