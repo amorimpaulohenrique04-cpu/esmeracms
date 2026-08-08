@@ -175,6 +175,7 @@ describe('storefront V2 catalog builders', () => {
       pricing: { mode: 'fixed', installment: { count: 12, amountCents: 4083, interestFree: true } },
     })
     expect(result.body).not.toHaveProperty('category')
+    expect(result.body.catalog).toMatchObject({ title: 'Coleções', visibleFilters: expect.arrayContaining(['material', 'price']) })
     expect(find.mock.calls.find(([args]) => args.collection === 'products')?.[0].where).toMatchObject({
       and: expect.arrayContaining([{ categories: { contains: '2' } }]),
     })

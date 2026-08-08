@@ -931,8 +931,9 @@ export async function buildProductsV2(
   payload: Payload,
   searchParams: URLSearchParams,
 ): Promise<BuiltResponse<StorefrontProductsV2>> {
-  const [categories, siteSettings] = await Promise.all([
+  const [categories, collectionDefaults, siteSettings] = await Promise.all([
     loadPublicCategories(payload, 1),
+    payload.findGlobal({ slug: 'collection-page', depth: 1, draft: false, overrideAccess: true }).catch(() => ({})),
     payload.findGlobal({ slug: 'site-settings', depth: 0, draft: false, overrideAccess: true }).catch(() => ({})),
   ])
   const paymentTerms = resolvePaymentTerms(record(siteSettings)?.paymentTerms)
@@ -1020,6 +1021,23 @@ export async function buildProductsV2(
   const facetProducts = facetsTruncated ? [] : facetResult.docs as unknown as UnknownRecord[]
   const base = {
     version: STOREFRONT_CONTRACT_V2,
+    catalog: {
+      title: text(record(collectionDefaults)?.title) || 'Coleções',
+      introduction: record(collectionDefaults)?.intro ?? null,
+      visibleFilters,
+      emptyStateTitle: nullableText(record(collectionDefaults)?.emptyStateTitle),
+      emptyStateCopy: nullableText(record(collectionDefaults)?.emptyStateCopy),
+      callToAction: (() => {
+        const cta = record(record(collectionDefaults)?.emptyStateCallToAction)
+        if (!cta) return null
+        const href = text(cta.destinationType) === 'internal'
+          ? safeInternalPath(cta.path)
+          : safeExternalURL(cta.url)
+        const label = text(cta.label)
+        return href && label ? { label, href } : null
+      })(),
+      seo: publicSEO(record(collectionDefaults)?.seo),
+    },
     items: products.map((product) => publicProduct(product, paymentTerms)),
     pagination: {
       page: result.page || page,
@@ -1036,7 +1054,7 @@ export async function buildProductsV2(
   }
   const body: StorefrontProductsV2 = { ...base, revision: deterministicRevision(base) }
   assertProductsV2(body)
-  return { body, lastModified: latestModified([siteSettings, ...products]) }
+  return { body, lastModified: latestModified([collectionDefaults, siteSettings, ...products]) }
 }
 
 export async function buildEditorialPageV2(payload: Payload, slug: string): Promise<BuiltResponse<StorefrontEditorialPageV2>> {
