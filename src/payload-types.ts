@@ -72,6 +72,7 @@ export interface Config {
     'report-export-files': ReportExportFile;
     categories: Category;
     products: Product;
+    'product-imports': ProductImport;
     leads: Lead;
     customers: Customer;
     'client-interests': ClientInterest;
@@ -96,6 +97,7 @@ export interface Config {
     'report-export-files': ReportExportFilesSelect<false> | ReportExportFilesSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
+    'product-imports': ProductImportsSelect<false> | ProductImportsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
     'client-interests': ClientInterestsSelect<false> | ClientInterestsSelect<true>;
@@ -145,6 +147,7 @@ export interface Config {
       createAfterSalesTask: TaskCreateAfterSalesTask;
       syncActiveShipments: TaskSyncActiveShipments;
       generateReportExport: TaskGenerateReportExport;
+      productImport: TaskProductImport;
       inline: {
         input: unknown;
         output: unknown;
@@ -213,6 +216,7 @@ export interface Media {
   alt: string;
   caption?: string | null;
   credit?: string | null;
+  sourceSha256?: string | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -227,6 +231,14 @@ export interface Media {
   focalY?: number | null;
   sizes?: {
     thumb?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    productCard?: {
       url?: string | null;
       width?: number | null;
       height?: number | null;
@@ -446,6 +458,7 @@ export interface Category {
   };
   publicationRevision?: string | null;
   publicationContractVersion?: string | null;
+  titleNormalized?: string | null;
   updatedAt: string;
   createdAt: string;
   deletedAt?: string | null;
@@ -514,7 +527,25 @@ export interface Product {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Para peça única, defina Edição = "Peça única" e Disponibilidade = "Disponível".
+   */
   availability: 'unique' | 'available' | 'made_to_order' | 'limited';
+  /**
+   * Dados físicos estruturados. Usados no card, em frete e em relatórios. Deixe em branco o que não se aplica.
+   */
+  physicalSpecs?: {
+    /**
+     * Ex.: 180 = 18 cm.
+     */
+    heightMm?: number | null;
+    widthMm?: number | null;
+    depthMm?: number | null;
+    /**
+     * Ex.: 1200 = 1,2 kg.
+     */
+    weightGrams?: number | null;
+  };
   priceMode: 'fixed' | 'inquiry';
   /**
    * Exemplo: R$ 14.900,00 = 1490000.
@@ -585,10 +616,53 @@ export interface Product {
         id?: string | null;
       }[]
     | null;
+  codeNormalized?: string | null;
   updatedAt: string;
   createdAt: string;
   deletedAt?: string | null;
   _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-imports".
+ */
+export interface ProductImport {
+  id: number;
+  status: 'queued' | 'processing' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled';
+  idempotencyKey: string;
+  requestedBy?: (number | null) | User;
+  requestedByName?: string | null;
+  requestedByEmail?: string | null;
+  requestedAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  totalRows: number;
+  processedRows: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errored: number;
+  payloadSnapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  results?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  error?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * Leads representam exclusivamente aquisição e qualificação. Negociação, etapa, próxima ação e fechamento pertencem a Opportunities.
@@ -1109,7 +1183,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'createAfterSalesTask' | 'syncActiveShipments' | 'generateReportExport';
+        taskSlug: 'inline' | 'createAfterSalesTask' | 'syncActiveShipments' | 'generateReportExport' | 'productImport';
         taskID: string;
         input?:
           | {
@@ -1142,7 +1216,8 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'createAfterSalesTask' | 'syncActiveShipments' | 'generateReportExport') | null;
+  taskSlug?:
+    ('inline' | 'createAfterSalesTask' | 'syncActiveShipments' | 'generateReportExport' | 'productImport') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -1179,6 +1254,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'products';
         value: number | Product;
+      } | null)
+    | ({
+        relationTo: 'product-imports';
+        value: number | ProductImport;
       } | null)
     | ({
         relationTo: 'leads';
@@ -1298,6 +1377,7 @@ export interface MediaSelect<T extends boolean = true> {
   alt?: T;
   caption?: T;
   credit?: T;
+  sourceSha256?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -1314,6 +1394,16 @@ export interface MediaSelect<T extends boolean = true> {
     | T
     | {
         thumb?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        productCard?:
           | T
           | {
               url?: T;
@@ -1534,6 +1624,7 @@ export interface CategoriesSelect<T extends boolean = true> {
       };
   publicationRevision?: T;
   publicationContractVersion?: T;
+  titleNormalized?: T;
   updatedAt?: T;
   createdAt?: T;
   deletedAt?: T;
@@ -1570,6 +1661,14 @@ export interface ProductsSelect<T extends boolean = true> {
         id?: T;
       };
   availability?: T;
+  physicalSpecs?:
+    | T
+    | {
+        heightMm?: T;
+        widthMm?: T;
+        depthMm?: T;
+        weightGrams?: T;
+      };
   priceMode?: T;
   basePriceCents?: T;
   optionDefinitions?:
@@ -1638,10 +1737,36 @@ export interface ProductsSelect<T extends boolean = true> {
         message?: T;
         id?: T;
       };
+  codeNormalized?: T;
   updatedAt?: T;
   createdAt?: T;
   deletedAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-imports_select".
+ */
+export interface ProductImportsSelect<T extends boolean = true> {
+  status?: T;
+  idempotencyKey?: T;
+  requestedBy?: T;
+  requestedByName?: T;
+  requestedByEmail?: T;
+  requestedAt?: T;
+  startedAt?: T;
+  completedAt?: T;
+  totalRows?: T;
+  processedRows?: T;
+  created?: T;
+  updated?: T;
+  skipped?: T;
+  errored?: T;
+  payloadSnapshot?: T;
+  results?: T;
+  error?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2500,6 +2625,20 @@ export interface SiteSetting {
    * Apenas sinaliza integração real. O CMS não inventa métricas de tráfego.
    */
   analyticsConfigured?: boolean | null;
+  /**
+   * Regra central de parcelamento. O storefront calcula as parcelas a partir daqui — nunca escreva o parcelamento à mão em cada produto.
+   */
+  paymentTerms?: {
+    maxInstallments?: number | null;
+    /**
+     * Até quantas parcelas ficam sem juros.
+     */
+    interestFreeInstallments?: number | null;
+    /**
+     * Ex.: 5000 = R$ 50,00. 0 desativa o piso.
+     */
+    minimumInstallmentCents?: number | null;
+  };
   _status?: ('draft' | 'published') | null;
   updatedAt?: string | null;
   createdAt?: string | null;
@@ -2871,6 +3010,13 @@ export interface SiteSettingsSelect<T extends boolean = true> {
   termsLabel?: T;
   termsHref?: T;
   analyticsConfigured?: T;
+  paymentTerms?:
+    | T
+    | {
+        maxInstallments?: T;
+        interestFreeInstallments?: T;
+        minimumInstallmentCents?: T;
+      };
   _status?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2953,6 +3099,23 @@ export interface TaskGenerateReportExport {
     filename: string;
     semanticVersion: string;
     fileSizeBytes: number;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskProductImport".
+ */
+export interface TaskProductImport {
+  input: {
+    importId: string;
+  };
+  output: {
+    importId: string;
+    status: string;
+    created: number;
+    updated: number;
+    skipped: number;
+    errored: number;
   };
 }
 /**

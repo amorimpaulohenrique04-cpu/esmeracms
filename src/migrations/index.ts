@@ -5,6 +5,7 @@ import * as migration_20260802_213200_home_partial_overrides from './20260802_21
 import * as migration_20260804_015500_public_revision from './20260804_015500_public_revision'
 import * as migration_20260807_104500_product_import_v2 from './20260807_104500_product_import_v2'
 import * as migration_20260807_164500_cleanup_imported_product_media from './20260807_164500_cleanup_imported_product_media'
+import * as migration_20260808_130000_product_card_model from './20260808_130000_product_card_model'
 
 export const migrations = [
   {
@@ -41,5 +42,10 @@ export const migrations = [
     up: migration_20260807_164500_cleanup_imported_product_media.up,
     down: migration_20260807_164500_cleanup_imported_product_media.down,
     name: '20260807_164500_cleanup_imported_product_media',
+  },
+  {
+    up: migration_20260808_130000_product_card_model.up,
+    down: migration_20260808_130000_product_card_model.down,
+    name: '20260808_130000_product_card_model',
   },
 ]

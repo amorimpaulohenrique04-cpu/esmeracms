@@ -323,10 +323,59 @@ export const Products: CollectionConfig = {
               required: true,
               defaultValue: 'available',
               options: [
-                { label: 'Peça única', value: 'unique' },
+                // `unique` é legado: "peça única" é uma característica da peça
+                // (campo Edição), não um estado de disponibilidade. Mantido apenas
+                // para transição; será removido do enum numa etapa futura.
+                { label: 'Peça única (legado — use Edição)', value: 'unique' },
                 { label: 'Disponível', value: 'available' },
                 { label: 'Sob encomenda', value: 'made_to_order' },
                 { label: 'Edição limitada', value: 'limited' },
+              ],
+              admin: {
+                description: 'Para peça única, defina Edição = "Peça única" e Disponibilidade = "Disponível".',
+              },
+            },
+            {
+              name: 'physicalSpecs',
+              type: 'group',
+              label: 'Dimensões e peso',
+              admin: {
+                description: 'Dados físicos estruturados. Usados no card, em frete e em relatórios. Deixe em branco o que não se aplica.',
+              },
+              fields: [
+                {
+                  type: 'row',
+                  fields: [
+                    {
+                      name: 'heightMm',
+                      type: 'number',
+                      label: 'Altura (mm)',
+                      min: 0,
+                      admin: { width: '25%', description: 'Ex.: 180 = 18 cm.' },
+                    },
+                    {
+                      name: 'widthMm',
+                      type: 'number',
+                      label: 'Largura (mm)',
+                      min: 0,
+                      admin: { width: '25%' },
+                    },
+                    {
+                      name: 'depthMm',
+                      type: 'number',
+                      label: 'Profundidade (mm)',
+                      min: 0,
+                      admin: { width: '25%' },
+                    },
+                    {
+                      name: 'weightGrams',
+                      type: 'number',
+                      label: 'Peso (g)',
+                      min: 0,
+                      admin: { width: '25%', description: 'Ex.: 1200 = 1,2 kg.' },
+                    },
+                  ],
+                },
               ],
             },
             {
