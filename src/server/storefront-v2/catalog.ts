@@ -1,6 +1,6 @@
 import type { Payload, Where } from 'payload'
 
-import { assertCollectionV2, assertEditorialPageV2, assertNavigationV2 } from './contracts'
+import { assertCollectionV2, assertEditorialPageV2, assertNavigationV2, assertProductDetailV2 } from './contracts'
 import { deterministicRevision } from './http'
 import {
   STOREFRONT_CONTRACT_V2,
@@ -8,8 +8,11 @@ import {
   type FacetV2,
   type NavigationHighlightV2,
   type NavigationNodeV2,
+  type PublicAvailabilityStateV2,
   type PublicContentBlockV2,
+  type PublicInstallmentV2,
   type PublicMediaV2,
+  type PublicProductDetailV2,
   type PublicProductV2,
   type PublicSEOV2,
   type StorefrontCollectionV2,
@@ -125,6 +128,76 @@ function publicMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 | nul
     width: numberValue(media.width),
     height: numberValue(media.height),
   }
+}
+
+// Ordem de preferência de crop para imagens de card/produto: productCard (3:4)
+// é o crop editorial oficial; card (4:5) é o legado; o original é o último recurso.
+const CARD_CROP_ORDER = ['productCard', 'card'] as const
+
+function publicCardMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 | null {
+  const media = record(value)
+  if (!media) return null
+  const sizes = record(media.sizes)
+  for (const name of CARD_CROP_ORDER) {
+    const size = record(sizes?.[name])
+    const url = text(size?.url)
+    if (url) {
+      return {
+        id: String(media.id || url),
+        url,
+        alt: text(explicitAlt) || text(media.alt) || text(media.filename),
+        width: numberValue(size?.width),
+        height: numberValue(size?.height),
+      }
+    }
+  }
+  return publicMedia(value, explicitAlt)
+}
+
+function fold(value: unknown) {
+  return text(value).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('pt-BR')
+}
+
+export type PaymentTermsV2 = {
+  maxInstallments: number
+  interestFreeInstallments: number
+  minimumInstallmentCents: number
+}
+
+const DEFAULT_PAYMENT_TERMS: PaymentTermsV2 = {
+  maxInstallments: 12,
+  interestFreeInstallments: 12,
+  minimumInstallmentCents: 0,
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+export function resolvePaymentTerms(value: unknown): PaymentTermsV2 {
+  const terms = record(value)
+  if (!terms) return DEFAULT_PAYMENT_TERMS
+  const max = clamp(integer(terms.maxInstallments, DEFAULT_PAYMENT_TERMS.maxInstallments), 1, 48)
+  const free = clamp(integer(terms.interestFreeInstallments, max), 0, 48)
+  const min = Math.max(0, integer(terms.minimumInstallmentCents, 0))
+  return { maxInstallments: max, interestFreeInstallments: free, minimumInstallmentCents: min }
+}
+
+/**
+ * Deriva o parcelamento a partir do preço e da política central. A parcela é
+ * SEMPRE calculada (preço ÷ nº de parcelas) — nunca texto fixo por produto. Se
+ * houver piso de parcela, o número de parcelas é reduzido para respeitá-lo.
+ */
+export function computeInstallment(priceCents: number | null, terms: PaymentTermsV2): PublicInstallmentV2 | null {
+  if (priceCents === null || !Number.isFinite(priceCents) || priceCents <= 0) return null
+  let count = terms.maxInstallments
+  if (terms.minimumInstallmentCents > 0) {
+    const maxByFloor = Math.floor(priceCents / terms.minimumInstallmentCents)
+    count = clamp(Math.min(count, maxByFloor), 1, terms.maxInstallments)
+  }
+  if (count < 1) count = 1
+  const amountCents = Math.round(priceCents / count)
+  return { count, amountCents, interestFree: count <= terms.interestFreeInstallments }
 }
 
 function publicSEO(value: unknown): PublicSEOV2 | null {
@@ -486,7 +559,14 @@ function relationshipFilter(ids: string[]): Where | null {
     : { or: ids.map((id) => ({ categories: { contains: id } })) }
 }
 
-function publicProduct(value: UnknownRecord): PublicProductV2 {
+function availabilityState(raw: string): PublicAvailabilityStateV2 {
+  // `unique` legado não é estado: dobra para `available` (isUnique cobre a semântica).
+  if (raw === 'made_to_order' || raw === 'limited') return raw
+  if (raw === 'archive') return 'archive'
+  return 'available'
+}
+
+export function publicProduct(value: UnknownRecord, terms: PaymentTermsV2): PublicProductV2 {
   const gallery = records(value.gallery)
   const cover = gallery.find((item) => item.role === 'cover') || gallery[0]
   const hover = gallery.find((item) => item !== cover && item.role !== 'cover') || gallery[1]
@@ -507,19 +587,45 @@ function publicProduct(value: UnknownRecord): PublicProductV2 {
       taxonomyAxis: nullableText(category.taxonomyAxis),
     }))
 
+  const availabilityRaw = text(value.availability)
+  const isUnique = availabilityRaw === 'unique' || fold(value.edition) === 'peca unica'
+  const state = availabilityState(availabilityRaw)
+  const priceMode: 'fixed' | 'inquiry' = text(value.priceMode) === 'fixed' ? 'fixed' : 'inquiry'
+  const pieceType = categories.find((category) => category.taxonomyAxis === 'piece_type')?.title ?? null
+  const material = nullableText(value.material)
+  const title = text(value.title)
+  const specsRecord = record(value.physicalSpecs)
+  const specs = {
+    heightMm: numberValue(specsRecord?.heightMm),
+    widthMm: numberValue(specsRecord?.widthMm),
+    depthMm: numberValue(specsRecord?.depthMm),
+    weightGrams: numberValue(specsRecord?.weightGrams),
+  }
+  // Comprável = tem preço fixo e está num estado que permite compra direta.
+  // made_to_order/sob consulta seguem por consulta, não por compra transacional.
+  const purchasable = Boolean(price !== null && priceMode === 'fixed' && (state === 'available' || state === 'limited'))
+  const installment: PublicInstallmentV2 | null = priceMode === 'fixed' ? computeInstallment(price, terms) : null
+
   return {
     id: String(value.id),
     slug: text(value.slug),
     code: nullableText(value.code),
-    title: text(value.title),
+    title,
     subtitle: nullableText(value.subtitle),
-    material: nullableText(value.material),
+    material,
     availability: nullableText(value.availability),
     price,
     priceUnit: 'cent',
-    image: cover ? publicMedia(cover.image, cover.alt) : null,
-    hoverImage: hover ? publicMedia(hover.image, hover.alt) : null,
+    image: cover ? publicCardMedia(cover.image, cover.alt) : null,
+    hoverImage: hover ? publicCardMedia(hover.image, hover.alt) : null,
     categories,
+    identity: { name: title, pieceType, material },
+    pieceType,
+    state,
+    isUnique,
+    purchasable,
+    specs,
+    pricing: { mode: priceMode, priceCents: price, installment },
   }
 }
 
@@ -640,10 +746,12 @@ export async function buildCollectionV2(
 ): Promise<BuiltResponse<StorefrontCollectionV2>> {
   if (!/^[a-z0-9-]+$/.test(slug)) throw new StorefrontInputError('Slug de coleção inválido.')
 
-  const [categories, collectionDefaults] = await Promise.all([
+  const [categories, collectionDefaults, siteSettings] = await Promise.all([
     loadPublicCategories(payload, 1),
     payload.findGlobal({ slug: 'collection-page', depth: 1, draft: false, overrideAccess: true }).catch(() => ({})),
+    payload.findGlobal({ slug: 'site-settings', depth: 0, draft: false, overrideAccess: true }).catch(() => ({})),
   ])
+  const paymentTerms = resolvePaymentTerms(record(siteSettings)?.paymentTerms)
   const category = findCategoryBySlug(categories, slug)
   if (!category || text(category.nodeType) !== 'collection') throw new StorefrontNotFoundError('Coleção não encontrada.')
 
@@ -737,9 +845,11 @@ export async function buildCollectionV2(
         title: true,
         subtitle: true,
         material: true,
+        edition: true,
         availability: true,
         priceMode: true,
         basePriceCents: true,
+        physicalSpecs: true,
         variants: true,
         gallery: true,
         categories: true,
@@ -796,7 +906,7 @@ export async function buildCollectionV2(
       layout: pageConfig?.layout === 'editorial' ? 'editorial' as const : 'grid' as const,
       seo: publicSEO(category.seo),
     },
-    items: products.map(publicProduct),
+    items: products.map((product) => publicProduct(product, paymentTerms)),
     pagination: {
       page: result.page || page,
       limit,
@@ -855,4 +965,69 @@ export async function buildEditorialPageV2(payload: Payload, slug: string): Prom
   const body: StorefrontEditorialPageV2 = { ...base, revision: deterministicRevision(base) }
   assertEditorialPageV2(body)
   return { body, lastModified: modifiedAt(category) }
+}
+
+export async function buildProductDetailV2(payload: Payload, slug: string): Promise<BuiltResponse<PublicProductDetailV2>> {
+  if (!/^[a-z0-9-]+$/.test(slug)) throw new StorefrontInputError('Slug de produto inválido.')
+
+  const siteSettings = await payload
+    .findGlobal({ slug: 'site-settings', depth: 0, draft: false, overrideAccess: true })
+    .catch(() => ({}))
+  const paymentTerms = resolvePaymentTerms(record(siteSettings)?.paymentTerms)
+
+  const result = await payload.find({
+    collection: 'products',
+    depth: 1,
+    draft: false,
+    limit: 1,
+    pagination: false,
+    overrideAccess: true,
+    where: {
+      and: [
+        { slug: { equals: slug } },
+        { catalogStatus: { equals: 'active' } },
+        { _status: { equals: 'published' } },
+      ],
+    },
+    select: {
+      id: true,
+      slug: true,
+      code: true,
+      title: true,
+      subtitle: true,
+      material: true,
+      edition: true,
+      description: true,
+      availability: true,
+      priceMode: true,
+      basePriceCents: true,
+      physicalSpecs: true,
+      variants: true,
+      gallery: true,
+      categories: true,
+      seo: true,
+      updatedAt: true,
+    },
+  })
+
+  const doc = (result.docs as unknown as UnknownRecord[])[0]
+  if (!doc) throw new StorefrontNotFoundError('Produto não encontrado.')
+
+  const card = publicProduct(doc, paymentTerms)
+  const gallery = records(doc.gallery)
+    .map((item) => publicCardMedia(item.image, item.alt))
+    .filter((item): item is PublicMediaV2 => Boolean(item))
+
+  const base = {
+    version: STOREFRONT_CONTRACT_V2,
+    product: {
+      ...card,
+      description: doc.description ?? null,
+      gallery,
+      seo: publicSEO(doc.seo),
+    },
+  }
+  const body: PublicProductDetailV2 = { ...base, revision: deterministicRevision(base) }
+  assertProductDetailV2(body)
+  return { body, lastModified: modifiedAt(doc) }
 }
