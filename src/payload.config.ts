@@ -21,6 +21,7 @@ import { Occurrences } from './collections/Occurrences'
 import { Opportunities } from './collections/Opportunities'
 import { ProductImports } from './collections/ProductImports'
 import { Products } from './collections/Products'
+import { Reservations } from './collections/Reservations'
 import { ReportExportFiles } from './collections/ReportExportFiles'
 import { ReportExports } from './collections/ReportExports'
 import { Sales } from './collections/Sales'
@@ -214,6 +215,7 @@ export default buildConfig({
     OperationalCategories,
     OperationalProducts,
     ProductImports,
+    Reservations,
     Leads,
     Customers,
     ClientInterests,

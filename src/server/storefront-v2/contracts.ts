@@ -1,6 +1,7 @@
 import {
   STOREFRONT_CONTRACT_V2,
   type NavigationNodeV2,
+  type PublicProductDetailV2,
   type StorefrontCollectionV2,
   type StorefrontEditorialPageV2,
   type StorefrontNavigationV2,
@@ -8,7 +9,7 @@ import {
 
 type UnknownRecord = Record<string, unknown>
 
-export type ContractV2Kind = 'navigation' | 'collection' | 'editorial'
+export type ContractV2Kind = 'navigation' | 'collection' | 'editorial' | 'product'
 
 export class StorefrontContractV2Error extends Error {
   constructor(
@@ -145,6 +146,30 @@ export function validateEditorialPageV2(value: unknown): string[] {
   if (!Array.isArray(page.content)) issues.push('editorial.page.content precisa ser uma lista.')
   if (!Array.isArray(page.breadcrumb)) issues.push('editorial.page.breadcrumb precisa ser uma lista.')
   return issues
+}
+
+export function validateProductDetailV2(value: unknown): string[] {
+  const issues: string[] = []
+  const data = record(value)
+  if (!data) return ['product precisa ser um objeto.']
+  if (data.version !== STOREFRONT_CONTRACT_V2) issues.push('product.version precisa ser 2.')
+  if (!nonEmptyText(data.revision)) issues.push('product.revision é obrigatória.')
+  const product = record(data.product)
+  if (!product) return [...issues, 'product.product é obrigatório.']
+  if (!nonEmptyText(product.id)) issues.push('product.product.id é obrigatório.')
+  if (!nonEmptyText(product.slug)) issues.push('product.product.slug é obrigatório.')
+  if (!nonEmptyText(product.title)) issues.push('product.product.title é obrigatório.')
+  if (product.priceUnit !== 'cent') issues.push('product.product.priceUnit precisa ser cent.')
+  if (!Array.isArray(product.gallery)) issues.push('product.product.gallery precisa ser uma lista.')
+  const pricing = record(product.pricing)
+  if (!pricing) issues.push('product.product.pricing é obrigatório.')
+  else if (pricing.mode !== 'fixed' && pricing.mode !== 'inquiry') issues.push('product.product.pricing.mode inválido.')
+  return issues
+}
+
+export function assertProductDetailV2(value: unknown): asserts value is PublicProductDetailV2 {
+  const issues = validateProductDetailV2(value)
+  if (issues.length) throw new StorefrontContractV2Error('product', issues)
 }
 
 export function assertNavigationV2(value: unknown): asserts value is StorefrontNavigationV2 {
