@@ -63,6 +63,35 @@ export type PublicProductCategoryV2 = {
   taxonomyAxis?: string | null
 }
 
+export type PublicInstallmentV2 = {
+  count: number
+  amountCents: number
+  interestFree: boolean
+}
+
+export type PublicProductPricingV2 = {
+  mode: 'fixed' | 'inquiry'
+  priceCents: number | null
+  installment: PublicInstallmentV2 | null
+}
+
+export type PublicProductSpecsV2 = {
+  heightMm: number | null
+  widthMm: number | null
+  depthMm: number | null
+  weightGrams: number | null
+}
+
+export type PublicProductIdentityV2 = {
+  name: string
+  pieceType: string | null
+  material: string | null
+}
+
+// Estados públicos de disponibilidade. `unique` NÃO é estado — é característica
+// da peça (isUnique), derivada de edition/availability legado.
+export type PublicAvailabilityStateV2 = 'available' | 'made_to_order' | 'limited' | 'archive'
+
 export type PublicProductV2 = {
   id: string
   slug: string
@@ -76,6 +105,24 @@ export type PublicProductV2 = {
   image?: PublicMediaV2 | null
   hoverImage?: PublicMediaV2 | null
   categories?: PublicProductCategoryV2[]
+  // Campos estruturados do card (PR2). Aditivos: consumidores antigos ignoram.
+  identity?: PublicProductIdentityV2
+  pieceType?: string | null
+  state?: PublicAvailabilityStateV2
+  isUnique?: boolean
+  purchasable?: boolean
+  specs?: PublicProductSpecsV2
+  pricing?: PublicProductPricingV2
+}
+
+export type PublicProductDetailV2 = {
+  version: typeof STOREFRONT_CONTRACT_V2
+  revision: string
+  product: PublicProductV2 & {
+    description?: unknown
+    gallery: PublicMediaV2[]
+    seo?: PublicSEOV2 | null
+  }
 }
 
 export type FacetV2 = {
