@@ -6,10 +6,12 @@ import { canManageBusiness } from '../../../../access/roles'
 import {
   isOpportunityLossReason,
   isOpportunityStage,
+  openOpportunityStages,
   type OpportunityStage,
 } from '../../../../businessRules/opportunities/stages'
 import {
   bulkMoveOpportunities,
+  createOpportunity,
   createSale,
   loseOpportunity,
   moveOpportunity,
@@ -20,7 +22,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type SalesAction = 'move-stage' | 'reorder-stage' | 'bulk-stage' | 'create' | 'win' | 'lose'
+type SalesAction = 'move-stage' | 'reorder-stage' | 'bulk-stage' | 'create-opportunity' | 'create' | 'win' | 'lose'
 
 type RequestBody = {
   action?: SalesAction
@@ -34,6 +36,13 @@ type RequestBody = {
   lossNotes?: string | null
   channel?: string
   customerID?: string | number
+  ownerID?: string | number | null
+  productID?: string | number | null
+  source?: string
+  estimatedValueCents?: number | null
+  nextAction?: string | null
+  nextActionAt?: string | null
+  priority?: string
   items?: SaleWorkflowItem[]
   discountCents?: number
   shippingCents?: number
@@ -43,6 +52,9 @@ type RequestBody = {
 }
 
 const channels = new Set(['whatsapp', 'instagram', 'site', 'referral', 'architect', 'other'])
+const sources = new Set(['whatsapp', 'instagram', 'site', 'referral', 'architect', 'organic', 'other'])
+const priorities = new Set(['low', 'normal', 'high'])
+const openStages = new Set<OpportunityStage>(openOpportunityStages)
 const deliveryModes = new Set(['carrier', 'pickup', 'own_delivery'])
 
 function errorMessage(error: unknown) {
@@ -114,6 +126,24 @@ export async function POST(request: Request) {
       return NextResponse.json(await createSale(payload, user, {
         customerID: body.customerID,
         items: body.items,
+      }))
+    }
+
+    if (body.action === 'create-opportunity') {
+      const targetStage = stage(body.stage)
+      if (body.customerID === undefined || !sources.has(String(body.source)) || targetStage === null || !openStages.has(targetStage) || !priorities.has(String(body.priority))) {
+        return NextResponse.json({ error: 'Cliente, origem, etapa e prioridade são obrigatórios.' }, { status: 400 })
+      }
+      return NextResponse.json(await createOpportunity(payload, user, {
+        customerID: body.customerID,
+        source: String(body.source),
+        ownerID: body.ownerID,
+        productID: body.productID,
+        estimatedValueCents: body.estimatedValueCents,
+        stage: targetStage as 'new' | 'curation' | 'proposal' | 'negotiation',
+        nextAction: body.nextAction,
+        nextActionAt: body.nextActionAt,
+        priority: body.priority as 'low' | 'normal' | 'high',
       }))
     }
 

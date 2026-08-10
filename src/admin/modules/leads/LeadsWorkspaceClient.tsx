@@ -58,7 +58,8 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
       if (result.opportunity) {
         const opportunityRef = result.opportunity as { id: string | number; code?: string | null }
         queryClient.setQueryData<LeadRecord[]>(['leads', 'list'], (current = []) => current.map((item) => String(item.id) === String(selectedId) ? { ...item, opportunity: opportunityRef } : item))
-        setFeedback(`Oportunidade ${opportunityRef.code || opportunityRef.id} criada/vinculada.`)
+        setFeedback(`Lead convertido em ${opportunityRef.code || opportunityRef.id}.`)
+        router.push(`/admin/collections/opportunities/${opportunityRef.id}`)
       }
       router.refresh()
     },
@@ -92,7 +93,7 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
                   <td><strong>{lead.name || 'Sem nome'}</strong></td>
                   <td>{lead.phone || lead.email || '—'}</td>
                   <td className="esmera-leads-table__origin">{sourceLabels[lead.source || ''] || lead.source || '—'}</td>
-                  <td><Status tone={opportunityId(lead.opportunity) ? 'success' : 'neutral'}>{opportunityId(lead.opportunity) ? 'Qualificado' : 'Novo'}</Status></td>
+                  <td><Status tone={opportunityId(lead.opportunity) ? 'success' : 'neutral'}>{opportunityId(lead.opportunity) ? 'Convertido' : 'Novo'}</Status></td>
                   <td className="esmera-leads-table__date">{shortDate(lead.createdAt)}</td>
                 </tr>
               ))}
@@ -115,7 +116,7 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
                   type="button"
                   disabled={operation.isPending}
                   onClick={() => { setFeedback(null); void operation.mutate({ action: 'qualify', id: selected.id }) }}
-                >{operation.isPending ? 'Qualificando…' : 'Qualificar e criar oportunidade'}</Button>
+                >{operation.isPending ? 'Convertendo…' : 'Converter em Oportunidade'}</Button>
               )}
             </div>}
           >

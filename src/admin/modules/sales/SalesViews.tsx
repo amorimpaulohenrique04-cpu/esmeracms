@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, Where } from 'payload'
 
 import { openOpportunityStages, opportunityStages } from '../../../businessRules/opportunities/stages'
-import { eligibleSaleStatuses } from '../../../collections/Sales'
 import { FunnelStepper, SegmentedControl, SegmentedControlLink } from '../../design-system'
 import {
   AccessDenied,
@@ -12,10 +11,9 @@ import {
   findDocs,
   PageHeader,
   QueryError,
-  TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
-import { SaleCreateDialog, SalesWorkspaceClient } from './SalesWorkspaceClient'
+import { OpportunityCreateDialog, SaleCreateDialog, SalesWorkspaceClient } from './SalesWorkspaceClient'
 import './sale-create-dialog.scss'
 import type {
   ActivityRecord,
@@ -23,7 +21,6 @@ import type {
   OpportunityRecord,
   ProductRef,
   SalesMode,
-  SalesTransaction,
   SalesWorkspaceFilters,
   UserRef,
 } from './types'
@@ -154,7 +151,7 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
 
     const queryPage = filters.view === 'pipeline' ? 1 : filters.page
     const queryLimit = filters.view === 'pipeline' ? 500 : filters.limit
-    const [opportunityResult, usersResult, productsResult, transactionsResult] = await Promise.all([
+    const [opportunityResult, usersResult, productsResult] = await Promise.all([
       findDocs<OpportunityRecord>(req, 'opportunities', {
         sort: filters.view === 'pipeline' ? 'rank' : payloadSort(filters.sort),
         page: queryPage,
@@ -172,10 +169,6 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
         sort: 'title', limit: 500, depth: 0, draft: true, where: { catalogStatus: { equals: 'active' } } as Where,
         select: { id: true, title: true, code: true, slug: true, priceMode: true, basePriceCents: true, variants: true },
       }),
-      findDocs<SalesTransaction>(req, 'sales', {
-        sort: '-confirmedAt', limit: 30, depth: 1, where: { status: { in: [...eligibleSaleStatuses] } } as Where,
-        select: { id: true, number: true, status: true, totalCents: true, channel: true, customer: true, opportunity: true, confirmedAt: true, expectedDeliveryAt: true, updatedAt: true },
-      }),
     ])
 
     const opportunityIds = opportunityResult.docs.map((opportunity) => opportunity.id)
@@ -190,7 +183,7 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
         eyebrow="Passo 2 do funil"
         title="Oportunidades"
         subtitle="Negociações em andamento, da qualificação ao fechamento. Ganhar uma oportunidade cria a Venda automaticamente."
-        actions={<><TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink><SaleCreateDialog products={productsResult.docs} /><Link className="esmera-button" href="/admin/sales">Vendas confirmadas</Link></>}
+        actions={<><OpportunityCreateDialog products={productsResult.docs} users={usersResult.docs} /><SaleCreateDialog products={productsResult.docs} /><Link className="esmera-button" href="/admin/sales">Vendas confirmadas</Link></>}
         context={<ViewSwitch filters={filters} />}
       />
       <FunnelStepper current={2} />
@@ -199,7 +192,6 @@ export async function SalesWorkspace(props: AdminViewServerProps) {
         activities={activitiesResult.docs}
         products={productsResult.docs}
         users={usersResult.docs}
-        transactions={transactionsResult.docs}
         filters={filters}
         totalDocs={opportunityResult.totalDocs}
         totalPages={opportunityResult.totalPages || 1}
