@@ -212,6 +212,8 @@ export const Home: GlobalConfig = {
               fields: [
                 { name: 'title', type: 'text', label: 'Título', required: true },
                 { name: 'copy', type: 'textarea', label: 'Texto' },
+                imageWithAltFields('image', 'Imagem'),
+                callToActionFields('link', 'Link (opcional)'),
               ],
             },
             callToActionFields('provenanceCallToAction', 'Chamada para ação'),

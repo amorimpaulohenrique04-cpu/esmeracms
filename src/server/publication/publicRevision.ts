@@ -329,6 +329,7 @@ function projectHome(document: PublicRecord): unknown {
         copy: scalar(step.copy),
         image: projectImageField(step.image, `home.provenanceSteps.${index}.image`),
         alt: scalar(step.alt),
+        link: projectCTA(step.link),
       }
     })
     : document.provenanceSteps

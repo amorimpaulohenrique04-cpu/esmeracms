@@ -8,6 +8,7 @@ import * as migration_20260807_164500_cleanup_imported_product_media from './202
 import * as migration_20260808_130000_product_card_model from './20260808_130000_product_card_model'
 import * as migration_20260808_140000_reservations from './20260808_140000_reservations'
 import * as migration_20260808_180000_reservations_locked_documents from './20260808_180000_reservations_locked_documents'
+import * as migration_20260810_000000_provenance_step_media from './20260810_000000_provenance_step_media'
 
 export const migrations = [
   {
@@ -59,5 +60,10 @@ export const migrations = [
     up: migration_20260808_180000_reservations_locked_documents.up,
     down: migration_20260808_180000_reservations_locked_documents.down,
     name: '20260808_180000_reservations_locked_documents',
+  },
+  {
+    up: migration_20260810_000000_provenance_step_media.up,
+    down: migration_20260810_000000_provenance_step_media.down,
+    name: '20260810_000000_provenance_step_media',
   },
 ]
