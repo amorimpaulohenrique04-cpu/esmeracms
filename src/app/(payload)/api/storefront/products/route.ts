@@ -10,6 +10,10 @@ import {
   StorefrontNotFoundError,
 } from '../../../../../server/storefront-v2/catalog'
 import { publicError, publicJSON } from '../../../../../server/storefront-v2/http'
+import {
+  readCanonicalMaterialFilters,
+  withCanonicalMaterialFilters,
+} from '../../../../../server/storefront-v2/materialFilters'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +21,11 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   const payload = await getPayload({ config })
   const url = new URL(request.url)
+  const materialFilters = readCanonicalMaterialFilters(url.searchParams)
+  const catalogPayload = withCanonicalMaterialFilters(payload, materialFilters)
   try {
     const result = await measureServerOperation('operational', 'storefront.products.v2', () =>
-      buildProductsV2(payload, url.searchParams))
+      buildProductsV2(catalogPayload, url.searchParams))
     return publicJSON(request, result.body, {
       revision: result.body.revision,
       lastModified: result.lastModified,
