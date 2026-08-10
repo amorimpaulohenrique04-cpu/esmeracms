@@ -6,7 +6,7 @@ import React, { useRef, useState } from 'react'
 
 import { Button, InlineFeedback, SavingState, Status } from '../../design-system'
 import { announceAdmin, announceDraftChanged } from '../../state/AdminStateProvider'
-import { imageURL, relationId, roleLabels, type ProductGalleryItem } from './types'
+import { imageURL, relationId, roleLabels, type ProductGalleryItem, type ProductMedia } from './types'
 
 function SortableMedia({
   item,
@@ -55,13 +55,87 @@ function nextGalleryWithout(gallery: ProductGalleryItem[], index: number) {
   return next
 }
 
-export function ProductMediaManager({ productId, initialGallery }: { productId: string | number; initialGallery: ProductGalleryItem[] }) {
+type MediaUploadResponse = ProductMedia & {
+  doc?: ProductMedia
+  error?: string | { summary?: string; message?: string }
+  errors?: Array<{ message?: string }>
+}
+
+function uploadError(body: MediaUploadResponse, fallback: string) {
+  if (typeof body.error === 'string') return body.error
+  return body.error?.summary || body.error?.message || body.errors?.[0]?.message || fallback
+}
+
+export function ProductMediaManager({
+  productId,
+  productTitle,
+  initialGallery,
+}: {
+  productId: string | number
+  productTitle?: string | null
+  initialGallery: ProductGalleryItem[]
+}) {
   const [gallery, setGallery] = useState(initialGallery)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [rollback, setRollback] = useState(false)
   const [clearArmed, setClearArmed] = useState(false)
   const lastSaved = useRef(initialGallery)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const busy = saving || uploading
+
+  async function addImage(file: File) {
+    if (busy || gallery.length >= 12) return
+    setUploading(true)
+    setRollback(false)
+    setClearArmed(false)
+    setFeedback(null)
+
+    try {
+      const position = gallery.length + 1
+      const alt = productTitle?.trim() ? `${productTitle.trim()} — imagem ${position}` : `Imagem ${position}`
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('_payload', JSON.stringify({ alt, _status: 'published' }))
+
+      const uploadResponse = await fetch('/api/media', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+        body: formData,
+      })
+      const uploadBody = await uploadResponse.json() as MediaUploadResponse
+      if (!uploadResponse.ok) throw new Error(uploadError(uploadBody, 'Não foi possível enviar a imagem.'))
+      const media = uploadBody.doc || uploadBody
+      if (media.id === undefined || media.id === null) throw new Error('A mídia foi enviada sem identificador retornado.')
+
+      const appendResponse = await fetch('/api/admin-products', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'add-gallery-image', id: productId, mediaId: media.id }),
+      })
+      const appendBody = await appendResponse.json() as MediaUploadResponse & { gallery?: ProductGalleryItem[] }
+      if (!appendResponse.ok) throw new Error(uploadError(appendBody, 'Não foi possível adicionar a imagem à galeria.'))
+      if (!Array.isArray(appendBody.gallery)) throw new Error('A galeria atualizada não foi retornada.')
+
+      setGallery(appendBody.gallery)
+      lastSaved.current = appendBody.gallery
+      const message = 'Imagem adicionada e metadados preenchidos automaticamente.'
+      setFeedback(message)
+      announceDraftChanged({ kind: 'product', id: productId, field: 'gallery' })
+      announceAdmin(message)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível adicionar a imagem.'
+      setRollback(true)
+      setFeedback(message)
+      announceAdmin(message, true)
+    } finally {
+      setUploading(false)
+      if (fileInput.current) fileInput.current.value = ''
+    }
+  }
 
   async function archiveForEmptyGallery() {
     const response = await fetch('/api/admin-products', {
@@ -119,7 +193,7 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
   }
 
   function move(from: number, to: number) {
-    if (to < 0 || to >= gallery.length || from === to || saving) return
+    if (to < 0 || to >= gallery.length || from === to || busy) return
     setClearArmed(false)
     const next = [...gallery]
     const [item] = next.splice(from, 1)
@@ -130,7 +204,7 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
   }
 
   function remove(index: number) {
-    if (saving || index < 0 || index >= gallery.length) return
+    if (busy || index < 0 || index >= gallery.length) return
     const removed = gallery[index]
     const next = nextGalleryWithout(gallery, index)
     setClearArmed(false)
@@ -139,7 +213,7 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
   }
 
   function removeAll() {
-    if (saving || !gallery.length) return
+    if (busy || !gallery.length) return
     if (!clearArmed) {
       setClearArmed(true)
       setRollback(false)
@@ -157,7 +231,9 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
   if (!gallery.length) {
     return (
       <div className="esmera-product-media-manager">
-        <div className="esmera-empty"><strong>Galeria vazia</strong><span>Importe ou adicione novas mídias antes de publicar o produto.</span></div>
+        <div className="esmera-empty"><strong>Galeria vazia</strong><span>Adicione a primeira imagem sem sair deste produto.</span><Button tone="primary" disabled={busy} onClick={() => fileInput.current?.click()}>Adicionar imagem</Button></div>
+        <input ref={fileInput} className="esmera-product-media-upload-input" type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) void addImage(file) }} />
+        {uploading ? <SavingState state="saving" message="Enviando imagem…" /> : null}
         {saving ? <SavingState state="saving" message="Limpando galeria…" /> : null}
         {feedback ? <InlineFeedback className={rollback ? 'is-rollback' : ''} tone={rollback ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
       </div>
@@ -168,14 +244,19 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
     <div className="esmera-product-media-manager">
       <div className="esmera-product-media-note">
         <span>Arraste para ordenar. Para teclado ou tecnologia assistiva, use os botões ↑ e ↓.</span>
-        <Button tone={clearArmed ? 'danger' : 'quiet'} disabled={saving} onClick={removeAll}>
-          {clearArmed ? 'Confirmar remoção' : 'Remover todas'}
-        </Button>
+        <div className="esmera-product-media-actions">
+          <Button tone="primary" disabled={busy || gallery.length >= 12} onClick={() => fileInput.current?.click()}>Adicionar imagem</Button>
+          <Button tone={clearArmed ? 'danger' : 'quiet'} disabled={busy} onClick={removeAll}>
+            {clearArmed ? 'Confirmar remoção' : 'Remover todas'}
+          </Button>
+        </div>
+        <input ref={fileInput} className="esmera-product-media-upload-input" type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) void addImage(file) }} />
+        {uploading ? <SavingState state="saving" message="Enviando imagem…" /> : null}
         {saving ? <SavingState state="saving" message="Salvando galeria…" /> : null}
       </div>
       <DragDropProvider
         onDragEnd={(event) => {
-          if (event.canceled || saving) return
+          if (event.canceled || busy) return
           const { source } = event.operation
           if (!isSortable(source)) return
           if (source.initialIndex === source.index) return
@@ -189,7 +270,7 @@ export function ProductMediaManager({ productId, initialGallery }: { productId: 
               item={item}
               index={index}
               total={gallery.length}
-              disabled={saving}
+              disabled={busy}
               onMove={move}
               onRemove={remove}
             />

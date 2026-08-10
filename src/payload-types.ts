@@ -476,7 +476,7 @@ export interface Product {
   subtitle?: string | null;
   slug: string;
   /**
-   * Identificador interno, como OBJ-021.
+   * Gerado automaticamente (ex.: OBJ-AB12CD34).
    */
   code: string;
   /**
@@ -523,9 +523,9 @@ export interface Product {
         /**
          * Exemplo: verde-frente. Usada por variantes.
          */
-        mediaKey: string;
-        role: 'cover' | 'detail' | 'context' | 'scale';
-        alt: string;
+        mediaKey?: string | null;
+        role?: ('cover' | 'detail' | 'context' | 'scale') | null;
+        alt?: string | null;
         id?: string | null;
       }[]
     | null;

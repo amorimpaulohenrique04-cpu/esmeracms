@@ -7,10 +7,12 @@ import {
   getVariantIssues,
   type ProductReadinessInput,
 } from '../businessRules/products/readiness'
+import { productCode } from '../businessRules/products/code'
 import { seoField, slugify } from '../fields/common'
 import { publicationMetadataFields } from '../server/publication/publicationMetadataFields'
 
 type GalleryItem = {
+  alt?: string | null
   mediaKey?: string | null
   role?: string | null
 }
@@ -85,12 +87,34 @@ export const Products: CollectionConfig = {
         if (!data) return data
         const id = originalDoc?.id as number | string | undefined
         if (data?.title && !data.slug) data.slug = slugify(String(data.title))
+        if (!data.code && !originalDoc?.code) data.code = productCode()
         if (data?.code) data.code = String(data.code).trim().toUpperCase()
         if (Array.isArray(data.gallery)) {
-          data.gallery = data.gallery.map((item: GalleryItem) => ({
-            ...item,
-            mediaKey: item.mediaKey ? slugify(String(item.mediaKey)) : item.mediaKey,
-          }))
+          const title = String(data.title ?? originalDoc?.title ?? '').trim()
+          const usedMediaKeys = new Set<string>()
+          let coverSeen = false
+          data.gallery = data.gallery.map((item: GalleryItem, index: number) => {
+            let role = item.role || 'detail'
+            if (role === 'cover' && coverSeen) role = 'detail'
+            if (role === 'cover') coverSeen = true
+
+            const baseMediaKey = slugify(String(item.mediaKey || `imagem-${index + 1}`)) || `imagem-${index + 1}`
+            let mediaKey = baseMediaKey
+            let suffix = 2
+            while (usedMediaKeys.has(mediaKey)) {
+              mediaKey = `${baseMediaKey}-${suffix}`
+              suffix += 1
+            }
+            usedMediaKeys.add(mediaKey)
+
+            return {
+              ...item,
+              mediaKey,
+              role,
+              alt: item.alt?.trim() || (title ? `${title} — imagem ${index + 1}` : `Imagem ${index + 1}`),
+            }
+          })
+          if (!coverSeen && data.gallery.length) data.gallery[0].role = 'cover'
         }
         if (Array.isArray(data.optionDefinitions)) {
           data.optionDefinitions = data.optionDefinitions.map((definition: OptionDefinition) => ({
@@ -199,7 +223,11 @@ export const Products: CollectionConfig = {
               required: true,
               unique: true,
               index: true,
-              admin: { description: 'Identificador interno, como OBJ-021.' },
+              admin: {
+                readOnly: true,
+                position: 'sidebar',
+                description: 'Gerado automaticamente (ex.: OBJ-AB12CD34).',
+              },
             },
             {
               name: 'catalogStatus',
@@ -285,16 +313,14 @@ export const Products: CollectionConfig = {
                   name: 'mediaKey',
                   type: 'text',
                   label: 'Chave da mídia',
-                  required: true,
                   admin: { description: 'Exemplo: verde-frente. Usada por variantes.' },
                   validate: (value: unknown) =>
-                    /^[a-z0-9-]+$/.test(String(value || '')) || 'Use letras minúsculas, números e hífens.',
+                    !value || /^[a-z0-9-]+$/.test(String(value)) || 'Use letras minúsculas, números e hífens.',
                 },
                 {
                   name: 'role',
                   type: 'select',
                   label: 'Uso principal',
-                  required: true,
                   options: [
                     { label: 'Capa', value: 'cover' },
                     { label: 'Detalhe', value: 'detail' },
@@ -306,7 +332,6 @@ export const Products: CollectionConfig = {
                   name: 'alt',
                   type: 'text',
                   label: 'Texto alternativo',
-                  required: true,
                   maxLength: 180,
                 },
               ],

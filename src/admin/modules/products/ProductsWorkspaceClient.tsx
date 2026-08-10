@@ -31,6 +31,7 @@ import type {
   BulkPublicationItemStatus,
   BulkPublicationResult,
 } from '../../../server/publication/types'
+import { ProductCreateDialog } from './ProductCreateDialog'
 import {
   availabilityLabels,
   coverItem,
@@ -604,7 +605,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     ) : null}
 
     {!products.length ? (
-      <EmptyState title="Nenhum produto encontrado" copy="Ajuste os filtros ou crie um novo produto para iniciar o catálogo." action={<Link className="esmera-button esmera-button--primary" href="/admin/collections/products/create">Novo produto</Link>} />
+      <EmptyState title="Nenhum produto encontrado" copy="Ajuste os filtros ou crie um novo produto para iniciar o catálogo." action={<ProductCreateDialog />} />
     ) : filters.view === 'list' ? (
       <DataTable label="Produtos do catálogo">
         <thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead>

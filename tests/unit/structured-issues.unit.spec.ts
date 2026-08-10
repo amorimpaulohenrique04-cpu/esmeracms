@@ -85,8 +85,8 @@ describe('ERR-U01 — readiness devolve code, path, tab e anchor estáveis', () 
   it('paths indexados identificam o item exato', () => {
     const paths = issues.map((issue) => issue.path)
 
-    expect(paths).toContain('gallery.0.alt')
-    expect(paths).toContain('gallery.1.alt')
+    expect(paths).not.toContain('gallery.0.alt')
+    expect(paths).not.toContain('gallery.1.alt')
     expect(paths).toContain('variants.0.sku')
     expect(paths).toContain('variants.2.sku')
     expect(paths).toContain('optionDefinitions.0.values.1.value')
