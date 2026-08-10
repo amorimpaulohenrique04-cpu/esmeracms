@@ -219,11 +219,6 @@ export function collectProductReadinessIssues(product: ProductReadinessInput): R
   if (gallery.length && !gallery.some((item) => relationshipID(item.image) !== null)) {
     raws.push(blocker(ISSUE_CODES.productGalleryMediaInvalid, 'gallery'))
   }
-  gallery.forEach((item, index) => {
-    if (!item.alt?.trim()) {
-      raws.push(blocker(ISSUE_CODES.productGalleryAltRequired, `gallery.${index}.alt`, { position: index + 1 }))
-    }
-  })
   if (gallery.length && gallery.filter((item) => item.role === 'cover').length !== 1) {
     raws.push(blocker(ISSUE_CODES.productGalleryCoverCount, 'gallery'))
   }

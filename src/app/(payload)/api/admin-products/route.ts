@@ -30,6 +30,7 @@ import { RevisionConflictError, STOREFRONT_CONTRACT_VERSION } from '../../../../
 export const dynamic = 'force-dynamic'
 
 type ProductAction =
+  | 'create'
   | 'publish'
   | 'save-and-publish'
   | 'unpublish'
@@ -39,6 +40,7 @@ type ProductAction =
   | 'set-availability'
   | 'save-draft'
   | 'reorder-gallery'
+  | 'add-gallery-image'
 
 type RequestBody = {
   action?: ProductAction
@@ -49,6 +51,7 @@ type RequestBody = {
   availability?: string
   data?: Record<string, unknown>
   gallery?: Array<Record<string, unknown>>
+  mediaId?: string | number
   expectedRevision?: string | null
   expectedUpdatedAt?: string | null
   confirmationToken?: string | null
@@ -116,6 +119,33 @@ export async function POST(request: Request) {
 
   const action = body.action
   if (!action) return adminCodedError('invalid_request', { summary: 'Ação não informada.' })
+
+  if (action === 'create') {
+    const title = String((body.data?.title as string) || '').trim()
+    if (!title) return adminInputError('Informe o nome do produto.')
+    const priceMode = body.data?.priceMode === 'fixed' ? 'fixed' : 'inquiry'
+    const basePriceCents = priceMode === 'fixed' && typeof body.data?.basePriceCents === 'number'
+      ? body.data.basePriceCents
+      : null
+
+    try {
+      const product = await payload.create({
+        collection: 'products',
+        data: { title, priceMode, basePriceCents, _status: 'draft' } as never,
+        draft: true,
+        depth: 0,
+        overrideAccess: false,
+        user,
+      })
+      return NextResponse.json({ id: product.id, created: 1 })
+    } catch (error) {
+      return adminErrorResponse(error, {
+        entity: 'product',
+        operation: 'create',
+        logger: payload.logger,
+      })
+    }
+  }
 
   if (action === 'save-draft') {
     if (body.id === undefined || body.id === null) return adminInputError('Produto não informado.')
@@ -312,6 +342,33 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (action === 'add-gallery-image') {
+      if (body.id === undefined || body.id === null) return adminInputError('Produto não informado.')
+      if (body.mediaId === undefined || body.mediaId === null) return adminInputError('Mídia não informada.')
+
+      const current = await payload.findByID({
+        collection: 'products',
+        id: body.id,
+        draft: true,
+        depth: 0,
+        overrideAccess: false,
+        user,
+      })
+      const gallery = Array.isArray(current.gallery) ? current.gallery : []
+      if (gallery.length >= 12) return adminInputError('A galeria aceita no máximo 12 imagens.')
+
+      const document = await payload.update({
+        collection: 'products',
+        id: body.id,
+        data: { gallery: [...gallery, { image: body.mediaId }], _status: 'draft' } as never,
+        draft: true,
+        depth: 2,
+        overrideAccess: false,
+        user,
+      })
+      return NextResponse.json({ updated: 1, gallery: document.gallery || [] })
+    }
+
     if (action === 'reorder-gallery') {
       if (body.id === undefined || body.id === null || !Array.isArray(body.gallery)) return adminCodedError('invalid_request', { summary: 'Galeria inválida.' })
       if (body.gallery.some((item) => relationID(item.image) === null)) return adminCodedError('invalid_request', { summary: 'Toda imagem precisa manter uma mídia válida.' })

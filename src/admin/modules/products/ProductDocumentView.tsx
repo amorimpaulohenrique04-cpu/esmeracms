@@ -94,7 +94,7 @@ function Overview({ product }: { product: ProductDetail }) {
 }
 
 function MediaTab({ product }: { product: ProductDetail }) {
-  return <section className="esmera-card"><div className="esmera-card-header"><h2>Galeria</h2><span>{product.gallery?.length || 0}/12 imagens</span></div><div className="esmera-card-body"><ProductMediaManager productId={product.id} initialGallery={product.gallery || []} /></div></section>
+  return <section className="esmera-card"><div className="esmera-card-header"><h2>Galeria</h2><span>{product.gallery?.length || 0}/12 imagens</span></div><div className="esmera-card-body"><ProductMediaManager productId={product.id} productTitle={product.title} initialGallery={product.gallery || []} /></div></section>
 }
 
 function CommercialTab({ product }: { product: ProductDetail }) {

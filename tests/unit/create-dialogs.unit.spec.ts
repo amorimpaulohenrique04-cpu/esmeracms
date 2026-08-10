@@ -28,9 +28,14 @@ describe('Popups de criação e responsividade', () => {
   it('substitui os links técnicos pelos dialogs de criação', () => {
     const salesView = source('src/admin/modules/sales/SalesViews.tsx')
     const categoriesView = source('src/admin/modules/categories/CategoriesView.tsx')
+    const productsView = source('src/admin/modules/products/ProductsView.tsx')
+    const productsWorkspace = source('src/admin/modules/products/ProductsWorkspaceClient.tsx')
     expect(salesView).toContain('<SaleCreateDialog products={productsResult.docs} />')
     expect(categoriesView).toContain('<CategoryCreateDialog categories={allResult.docs} />')
     expect(categoriesView).not.toContain('/admin/collections/categories/create')
+    expect(productsView).toContain('<ProductCreateDialog />')
+    expect(productsView).not.toContain('/admin/collections/products/create')
+    expect(productsWorkspace).toContain('action={<ProductCreateDialog />}')
   })
 
   it('preserva a ação primária de categoria e evita compressão do cabeçalho de vendas', () => {
@@ -60,6 +65,14 @@ describe('Popups de criação e responsividade', () => {
     expect(route).toContain("body.action === 'create'")
     expect(route).toContain("_status: 'draft'")
     expect(dialog).toContain('router.push(`/admin/categories?category=${body.id}&tab=general`)')
+  })
+
+  it('cria produtos mínimos como rascunho e abre o detalhe customizado', () => {
+    const route = source('src/app/(payload)/api/admin-products/route.ts')
+    const dialog = source('src/admin/modules/products/ProductCreateDialog.tsx')
+    expect(route).toContain("action === 'create'")
+    expect(route).toContain("data: { title, priceMode, basePriceCents, _status: 'draft' }")
+    expect(dialog).toContain('router.push(`/admin/products?product=${body.id}`)')
   })
 
   it('mantém busca responsiva e separa o z-index do rail peek', () => {
