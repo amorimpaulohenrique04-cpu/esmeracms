@@ -10,6 +10,10 @@ import {
   StorefrontNotFoundError,
 } from '../../../../../../server/storefront-v2/catalog'
 import { publicError, publicJSON } from '../../../../../../server/storefront-v2/http'
+import {
+  readCanonicalMaterialFilters,
+  withCanonicalMaterialFilters,
+} from '../../../../../../server/storefront-v2/materialFilters'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,13 +25,15 @@ export async function GET(request: Request, context: RouteContext) {
   const payload = await getPayload({ config })
   const { slug } = await context.params
   const url = new URL(request.url)
+  const materialFilters = readCanonicalMaterialFilters(url.searchParams)
+  const catalogPayload = withCanonicalMaterialFilters(payload, materialFilters)
   const page = url.searchParams.get('page') || '1'
   const limit = url.searchParams.get('limit') || 'default'
   const filterCount = Array.from(url.searchParams.keys()).filter((key) => !['page', 'limit', 'sort'].includes(key)).length
 
   try {
     const result = await measureServerOperation('operational', 'storefront.collection.v2', () =>
-      buildCollectionV2(payload, slug, url.searchParams))
+      buildCollectionV2(catalogPayload, slug, url.searchParams))
     payload.logger.info({
       event: 'storefront.collection.v2.served',
       slug,
