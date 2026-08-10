@@ -6,9 +6,13 @@ type WorkflowUser = { id?: string | number } | null | undefined
 
 type LeadDocument = {
   id: string | number
+  name?: string | null
+  phone?: string | null
+  email?: string | null
   source?: string | null
   owner?: unknown
   interestedProducts?: unknown
+  customer?: unknown
   opportunity?: unknown
 }
 
@@ -54,12 +58,41 @@ export async function qualifyLead(payload: Payload, user: WorkflowUser, leadId: 
     user: userOption(user),
   }) as unknown as LeadDocument
 
-  const linkedId = relationshipID(lead.opportunity)
-  if (linkedId !== null) {
-    const opportunity = await payload.findByID({ collection: 'opportunities', id: linkedId, overrideAccess: false, user: userOption(user) })
-    return { opportunity }
+  let customerID = relationshipID(lead.customer)
+  if (customerID === null) {
+    const customerCandidates = await payload.find({
+      collection: 'customers',
+      depth: 0,
+      limit: 1,
+      pagination: false,
+      overrideAccess: false,
+      user: userOption(user),
+      where: {
+        or: [
+          { sourceLead: { equals: leadId } },
+          ...(lead.phone ? [{ phone: { equals: lead.phone } }] : []),
+          ...(lead.email ? [{ email: { equals: lead.email } }] : []),
+        ],
+      },
+    })
+    const customer = customerCandidates.docs[0] || await payload.create({
+      collection: 'customers',
+      overrideAccess: false,
+      user: userOption(user),
+      data: {
+        name: lead.name || `Lead ${lead.id}`,
+        phone: lead.phone || null,
+        email: lead.email || null,
+        origin: lead.source || 'other',
+        owner: relationshipID(lead.owner) || user?.id || undefined,
+        sourceLead: leadId,
+        status: 'active',
+      } as never,
+    })
+    customerID = customer.id
   }
 
+  const linkedId = relationshipID(lead.opportunity)
   const existing = await payload.find({
     collection: 'opportunities',
     where: { sourceLead: { equals: leadId } },
@@ -68,25 +101,39 @@ export async function qualifyLead(payload: Payload, user: WorkflowUser, leadId: 
     overrideAccess: false,
     user: userOption(user),
   })
-  const opportunity = existing.docs.length ? existing.docs[0] : await payload.create({
+  let opportunity = linkedId !== null
+    ? await payload.findByID({ collection: 'opportunities', id: linkedId, overrideAccess: false, user: userOption(user) })
+    : existing.docs[0]
+
+  if (!opportunity) opportunity = await payload.create({
     collection: 'opportunities',
     overrideAccess: false,
     user: userOption(user),
     data: {
       source: lead.source || 'other',
+      customer: customerID,
       interestedProducts: lead.interestedProducts,
       owner: relationshipID(lead.owner) || user?.id || undefined,
       sourceLead: leadId,
     } as never,
   })
+  else if (relationshipID(opportunity.customer) === null) {
+    opportunity = await payload.update({
+      collection: 'opportunities',
+      id: opportunity.id,
+      overrideAccess: false,
+      user: userOption(user),
+      data: { customer: customerID, source: lead.source || 'other' } as never,
+    })
+  }
 
   await payload.update({
     collection: 'leads',
     id: leadId,
     overrideAccess: false,
     user: userOption(user),
-    data: { opportunity: opportunity.id } as never,
+    data: { customer: customerID, opportunity: opportunity.id, opportunityMigratedAt: new Date().toISOString() } as never,
   })
 
-  return { opportunity }
+  return { customerID, opportunity }
 }

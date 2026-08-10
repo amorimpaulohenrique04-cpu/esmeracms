@@ -32,7 +32,6 @@ import {
   Button,
   ComboboxPrimitive,
   comboboxClasses,
-  DataSection,
   DataTable,
   DialogPanel,
   DrawerPanel,
@@ -47,7 +46,6 @@ import type {
   CustomerRef,
   OpportunityRecord,
   ProductRef,
-  SalesTransaction,
   SalesWorkspaceFilters,
   UserRef,
 } from './types'
@@ -64,7 +62,6 @@ type Props = {
   activities: ActivityRecord[]
   products: ProductRef[]
   users: UserRef[]
-  transactions: SalesTransaction[]
   filters: SalesWorkspaceFilters
   totalDocs: number
   totalPages: number
@@ -125,7 +122,27 @@ function stageTone(stage?: string | null): 'success' | 'warning' | 'danger' | 'i
 }
 
 function customerName(opportunity: OpportunityRecord) {
-  return relationLabel(opportunity.customer, 'Cliente ainda não vinculado')
+  return relationLabel(opportunity.customer, 'Sem cliente')
+}
+
+function localDay(value: Date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Recife',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value)
+}
+
+function nextActionTone(value?: string | null): 'success' | 'warning' | 'danger' | 'neutral' {
+  if (!value) return 'neutral'
+  const deadline = new Date(value)
+  if (Number.isNaN(deadline.getTime())) return 'neutral'
+  const deadlineDay = localDay(deadline)
+  const today = localDay(new Date())
+  if (deadlineDay < today) return 'danger'
+  if (deadlineDay === today) return 'warning'
+  return 'success'
 }
 
 function productObject(value: OpportunityRecord['interestedProducts'][number] | undefined, products: ProductRef[]) {
@@ -455,10 +472,6 @@ function Filters({ filters, users }: { filters: SalesWorkspaceFilters; users: Us
   </form>
 }
 
-function Transactions({ transactions }: { transactions: SalesTransaction[] }) {
-  return <DataSection className="esmera-sales-transactions" eyebrow="Fulfillment" title="Vendas confirmadas recentes" description="Sales transacionais criadas a partir de oportunidades ganhas." action={<Link href="/admin/sales">Ver todas as vendas</Link>}>{transactions.length ? <div className="esmera-data-table-wrap"><table className="esmera-data-table"><thead><tr><th>Venda</th><th>Cliente</th><th>Status</th><th>Total</th><th>Confirmada</th><th /></tr></thead><tbody>{transactions.map((sale) => <tr key={String(sale.id)}><td><strong>{sale.number || sale.id}</strong></td><td>{relationLabel(sale.customer, '—')}</td><td><Status tone={sale.status === 'delivered' ? 'success' : 'info'}>{saleStatusLabels[sale.status || ''] || sale.status}</Status></td><td><span className="esmera-nums">{money(sale.totalCents)}</span></td><td>{shortDate(sale.confirmedAt || sale.updatedAt)}</td><td><Link href={`/admin/collections/sales/${sale.id}`}>Abrir</Link></td></tr>)}</tbody></table></div> : <EmptyState title="Nenhuma venda confirmada" copy="Quando uma oportunidade for ganha, a Sale criada aparecerá aqui." />}</DataSection>
-}
-
 function WorkspaceInner(props: Props) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -518,12 +531,11 @@ function WorkspaceInner(props: Props) {
 
   const columns = useMemo<ColumnDef<OpportunityRecord>[]>(() => [
     { id: 'select', header: ({ table }) => <input aria-label="Selecionar página" type="checkbox" checked={table.getIsAllPageRowsSelected()} onChange={table.getToggleAllPageRowsSelectedHandler()} />, cell: ({ row }) => <input aria-label={`Selecionar ${row.original.code || row.original.id}`} type="checkbox" checked={row.getIsSelected()} onChange={row.getToggleSelectedHandler()} /> },
-    { accessorKey: 'code', header: 'Oportunidade', cell: ({ row }) => <div className="esmera-sales-table-title"><strong>{row.original.code || row.original.id}</strong><small>{sourceLabels[row.original.source || ''] || 'Origem não informada'}</small></div> },
-    { id: 'customer', header: 'Cliente', cell: ({ row }) => customerName(row.original) },
+    { accessorKey: 'code', header: 'Cliente / Empresa', cell: ({ row }) => <div className="esmera-sales-table-title"><strong>{customerName(row.original)}</strong><small>{row.original.code || 'Sem código'}</small></div> },
     { accessorKey: 'stage', header: 'Etapa', cell: ({ row }) => <Status tone={stageTone(row.original.stage)}>{opportunityStageLabels[(row.original.stage || 'new') as OpportunityStage] || row.original.stage}</Status> },
     { accessorKey: 'estimatedValueCents', header: 'Valor', cell: ({ row }) => <span className="esmera-nums">{money(row.original.estimatedValueCents)}</span> },
     { id: 'owner', header: 'Responsável', cell: ({ row }) => relationLabel(row.original.owner, 'Não definido') },
-    { accessorKey: 'nextActionAt', header: 'Próxima ação', cell: ({ row }) => <div className="esmera-sales-table-title"><strong>{row.original.nextAction || 'Sem ação'}</strong><small>{dateTime(row.original.nextActionAt)}</small></div> },
+    { accessorKey: 'nextActionAt', header: 'Próxima ação', cell: ({ row }) => <div className="esmera-sales-table-title"><strong>{row.original.nextAction || 'Sem ação'}</strong><Status tone={nextActionTone(row.original.nextActionAt)}>{row.original.nextActionAt ? dateTime(row.original.nextActionAt) : 'Sem prazo'}</Status></div> },
     { accessorKey: 'updatedAt', header: 'Atualizado', cell: ({ row }) => shortDate(row.original.updatedAt) },
     { id: 'actions', header: '', enableHiding: false, cell: ({ row }) => <div className="esmera-sales-row-actions"><DrawerPanel trigger="Inspecionar" title={row.original.code || 'Oportunidade'} description={customerName(row.original)}><InspectorContent opportunity={row.original} activities={props.activities} /></DrawerPanel><Link className="esmera-button esmera-button--quiet" href={`/admin/collections/opportunities/${row.original.id}`}>Editar</Link></div> },
   ], [props.activities])
@@ -574,7 +586,6 @@ function WorkspaceInner(props: Props) {
         {!opportunities.length ? <EmptyState title="Nenhuma oportunidade encontrada" copy="Ajuste os filtros ou crie uma nova oportunidade comercial." /> : <DataTable label="Oportunidades comerciais"><thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : <button className="esmera-table-sort" type="button" disabled={!header.column.getCanSort()} onClick={header.column.getToggleSortingHandler()}>{flexRender(header.column.columnDef.header, header.getContext())}{header.column.getIsSorted() === 'asc' ? ' ↑' : header.column.getIsSorted() === 'desc' ? ' ↓' : ''}</button>}</th>)}</tr>)}</thead><tbody>{table.getRowModel().rows.map((row) => <tr key={row.id}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody></DataTable>}
       </div>
       {props.totalPages > 1 ? <nav className="esmera-pagination" aria-label="Paginação de oportunidades"><Link className="esmera-button" aria-disabled={props.filters.page <= 1} href={filterHref(props.filters, { page: Math.max(1, props.filters.page - 1) })}>Anterior</Link><span>Página {props.filters.page} de {props.totalPages}</span><Link className="esmera-button" aria-disabled={props.filters.page >= props.totalPages} href={filterHref(props.filters, { page: Math.min(props.totalPages, props.filters.page + 1) })}>Próxima</Link></nav> : null}
-      <Transactions transactions={props.transactions} />
     </>}
   </>
 }
@@ -587,6 +598,149 @@ type CustomerSearchResponse = {
 
 function customerSearchLabel(customer: CustomerRef) {
   return [customer.name || 'Cliente', customer.company, customer.phone].filter(Boolean).join(' · ')
+}
+
+function maskedCurrency(digits: string) {
+  if (!digits) return ''
+  return (Number(digits) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+export function OpportunityCreateDialog({ products, users }: { products: ProductRef[]; users: UserRef[] }) {
+  const router = useRouter()
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const portalContainerRef = useRef<HTMLFormElement>(null)
+  const [customer, setCustomer] = useState<CustomerRef | null>(null)
+  const [query, setQuery] = useState('')
+  const [customers, setCustomers] = useState<CustomerRef[]>([])
+  const [searching, setSearching] = useState(false)
+  const [source, setSource] = useState('other')
+  const [ownerID, setOwnerID] = useState('')
+  const [productID, setProductID] = useState('')
+  const [valueDigits, setValueDigits] = useState('')
+  const [stage, setStage] = useState<(typeof openOpportunityStages)[number]>('new')
+  const [nextAction, setNextAction] = useState('')
+  const [nextActionAt, setNextActionAt] = useState('')
+  const [priority, setPriority] = useState<'low' | 'normal' | 'high'>('normal')
+  const [quickCustomer, setQuickCustomer] = useState(false)
+  const [quick, setQuick] = useState({ name: '', company: '', phone: '', email: '' })
+  const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
+
+  useEffect(() => {
+    const term = query.trim()
+    if (term.length < 2) return
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      setSearching(true)
+      try {
+        const response = await fetch(`/api/admin-customers?q=${encodeURIComponent(term)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: controller.signal })
+        const body = await response.json() as CustomerSearchResponse
+        if (!response.ok) throw new Error(body.error || 'Não foi possível buscar clientes.')
+        setCustomers(body.docs || [])
+      } catch (error) {
+        if (!controller.signal.aborted) setFeedback(error instanceof Error ? error.message : 'Não foi possível buscar clientes.')
+      } finally {
+        if (!controller.signal.aborted) setSearching(false)
+      }
+    }, 280)
+    return () => { controller.abort(); window.clearTimeout(timer) }
+  }, [query])
+
+  async function createQuickCustomer() {
+    if (!quick.name.trim() || (!quick.phone.trim() && !quick.email.trim())) {
+      setFeedback('Informe nome e telefone ou e-mail para cadastrar o cliente.')
+      return
+    }
+    setBusy(true)
+    setFeedback(null)
+    try {
+      const response = await fetch('/api/admin-customers', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'create', data: { ...quick, origin: source } }),
+      })
+      const body = await response.json() as { customer?: CustomerRef; error?: string }
+      if (!response.ok || !body.customer) throw new Error(body.error || 'Não foi possível cadastrar o cliente.')
+      setCustomer(body.customer)
+      setCustomers([body.customer])
+      setQuickCustomer(false)
+      setQuick({ name: '', company: '', phone: '', email: '' })
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Não foi possível cadastrar o cliente.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!customer || !productID || busy) return
+    setBusy(true)
+    setFeedback(null)
+    try {
+      await postSales({
+        action: 'create-opportunity',
+        customerID: customer.id,
+        source,
+        ownerID: ownerID || null,
+        productID,
+        estimatedValueCents: valueDigits ? Number(valueDigits) : null,
+        stage,
+        nextAction,
+        nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : null,
+        priority,
+      })
+      router.refresh()
+      closeRef.current?.click()
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Não foi possível criar a oportunidade.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <DialogPanel trigger="Nova oportunidade" triggerClassName="esmera-button--primary" title="Nova oportunidade" description="Preencha o negócio em um único fluxo, sem navegar entre abas.">
+    <form ref={portalContainerRef} className="esmera-sales-create-form esmera-opportunity-create-form" onSubmit={submit}>
+      <section className="esmera-opportunity-create-section">
+        <div><span className="esmera-eyebrow">1</span><h3>Cliente e Negócio</h3></div>
+        <Field className="esmera-sales-customer-field" label="Cliente">
+          <ComboboxPrimitive.Root items={customers} value={customer} filter={null} onValueChange={(value) => { setCustomer(value); setQuery(''); setCustomers(value ? [value] : []) }} onInputValueChange={(value, { reason }) => { if (reason === 'item-press') return; setQuery(value); setCustomer(null); if (value.trim().length < 2) setCustomers([]) }} itemToStringLabel={customerSearchLabel} isItemEqualToValue={(item, value) => String(item.id) === String(value.id)}>
+            <ComboboxPrimitive.InputGroup className="esmera-sales-customer-combobox"><ComboboxPrimitive.Input className={`esmera-input ${comboboxClasses.input}`} required placeholder="Digite nome, empresa ou telefone" aria-label="Buscar cliente" /><ComboboxPrimitive.Trigger className={comboboxClasses.trigger} aria-label="Abrir resultados">⌄</ComboboxPrimitive.Trigger></ComboboxPrimitive.InputGroup>
+            <ComboboxPrimitive.Portal container={portalContainerRef} className="esmera-sales-customer-portal"><ComboboxPrimitive.Positioner className={comboboxClasses.positioner} sideOffset={4} align="start"><ComboboxPrimitive.Popup className={`${comboboxClasses.popup} esmera-sales-customer-popup`}><ComboboxPrimitive.Empty className="esmera-sales-customer-empty">{searching ? 'Buscando clientes…' : 'Nenhum cliente encontrado.'}</ComboboxPrimitive.Empty><ComboboxPrimitive.List className="esmera-sales-customer-list">{(item: CustomerRef) => <ComboboxPrimitive.Item key={String(item.id)} className={comboboxClasses.item} value={item}><span className="esmera-sales-customer-result"><strong>{item.name || 'Cliente'}</strong><small>{[item.company, item.phone].filter(Boolean).join(' · ')}</small></span></ComboboxPrimitive.Item>}</ComboboxPrimitive.List></ComboboxPrimitive.Popup></ComboboxPrimitive.Positioner></ComboboxPrimitive.Portal>
+          </ComboboxPrimitive.Root>
+        </Field>
+        <Button type="button" onClick={() => setQuickCustomer((current) => !current)}>{quickCustomer ? 'Cancelar cadastro rápido' : '+ Cadastrar cliente rápido'}</Button>
+        {quickCustomer ? <div className="esmera-sales-create-grid esmera-opportunity-quick-customer">
+          <Field label="Nome"><input className="esmera-input" value={quick.name} onChange={(event) => setQuick((current) => ({ ...current, name: event.target.value }))} /></Field>
+          <Field label="Empresa"><input className="esmera-input" value={quick.company} onChange={(event) => setQuick((current) => ({ ...current, company: event.target.value }))} /></Field>
+          <Field label="Telefone"><input className="esmera-input" value={quick.phone} onChange={(event) => setQuick((current) => ({ ...current, phone: event.target.value }))} /></Field>
+          <Field label="E-mail"><input className="esmera-input" type="email" value={quick.email} onChange={(event) => setQuick((current) => ({ ...current, email: event.target.value }))} /></Field>
+          <Button type="button" disabled={busy} onClick={() => void createQuickCustomer()}>Salvar cliente</Button>
+        </div> : null}
+        <div className="esmera-sales-create-grid">
+          <Field label="Origem do Lead"><select className="esmera-input" value={source} onChange={(event) => setSource(event.target.value)}>{Object.entries(sourceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+          <Field label="Responsável"><select className="esmera-input" value={ownerID} onChange={(event) => setOwnerID(event.target.value)}><option value="">Usuário atual</option>{users.map((user) => <option key={String(user.id)} value={String(user.id)}>{user.name || user.email || user.id}</option>)}</select></Field>
+        </div>
+      </section>
+      <section className="esmera-opportunity-create-section">
+        <div><span className="esmera-eyebrow">2</span><h3>Financeiro e Comercial</h3></div>
+        <div className="esmera-sales-create-grid">
+          <Field label="Produto / Serviço"><select className="esmera-input" required value={productID} onChange={(event) => setProductID(event.target.value)}><option value="">Selecione</option>{products.map((product) => <option key={String(product.id)} value={String(product.id)}>{product.title || product.code || product.id}</option>)}</select></Field>
+          <Field label="Valor Estimado"><input className="esmera-input" inputMode="numeric" value={maskedCurrency(valueDigits)} onChange={(event) => setValueDigits(event.target.value.replace(/\D/g, ''))} placeholder="R$ 0,00" /></Field>
+          <Field label="Etapa do Funil"><select className="esmera-input" value={stage} onChange={(event) => setStage(event.target.value as typeof stage)}>{openOpportunityStages.map((value) => <option key={value} value={value}>{opportunityStageLabels[value]}</option>)}</select></Field>
+        </div>
+      </section>
+      <section className="esmera-opportunity-create-section">
+        <div><span className="esmera-eyebrow">3</span><h3>Follow-up</h3></div>
+        <Field label="Descrição da Próxima Ação"><input className="esmera-input" required value={nextAction} onChange={(event) => setNextAction(event.target.value)} /></Field>
+        <div className="esmera-sales-create-grid">
+          <Field label="Data/Hora do Prazo"><input className="esmera-input" type="datetime-local" required value={nextActionAt} onChange={(event) => setNextActionAt(event.target.value)} /></Field>
+          <Field label="Prioridade"><select className="esmera-input" value={priority} onChange={(event) => setPriority(event.target.value as typeof priority)}><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option></select></Field>
+        </div>
+      </section>
+      {feedback ? <InlineFeedback tone="danger">{feedback}</InlineFeedback> : null}
+      <div className="esmera-actions esmera-sales-create-actions"><Dialog.Close ref={closeRef} className="esmera-button" type="button">Cancelar</Dialog.Close><Button type="submit" tone="primary" disabled={busy || !customer || !productID}>{busy ? 'Criando…' : 'Criar oportunidade'}</Button></div>
+    </form>
+  </DialogPanel>
 }
 
 function effectiveProductPrice(product: ProductRef | undefined, variantSku: string) {

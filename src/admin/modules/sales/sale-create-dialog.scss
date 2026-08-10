@@ -85,6 +85,24 @@
   justify-content: flex-end;
 }
 
+.esmera-opportunity-create-form {
+  max-height: min(72vh, 760px);
+  overflow-y: auto;
+  padding-right: var(--esmera-space-2);
+}
+
+.esmera-opportunity-create-section {
+  display: grid;
+  gap: var(--esmera-space-4);
+  padding: var(--esmera-space-4);
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-panel-radius);
+  background: var(--esmera-surface-raised);
+}
+
+.esmera-opportunity-create-section h3 { margin: 2px 0 0; }
+.esmera-opportunity-quick-customer { padding: var(--esmera-space-3); background: var(--esmera-surface-panel); }
+
 
 @container esmera-workspace (min-width: 701px) and (max-width: 1220px) {
   .esmera-sales-command-bar .esmera-command-bar__main {

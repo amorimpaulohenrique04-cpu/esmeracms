@@ -8,9 +8,9 @@ export const migratedLeadStages = ['curation', 'proposal', 'negotiation', 'won',
 
 export const opportunityStageLabels: Record<OpportunityStage, string> = {
   new: 'Novo',
-  curation: 'Curadoria',
-  proposal: 'Proposta',
-  negotiation: 'Negociação',
+  curation: 'Em Qualificação',
+  proposal: 'Proposta Enviada',
+  negotiation: 'Em Negociação',
   won: 'Ganho',
   lost: 'Perdido',
 }

@@ -10,6 +10,7 @@ import {
 } from '../businessRules/opportunities/stages'
 import { businessUserRelationship } from '../fields/userRelationship'
 import { applyOpportunityRules } from '../hooks/opportunities/applyOpportunityRules'
+import { automateWonOpportunity } from '../hooks/opportunities/automateWonOpportunity'
 import { logOpportunityActivity } from '../hooks/opportunities/logOpportunityActivity'
 
 export const Opportunities: CollectionConfig = {
@@ -18,7 +19,7 @@ export const Opportunities: CollectionConfig = {
   admin: {
     group: 'Business',
     useAsTitle: 'code',
-    defaultColumns: ['code', 'customer', 'stage', 'estimatedValueCents', 'owner', 'nextActionAt', 'updatedAt'],
+    defaultColumns: ['customer', 'code', 'stage', 'estimatedValueCents', 'owner', 'nextActionAt', 'updatedAt'],
     listSearchableFields: ['code', 'nextAction', 'lossNotes'],
   },
   access: {
@@ -32,173 +33,66 @@ export const Opportunities: CollectionConfig = {
   versions: { maxPerDoc: 100 },
   hooks: {
     beforeValidate: [applyOpportunityRules],
-    afterChange: [logOpportunityActivity],
+    afterChange: [automateWonOpportunity, logOpportunityActivity],
   },
   fields: [
     {
-      type: 'tabs',
-      tabs: [
+      type: 'collapsible',
+      label: 'Cliente e Negócio',
+      fields: [
+        { name: 'customer', type: 'relationship', relationTo: 'customers', label: 'Cliente', index: true, admin: { description: 'Busque um cliente existente ou use o cadastro rápido no workspace de Oportunidades.' } },
+        { name: 'source', type: 'select', label: 'Origem do Lead', required: true, defaultValue: 'other', index: true, options: acquisitionChannelOptions },
+        { ...businessUserRelationship('owner', 'Responsável'), index: true },
+      ],
+    },
+    {
+      type: 'collapsible',
+      label: 'Financeiro e Comercial',
+      fields: [
+        { name: 'interestedProducts', type: 'relationship', relationTo: 'products', hasMany: true, label: 'Produto / Serviço' },
         {
-          label: 'Oportunidade',
-          fields: [
-            {
-              name: 'code',
-              type: 'text',
-              label: 'Código',
-              required: true,
-              unique: true,
-              index: true,
-              admin: { readOnly: true, description: 'Gerado automaticamente pelo domínio comercial.' },
-            },
-            {
-              name: 'customer',
-              type: 'relationship',
-              relationTo: 'customers',
-              label: 'Cliente',
-              index: true,
-              admin: { description: 'Pode permanecer vazio durante qualificação; torna-se obrigatório ao ganhar.' },
-            },
-            {
-              name: 'source',
-              type: 'select',
-              label: 'Origem',
-              required: true,
-              defaultValue: 'other',
-              index: true,
-              options: acquisitionChannelOptions,
-            },
-            {
-              name: 'stage',
-              type: 'select',
-              label: 'Etapa comercial',
-              required: true,
-              defaultValue: 'new',
-              index: true,
-              options: opportunityStages.map((value) => ({ label: opportunityStageLabels[value], value })),
-            },
-            {
-              name: 'rank',
-              type: 'number',
-              label: 'Ordem no estágio',
-              required: true,
-              index: true,
-              admin: { position: 'sidebar', description: 'Usado para ordenar cards no Pipeline.' },
-            },
-            {
-              ...businessUserRelationship('owner', 'Responsável'),
-              index: true,
-            },
-            {
-              name: 'priority',
-              type: 'select',
-              label: 'Prioridade',
-              defaultValue: 'normal',
-              index: true,
-              options: [
-                { label: 'Baixa', value: 'low' },
-                { label: 'Normal', value: 'normal' },
-                { label: 'Alta', value: 'high' },
-                { label: 'Urgente', value: 'urgent' },
-              ],
-            },
-          ],
+          name: 'estimatedValueCents',
+          type: 'number',
+          label: 'Valor Estimado',
+          min: 0,
+          admin: {
+            description: 'Informe o valor em reais. O CMS mantém o armazenamento interno em centavos.',
+            components: { Field: '/admin/components/CurrencyCentsField#CurrencyCentsField' },
+          },
         },
+        { name: 'stage', type: 'select', label: 'Etapa do Funil', required: true, defaultValue: 'new', index: true, options: opportunityStages.map((value) => ({ label: opportunityStageLabels[value], value })) },
+      ],
+    },
+    {
+      type: 'collapsible',
+      label: 'Follow-up',
+      fields: [
+        { name: 'nextAction', type: 'text', label: 'Descrição da Próxima Ação' },
+        { name: 'nextActionAt', type: 'date', label: 'Data/Hora do Prazo', index: true, admin: { date: { pickerAppearance: 'dayAndTime' } } },
         {
-          label: 'Interesse e valor',
-          fields: [
-            {
-              name: 'interestedProducts',
-              type: 'relationship',
-              relationTo: 'products',
-              hasMany: true,
-              label: 'Produtos de interesse',
-            },
-            {
-              name: 'estimatedValueCents',
-              type: 'number',
-              label: 'Valor potencial em centavos',
-              min: 0,
-              admin: { description: 'Valor informado pelo operador. Nunca é estimado automaticamente.' },
-            },
-            { name: 'nextAction', type: 'text', label: 'Próxima ação' },
-            {
-              name: 'nextActionAt',
-              type: 'date',
-              label: 'Prazo da próxima ação',
-              index: true,
-              admin: { date: { pickerAppearance: 'dayAndTime' } },
-            },
-            {
-              name: 'expectedCloseAt',
-              type: 'date',
-              label: 'Fechamento esperado',
-              index: true,
-              admin: { date: { pickerAppearance: 'dayAndTime' } },
-            },
-          ],
-        },
-        {
-          label: 'Fechamento',
-          fields: [
-            {
-              name: 'closedAt',
-              type: 'date',
-              label: 'Encerrada em',
-              index: true,
-              admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
-            },
-            {
-              name: 'lossReason',
-              type: 'select',
-              label: 'Motivo da perda',
-              options: opportunityLossReasons.map((value) => ({ label: opportunityLossReasonLabels[value], value })),
-              admin: { condition: (_, siblingData) => siblingData?.stage === 'lost' },
-            },
-            {
-              name: 'lossNotes',
-              type: 'textarea',
-              label: 'Contexto da perda',
-              admin: { condition: (_, siblingData) => siblingData?.stage === 'lost' },
-            },
-            {
-              name: 'wonSale',
-              type: 'relationship',
-              relationTo: 'sales',
-              label: 'Venda gerada',
-              unique: true,
-              index: true,
-              admin: { readOnly: true, condition: (_, siblingData) => siblingData?.stage === 'won' },
-            },
-          ],
-        },
-        {
-          label: 'Compatibilidade',
-          fields: [
-            {
-              name: 'sourceLead',
-              type: 'relationship',
-              relationTo: 'leads',
-              label: 'Lead de origem',
-              unique: true,
-              index: true,
-              admin: { readOnly: true, description: 'Vínculo mantido durante o ciclo de compatibilidade.' },
-            },
-            {
-              name: 'migrationVersion',
-              type: 'text',
-              label: 'Versão da migração',
-              index: true,
-              admin: { readOnly: true },
-            },
-            {
-              name: 'migratedAt',
-              type: 'date',
-              label: 'Migrada em',
-              admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
-            },
+          name: 'priority',
+          type: 'select',
+          label: 'Prioridade',
+          defaultValue: 'normal',
+          index: true,
+          options: [
+            { label: 'Baixa', value: 'low' },
+            { label: 'Normal', value: 'normal' },
+            { label: 'Alta', value: 'high' },
+            { label: 'Urgente', value: 'urgent' },
           ],
         },
       ],
     },
+    { name: 'code', type: 'text', label: 'Código', required: true, unique: true, index: true, admin: { hidden: true, readOnly: true } },
+    { name: 'rank', type: 'number', label: 'Ordem no estágio', required: true, index: true, admin: { hidden: true } },
+    { name: 'expectedCloseAt', type: 'date', label: 'Fechamento esperado', index: true, admin: { hidden: true } },
+    { name: 'closedAt', type: 'date', label: 'Encerrada em', index: true, admin: { hidden: true, readOnly: true } },
+    { name: 'lossReason', type: 'select', label: 'Motivo da perda', options: opportunityLossReasons.map((value) => ({ label: opportunityLossReasonLabels[value], value })), admin: { hidden: true } },
+    { name: 'lossNotes', type: 'textarea', label: 'Contexto da perda', admin: { hidden: true } },
+    { name: 'wonSale', type: 'relationship', relationTo: 'sales', label: 'Venda gerada', unique: true, index: true, admin: { hidden: true, readOnly: true } },
+    { name: 'sourceLead', type: 'relationship', relationTo: 'leads', label: 'Lead de origem', unique: true, index: true, admin: { hidden: true, readOnly: true } },
+    { name: 'migrationVersion', type: 'text', label: 'Versão da migração', index: true, admin: { hidden: true, readOnly: true } },
+    { name: 'migratedAt', type: 'date', label: 'Migrada em', admin: { hidden: true, readOnly: true } },
   ],
 }

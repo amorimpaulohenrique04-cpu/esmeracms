@@ -37,6 +37,18 @@ export type CreateSaleInput = {
   items: SaleWorkflowItem[]
 }
 
+export type CreateOpportunityInput = {
+  customerID: string | number
+  source: string
+  ownerID?: string | number | null
+  productID?: string | number | null
+  estimatedValueCents?: number | null
+  stage: (typeof openOpportunityStages)[number]
+  nextAction?: string | null
+  nextActionAt?: string | null
+  priority: 'low' | 'normal' | 'high'
+}
+
 export type MoveOpportunityInput = {
   id: string | number
   toStage: OpportunityStage
@@ -273,6 +285,36 @@ export async function createSale(payload: Payload, user: WorkflowUser, input: Cr
 
     return { sale }
   })
+}
+
+export async function createOpportunity(payload: Payload, user: WorkflowUser, input: CreateOpportunityInput) {
+  if (input.customerID === undefined || input.customerID === null || String(input.customerID).trim() === '') {
+    throw new Error('Selecione o cliente da oportunidade.')
+  }
+  if (!openStageSet.has(input.stage)) throw new Error('Selecione uma etapa aberta do funil.')
+  if (!['low', 'normal', 'high'].includes(input.priority)) throw new Error('Selecione uma prioridade válida.')
+  if (input.estimatedValueCents !== null && input.estimatedValueCents !== undefined && (!Number.isSafeInteger(input.estimatedValueCents) || input.estimatedValueCents < 0)) {
+    throw new Error('Informe um valor estimado válido em reais.')
+  }
+  if (input.nextActionAt && Number.isNaN(new Date(input.nextActionAt).getTime())) throw new Error('Informe um prazo válido para o follow-up.')
+
+  const opportunity = await payload.create({
+    collection: 'opportunities',
+    overrideAccess: false,
+    user: user as never,
+    data: {
+      customer: input.customerID,
+      source: input.source,
+      owner: input.ownerID ?? user?.id ?? undefined,
+      interestedProducts: input.productID ? [input.productID] : [],
+      estimatedValueCents: input.estimatedValueCents ?? null,
+      stage: input.stage,
+      nextAction: input.nextAction?.trim() || null,
+      nextActionAt: input.nextActionAt || null,
+      priority: input.priority,
+    } as never,
+  })
+  return { opportunity }
 }
 
 export async function winOpportunity(payload: Payload, user: WorkflowUser, input: WinOpportunityInput) {

@@ -220,7 +220,11 @@ export async function POST(request: Request) {
       if (candidates.length && !body.force) return NextResponse.json({ error: 'Encontramos registros possivelmente duplicados.', candidates }, { status: 409 })
 
       const customer = await payload.create({ collection: 'customers', data: { ...data, name, status: data.status || 'active' } as never, overrideAccess: false, user })
-      return NextResponse.json({ id: customer.id, created: 1 })
+      return NextResponse.json({
+        id: customer.id,
+        customer: { id: customer.id, name: customer.name, company: customer.company, phone: customer.phone, email: customer.email },
+        created: 1,
+      })
     }
 
     if (body.action === 'save-profile') {
