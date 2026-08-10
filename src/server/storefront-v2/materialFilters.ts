@@ -20,8 +20,7 @@ const MATERIAL_ALIASES: Record<string, string[]> = {
 }
 
 type UnknownRecord = Record<string, unknown>
-
-type PayloadFindArgs = Parameters<Payload['find']>[0]
+type FindArgs = UnknownRecord & { where?: Where }
 
 function record(value: unknown): UnknownRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as UnknownRecord : null
@@ -104,6 +103,10 @@ export function rewriteRequestedMaterialWhere(
  * Catalog V2 currently stores `Products.material` as editorial free text.
  * This lightweight Payload proxy lets the public API accept stable material
  * keys while preserving the existing CMS schema and listing-rule semantics.
+ *
+ * Payload's `find` method is generic/overloaded, so the wrapper deliberately
+ * narrows only the runtime shape needed here and casts the final proxy back to
+ * Payload. This avoids leaking the generic overload into the wrapper itself.
  */
 export function withCanonicalMaterialFilters(
   payload: Payload,
@@ -111,17 +114,19 @@ export function withCanonicalMaterialFilters(
 ): Payload {
   if (!requested.length) return payload
 
-  const find = ((args: PayloadFindArgs) =>
-    payload.find({
-      ...args,
-      where: rewriteRequestedMaterialWhere(args.where as Where | undefined, requested),
-    })) as Payload['find']
+  const rawFind = payload.find.bind(payload) as unknown as (
+    args: FindArgs,
+  ) => Promise<unknown>
+  const wrappedFind = (args: FindArgs) => rawFind({
+    ...args,
+    where: rewriteRequestedMaterialWhere(args.where, requested),
+  })
 
   return new Proxy(payload, {
     get(target, property) {
-      if (property === 'find') return find
+      if (property === 'find') return wrappedFind
       const value = Reflect.get(target, property, target)
       return typeof value === 'function' ? value.bind(target) : value
     },
-  })
+  }) as Payload
 }
