@@ -2281,7 +2281,7 @@ export interface Home {
     caption?: string | null;
   };
   /**
-   * Selecione até 4 produtos. Nenhum dado do produto é copiado aqui.
+   * Selecione até 4 produtos ativos, publicados e prontos para o storefront. Nenhum dado do produto é copiado aqui.
    */
   selectedProducts?: (number | Product)[] | null;
   matterPanels?:
@@ -2347,6 +2347,23 @@ export interface Home {
     | {
         title: string;
         copy?: string | null;
+        image?: {
+          image?: (number | null) | Media;
+          /**
+           * Descreva a imagem para pessoas que usam leitores de tela.
+           */
+          alt?: string | null;
+          caption?: string | null;
+        };
+        link?: {
+          label?: string | null;
+          destinationType?: ('internal' | 'external' | 'whatsapp') | null;
+          /**
+           * Exemplo: /colecao
+           */
+          path?: string | null;
+          url?: string | null;
+        };
         id?: string | null;
       }[]
     | null;
@@ -2827,6 +2844,21 @@ export interface HomeSelect<T extends boolean = true> {
     | {
         title?: T;
         copy?: T;
+        image?:
+          | T
+          | {
+              image?: T;
+              alt?: T;
+              caption?: T;
+            };
+        link?:
+          | T
+          | {
+              label?: T;
+              destinationType?: T;
+              path?: T;
+              url?: T;
+            };
         id?: T;
       };
   provenanceCallToAction?:

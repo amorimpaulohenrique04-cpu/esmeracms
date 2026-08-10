@@ -199,11 +199,37 @@ function validateHome(data: UnknownRecord): PublicationIssue[] {
   const ctaFields = ['provenanceCallToAction']
   for (const path of ctaFields) {
     const cta = record(data[path])
-    if (cta?.href && !text(cta.href).startsWith('/') && !validAbsoluteURL(cta.href) && !text(cta.href).startsWith('mailto:') && !text(cta.href).startsWith('tel:')) {
-      issues.push(issue({ code: ISSUE_CODES.storefrontHomeCtaInvalid, path: `${path}.href`, entity }))
+    const target = cta ? ctaTarget(cta) : null
+    if (target && !validCtaTarget(target.value)) {
+      issues.push(issue({ code: ISSUE_CODES.storefrontHomeCtaInvalid, path: `${path}.${target.field}`, entity }))
     }
   }
+
+  const provenanceSteps = Array.isArray(data.provenanceSteps) ? data.provenanceSteps : []
+  provenanceSteps.forEach((value, index) => {
+    const cta = record(record(value)?.link)
+    const target = cta ? ctaTarget(cta) : null
+    if (target && !validCtaTarget(target.value)) {
+      issues.push(issue({
+        code: ISSUE_CODES.storefrontHomeCtaInvalid,
+        path: `provenanceSteps.${index}.link.${target.field}`,
+        entity,
+        severity: 'warning',
+      }))
+    }
+  })
   return issues
+}
+
+function ctaTarget(cta: UnknownRecord): { field: string; value: string } | null {
+  if (text(cta.href)) return { field: 'href', value: text(cta.href) }
+  if (cta.destinationType === 'internal' && text(cta.path)) return { field: 'path', value: text(cta.path) }
+  if (cta.destinationType === 'external' && text(cta.url)) return { field: 'url', value: text(cta.url) }
+  return null
+}
+
+function validCtaTarget(value: string): boolean {
+  return value.startsWith('/') || validAbsoluteURL(value) || value.startsWith('mailto:') || value.startsWith('tel:')
 }
 
 export function validateStorefrontSnapshot(kind: StorefrontKind, value: unknown): StorefrontContractValidation {
