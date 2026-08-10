@@ -1,3 +1,4 @@
+import type { Where } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -12,7 +13,7 @@ describe('storefront canonical material filters', () => {
   })
 
   it('rewrites only the requested material condition to textual matching', () => {
-    const where = {
+    const where: Where = {
       and: [
         { catalogStatus: { equals: 'active' } },
         { material: { in: ['esmeralda', 'metal'] } },
@@ -39,8 +40,9 @@ describe('storefront canonical material filters', () => {
   })
 
   it('maps accented canonical aliases used by the public storefront', () => {
+    const where: Where = { material: { in: ['calcario', 'bege-bahia'] } }
     expect(rewriteRequestedMaterialWhere(
-      { material: { in: ['calcario', 'bege-bahia'] } },
+      where,
       ['calcario', 'bege-bahia'],
     )).toEqual({
       or: [
