@@ -74,6 +74,9 @@ export const Media: CollectionConfig = {
       { name: 'productCard', width: 900, height: 1200, position: 'centre' },
       { name: 'card', width: 900, height: 1125, position: 'centre' },
       { name: 'wide', width: 1800, height: 1200, position: 'centre' },
+      // Painéis editoriais Matter/Território usam composição vertical 5:9.
+      // Não reutilizar `wide`: isso força um crop 3:2 antes do cover do storefront.
+      { name: 'territory', width: 1200, height: 2160, position: 'centre' },
     ],
   },
 }

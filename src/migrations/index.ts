@@ -9,6 +9,7 @@ import * as migration_20260808_130000_product_card_model from './20260808_130000
 import * as migration_20260808_140000_reservations from './20260808_140000_reservations'
 import * as migration_20260808_180000_reservations_locked_documents from './20260808_180000_reservations_locked_documents'
 import * as migration_20260810_000000_provenance_step_media from './20260810_000000_provenance_step_media'
+import * as migration_20260811_153500_territory_media_size from './20260811_153500_territory_media_size'
 
 export const migrations = [
   {
@@ -65,5 +66,10 @@ export const migrations = [
     up: migration_20260810_000000_provenance_step_media.up,
     down: migration_20260810_000000_provenance_step_media.down,
     name: '20260810_000000_provenance_step_media',
+  },
+  {
+    up: migration_20260811_153500_territory_media_size.up,
+    down: migration_20260811_153500_territory_media_size.down,
+    name: '20260811_153500_territory_media_size',
   },
 ]
