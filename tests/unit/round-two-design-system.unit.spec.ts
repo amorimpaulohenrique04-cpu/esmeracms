@@ -56,7 +56,7 @@ describe('Rodada 2 — Design System Esméra v2', () => {
       ['src/admin/modules/customers/CustomersWorkspaceView.tsx', ['MetricStrip', 'CustomerDetailTabs', 'SplitWorkspace']],
       ['src/admin/modules/customers/CustomerDetailTabs.tsx', ['SectionNav', 'LoadingState']],
       ['src/admin/modules/customers/CustomerDetailTabPanel.tsx', ['DataSection']],
-      ['src/admin/modules/sales/SalesWorkspaceClient.tsx', ['FilterPanel', 'InlineFeedback', 'DataSection']],
+      ['src/admin/modules/sales/SalesWorkspaceClient.tsx', ['FilterPanel', 'InlineFeedback', 'DataTable']],
       ['src/admin/modules/privacy/PrivacyView.tsx', ['FilterPanel', 'DataSection']],
       ['src/admin/modules/settings/SettingsView.tsx', ['DataSection', 'IntegrationState']],
       ['src/admin/modules/technical/TechnicalView.tsx', ['DataSection', 'PartialDataState']],

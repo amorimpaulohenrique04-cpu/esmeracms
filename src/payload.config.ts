@@ -45,6 +45,7 @@ const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 const payloadSecret = process.env.PAYLOAD_SECRET || ''
 const databaseURL = requireDatabaseURL()
+const isTest = process.env.NODE_ENV === 'test'
 
 if (process.env.NODE_ENV === 'production' && payloadSecret.length < 24) {
   throw new Error('PAYLOAD_SECRET deve possuir pelo menos 24 caracteres em produção.')
@@ -246,35 +247,37 @@ export default buildConfig({
     push: process.env.NODE_ENV !== 'production',
     pool: {
       connectionString: databaseURL,
-      max: 5,
+      // Payload's test bootstrap introspects many tables concurrently. A pool of
+      // five can deadlock that startup in CI even with serial Vitest files.
+      max: isTest ? 20 : 5,
       idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 5_000,
+      connectionTimeoutMillis: isTest ? 30_000 : 5_000,
     },
   }),
   sharp,
   plugins: [
-  s3Storage({
-    enabled: process.env.MEDIA_STORAGE_DRIVER === 'r2',
+    s3Storage({
+      enabled: process.env.MEDIA_STORAGE_DRIVER === 'r2',
 
-    collections: {
-      media: true,
-      'report-export-files': true,
-    },
-
-    bucket: process.env.S3_BUCKET || '',
-
-    clientUploads: true,
-
-    config: {
-      credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+      collections: {
+        media: true,
+        'report-export-files': true,
       },
 
-      region: process.env.S3_REGION || 'auto',
-      endpoint: process.env.S3_ENDPOINT,
-      forcePathStyle: true,
-    },
-  }),
+      bucket: process.env.S3_BUCKET || '',
+
+      clientUploads: true,
+
+      config: {
+        credentials: {
+          accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+        },
+
+        region: process.env.S3_REGION || 'auto',
+        endpoint: process.env.S3_ENDPOINT,
+        forcePathStyle: true,
+      },
+    }),
   ],
 })
