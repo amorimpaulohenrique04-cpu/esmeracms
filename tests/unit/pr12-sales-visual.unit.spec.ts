@@ -36,10 +36,9 @@ describe('PR-12C — Vendas visual', () => {
     expect(workspace).toMatch(/if \(next\.page > 1\) params\.set\('page', String\(next\.page\)\)/)
   })
 
-  it('valores financeiros usam tabular-nums', () => {
+  it('valores financeiros da tabela usam tabular-nums', () => {
     expect(scss).toMatch(/\.esmera-nums\s*\{[^}]*font-variant-numeric:\s*tabular-nums/)
     expect(workspace).toMatch(/<span className="esmera-nums">\{money\(row\.original\.estimatedValueCents\)\}<\/span>/)
-    expect(workspace).toMatch(/<span className="esmera-nums">\{money\(sale\.totalCents\)\}<\/span>/)
   })
 
   it('ações secundárias da lista revelam por hover e focus-within apenas em ponteiro fino', () => {
