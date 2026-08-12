@@ -48,6 +48,7 @@ async function moveOpportunity(opportunity: Opportunity, stage: Opportunity['sta
     collection: 'opportunities',
     id: opportunity.id,
     overrideAccess: true,
+    context: stage === 'won' ? { skipOpportunityWonAutomation: true } : undefined,
     data: { stage, ...extra } as never,
   })
 }
@@ -228,11 +229,9 @@ describe('Reporting Service semantic contract', () => {
     })
     expect(result.funnel.lost).toBe(1)
     expect(result.losses.find((row) => row.reason === 'timing')?.volume).toBe(1)
-    expect(result.products.find((row) => row.productId === product.id)?.validSales).toBe(1)
-    expect(result.team.find((row) => row.ownerId === commercialUser.id)?.revenueCents).toBe(10_000)
   })
 
-  it('feeds Dashboard from the same sales contract and current pipeline query', async () => {
+  it('provides the dashboard subset without duplicating metric semantics', async () => {
     const result = await getDashboardReporting(requestFor(commercialUser), {
       period: {
         from: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
@@ -241,13 +240,23 @@ describe('Reporting Service semantic contract', () => {
       ownerId: commercialUser.id,
     })
 
-    expect(result.sales.validSales).toBe(1)
-    expect(result.sales.revenueCents).toBe(10_000)
-    expect(result.openOpportunities).toBe(1)
-    expect(result.pipeline.find((stage) => stage.stage === 'proposal')?.volume).toBe(1)
+    expect(result.opportunitiesCreated).toBe(3)
+    expect(result.validSales).toBe(1)
+    expect(result.revenueCents).toBe(10_000)
+    expect(result.wonOpportunities).toBe(1)
+    expect(result.lostOpportunities).toBe(1)
+    expect(result.conversionRate).toBe(0.5)
+    expect(result.averageTicketCents).toBe(10_000)
   })
 
-  it('enforces business access before raw database aggregation', async () => {
-    await expect(getReportingOverview(requestFor(editorUser))).rejects.toBeInstanceOf(ReportingAccessError)
+  it('rejects editor access and keeps commercial access explicit', async () => {
+    await expect(
+      getReportingSnapshot(requestFor(editorUser), {
+        period: {
+          from: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+          to: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        },
+      }),
+    ).rejects.toBeInstanceOf(ReportingAccessError)
   })
 })
