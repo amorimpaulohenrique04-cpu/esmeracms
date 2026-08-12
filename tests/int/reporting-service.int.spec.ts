@@ -240,13 +240,11 @@ describe('Reporting Service semantic contract', () => {
       ownerId: commercialUser.id,
     })
 
-    expect(result.opportunitiesCreated).toBe(3)
-    expect(result.validSales).toBe(1)
-    expect(result.revenueCents).toBe(10_000)
-    expect(result.wonOpportunities).toBe(1)
-    expect(result.lostOpportunities).toBe(1)
-    expect(result.conversionRate).toBe(0.5)
-    expect(result.averageTicketCents).toBe(10_000)
+    expect(result.sales.validSales).toBe(1)
+    expect(result.sales.revenueCents).toBe(10_000)
+    expect(result.sales.averageTicketCents).toBe(10_000)
+    expect(result.openOpportunities).toBe(1)
+    expect(result.pipeline.find((row) => row.stage === 'proposal')?.volume).toBe(1)
   })
 
   it('rejects editor access and keeps commercial access explicit', async () => {
