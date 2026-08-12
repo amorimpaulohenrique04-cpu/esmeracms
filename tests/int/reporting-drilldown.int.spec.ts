@@ -101,6 +101,7 @@ describe('Reporting Service drill-downs', () => {
       collection: 'opportunities',
       id: opportunity.id,
       overrideAccess: true,
+      context: { skipOpportunityWonAutomation: true },
       data: { stage: 'won', customer: customer.id },
     })
 
