@@ -1,0 +1,57 @@
+name: Gallery test diagnostics
+
+on:
+  push:
+    branches:
+      - agent/gallery-pr1-cms-uncropped-size
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: esmera
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/esmera
+      PAYLOAD_SECRET: ci-only-payload-secret-change-me
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Capture integration test output
+        shell: bash
+        run: |
+          set +e
+          pnpm test:int 2>&1 | tee gallery-test-output.txt
+          code=${PIPESTATUS[0]}
+          echo "$code" > gallery-test-exit-code.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gallery-test-diagnostics
+          path: |
+            gallery-test-output.txt
+            gallery-test-exit-code.txt
+          retention-days: 1
