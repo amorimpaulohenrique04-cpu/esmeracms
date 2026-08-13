@@ -64,14 +64,16 @@ function SortableCategory({
   return (
     <li
       ref={sortable.ref}
-      className={`esmera-category-row esmera-spatial-selection${selected ? ' is-selected' : ''}${sortable.isDragging ? ' is-dragging' : ''}`}
+      className={`esmera-category-row esmera-spatial-selection${selected ? ' is-selected' : ''}${sortable.isDragging ? ' is-dragging' : ''}${category.hasChildren ? ' is-parent' : ' is-leaf'}`}
       style={{ '--category-depth': category.depth } as React.CSSProperties}
+      data-depth={category.depth}
       data-esmera-context-key={`category-${category.id}`}
     >
       <button ref={sortable.handleRef} type="button" className="esmera-category-drag" aria-label={`Reordenar ${title}`} disabled={disabled}>
         <span aria-hidden="true">⋮⋮</span>
       </button>
       <Link className="esmera-category-row__main" href={categoryHref(filters, category.id)} data-esmera-recent-label={title} data-esmera-recent-meta={`Categoria · /${category.slug || 'sem-slug'}`}>
+        {category.depth > 0 ? <span className="esmera-category-branch" aria-hidden="true" /> : null}
         <span className="esmera-category-thumb">{image ? <img src={image} alt={alt} /> : <span aria-hidden="true">◇</span>}</span>
         <span className="esmera-category-row__copy"><strong>{title}</strong><small>/{category.slug || 'sem-slug'}{category.depth > 0 ? ` · nível ${category.depth + 1}` : ''}</small></span>
       </Link>

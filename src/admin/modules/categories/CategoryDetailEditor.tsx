@@ -16,6 +16,7 @@ import {
 } from '../../design-system'
 import type { AdminEntityError, AdminFieldError } from '../../state/asyncState'
 import { expectAdminResponse, normalizeAdminError } from '../../state/asyncState'
+import { getCategoryDepth, indexCategoriesById, orderCategoriesHierarchically } from './hierarchy'
 import {
   categoryImageAlt,
   categoryImageURL,
@@ -179,6 +180,19 @@ export function CategoryDetailEditor({
     const exact = base.some((item) => item.value.toLocaleLowerCase('pt-BR') === trimmed.toLocaleLowerCase('pt-BR'))
     return trimmed && !exact ? [...base, { id: `create:${trimmed.toLocaleLowerCase('pt-BR')}`, value: `Adicionar “${trimmed}”`, creatable: trimmed }] : base
   }, [query, termSuggestions, terms])
+
+  // Opções de "Categoria principal" na mesma pré-ordem hierárquica da lista.
+  // `<option>` não aceita recuo por CSS, então a profundidade vira prefixo
+  // textual. A profundidade é calculada sobre o conjunto completo (com a própria
+  // categoria) para nesting correto; a própria é omitida na renderização.
+  const parentOptions = useMemo(() => {
+    const byId = indexCategoriesById(categories)
+    return orderCategoriesHierarchically(categories).map((item) => ({
+      id: item.id,
+      label: item.title || item.slug || String(item.id),
+      depth: getCategoryDepth(item, byId),
+    }))
+  }, [categories])
 
   // Toda edição visível marca o formulário como sujo; o baseline volta a limpo
   // apenas quando o servidor confirma a gravação.
@@ -421,7 +435,7 @@ export function CategoryDetailEditor({
             {(control) => (
               <select {...control} className="esmera-input" value={parent} onChange={(event) => { setParent(event.target.value); edited() }}>
                 <option value="">Sem categoria principal</option>
-                {categories.filter((item) => String(item.id) !== String(category.id)).map((item) => <option key={String(item.id)} value={String(item.id)}>{item.title || item.slug || item.id}</option>)}
+                {parentOptions.filter((item) => String(item.id) !== String(category.id)).map((item) => <option key={String(item.id)} value={String(item.id)}>{item.depth > 0 ? `${' '.repeat(item.depth)}↳ ${item.label}` : item.label}</option>)}
               </select>
             )}
           </FieldV2>

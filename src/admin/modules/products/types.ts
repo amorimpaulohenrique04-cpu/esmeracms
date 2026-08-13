@@ -38,6 +38,9 @@ export type ProductPickerCategory = {
   title?: string | null
   slug?: string | null
   image?: ProductMedia | string | number | null
+  // Relação para a categoria-pai (id ou objeto). Alimenta a seleção automática
+  // de ancestrais elegíveis no seletor do popup — ver ProductCategoryPicker.
+  parent?: ProductCategory | string | number | null
 }
 
 export type ProductOptionValue = {

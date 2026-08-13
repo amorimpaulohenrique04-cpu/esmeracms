@@ -18,7 +18,12 @@ import { CategoryCreateDialog } from './CategoryCreateDialog'
 import { CategoryDetailView } from './CategoryDetailView'
 import { CategoryRelatedProductsPanel } from './CategoryRelatedProductsPanel'
 import {
-  relationId,
+  collectParentIds,
+  getCategoryDepth,
+  indexCategoriesById,
+  orderCategoriesHierarchically,
+} from './hierarchy'
+import {
   type CategoryDetail,
   type CategoryListItem,
   type CategoryMedia,
@@ -58,22 +63,6 @@ function whereFrom(filters: CategoryWorkspaceFilters): Where {
     } as Where)
   }
   return { and } as Where
-}
-
-function hierarchyDepth(category: CategoryParent, byId: Map<string, CategoryParent>) {
-  const visited = new Set<string>([String(category.id)])
-  let depth = 0
-  let parentId = relationId(category.parent)
-  while (parentId !== null && depth < 20) {
-    const key = String(parentId)
-    if (visited.has(key)) return depth
-    visited.add(key)
-    const parent = byId.get(key)
-    if (!parent) return depth + 1
-    depth += 1
-    parentId = relationId(parent.parent)
-  }
-  return depth
 }
 
 async function selectedDetail(props: AdminViewServerProps, categoryId: string) {
@@ -135,13 +124,25 @@ export async function CategoriesView(props: AdminViewServerProps) {
       }),
     ])
 
-    const hierarchyMap = new Map(allResult.docs.map((category) => [String(category.id), category]))
+    const hierarchyMap = indexCategoriesById(allResult.docs)
+    // Pré-ordem sobre TODA a taxonomia (fonte única de sequência). A lista
+    // visível e o `allOrderIds` do reorder derivam desta mesma sequência para
+    // que a relação de posição entre item visível e conjunto completo continue
+    // consistente — condição de correção do `mergedFullOrder` no cliente.
+    const orderedAll = orderCategoriesHierarchically(allResult.docs)
+    const positionInFull = new Map(orderedAll.map((category, index) => [String(category.id), index]))
+    const allOrderIds = orderedAll.map((category) => category.id)
+
     const counts = await Promise.all(visibleResult.docs.map((category) => countDocs(req, 'products', { categories: { contains: category.id } } as Where)))
-    const categories: CategoryListItem[] = visibleResult.docs.map((category, index) => ({
-      ...category,
-      productCount: counts[index],
-      depth: hierarchyDepth(category as CategoryParent, hierarchyMap),
-    }))
+    const visibleParentIds = collectParentIds(visibleResult.docs)
+    const categories: CategoryListItem[] = visibleResult.docs
+      .map((category, index) => ({
+        ...category,
+        productCount: counts[index],
+        depth: getCategoryDepth(category as CategoryParent, hierarchyMap),
+        hasChildren: visibleParentIds.has(String(category.id)),
+      }))
+      .sort((left, right) => (positionInFull.get(String(left.id)) ?? 0) - (positionInFull.get(String(right.id)) ?? 0))
 
     let detail: CategoryDetail | null = null
     let media: CategoryMedia[] = []
@@ -161,7 +162,7 @@ export async function CategoriesView(props: AdminViewServerProps) {
       media = mediaResult.docs
       relatedTotal = productsCount
       detail.productCount = relatedTotal
-      detail.depth = hierarchyDepth(detail, hierarchyMap)
+      detail.depth = getCategoryDepth(detail, hierarchyMap)
     }
 
     const termSuggestions = allResult.docs
@@ -186,7 +187,7 @@ export async function CategoriesView(props: AdminViewServerProps) {
           actions={<CategoryCreateDialog categories={allResult.docs} />}
         />
         <div className={`esmera-categories-workspace${detail ? ' has-detail' : ''}`}>
-          <CategoriesMasterList categories={categories} allOrderIds={allResult.docs.map((category) => category.id)} filters={filters} selectedId={categoryId} />
+          <CategoriesMasterList categories={categories} allOrderIds={allOrderIds} filters={filters} selectedId={categoryId} />
           {detail ? (
             <CategoryDetailView
               category={detail}

@@ -85,14 +85,20 @@ describe('Popups de criação e responsividade', () => {
     expect(dialog).toContain('<ProductCategoryPicker')
     expect(dialog).toContain('<ProductGalleryUploader')
     expect(dialog).toContain('size="wide"')
-    // Seletor visual grava set-categories com otimista-com-rollback.
+    // Seletor hierárquico grava a união (diretas ∪ ancestrais elegíveis) via
+    // set-categories, com otimista-com-rollback.
     expect(picker).toContain("action: 'set-categories'")
-    expect(picker).toContain('onSelectedChange(previous)')
-    // Uploader reaproveita add-gallery-image (mediaKey/capa/alt gerados no servidor).
+    expect(picker).toContain('onSelectedChange(previousUnion)')
+    expect(picker).toContain('getAncestorChain')
+    expect(picker).toContain('orderCategoriesHierarchically')
+    // Uploader reaproveita add-gallery-image (mediaKey/capa/alt gerados no servidor)
+    // e estiliza o disparo do upload sem o controle nativo cru; vazio via EmptyState.
     expect(media).toContain("collection: 'media'")
     expect(media).toContain('canManageSite')
     expect(uploader).toContain('/api/admin-product-media')
     expect(uploader).toContain("action: 'add-gallery-image'")
+    expect(uploader).toContain('esmera-file-upload')
+    expect(uploader).toContain('EmptyState')
   })
 
   it('mantém busca responsiva e separa o z-index do rail peek', () => {

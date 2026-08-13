@@ -14,6 +14,7 @@
 }
 
 .esmera-button {
+  box-sizing: border-box;
   min-height: var(--esmera-control-standard);
   display: inline-flex;
   align-items: center;
@@ -43,6 +44,20 @@
 .esmera-button--quiet:hover { background: var(--esmera-surface-selected); }
 .esmera-button--danger { border-color: color-mix(in srgb, var(--esmera-danger) 35%, var(--esmera-line-default)); color: var(--esmera-danger); }
 .esmera-button:disabled { opacity: .48; cursor: not-allowed; transform: none; }
+
+/* Botões numa linha de controles (filtros/toolbars) compartilham a altura
+   padrão dos controles, para alinhar com inputs/selects na mesma baseline.
+   Antes espalhado por ui-ux-fixes.scss em três regras — incluindo um literal
+   38px divergente no pós-venda; consolidado aqui numa única fonte de proporção. */
+.esmera-products-filter-panel .esmera-filter-panel__actions .esmera-button,
+.esmera-after-sales-filters__primary > .esmera-button,
+.esmera-after-sales-filters__primary > [data-root] > .esmera-button,
+.esmera-after-sales-filters__primary > button,
+.esmera-report-filter-primary > .esmera-button {
+  height: var(--esmera-control-standard);
+  min-height: var(--esmera-control-standard);
+  white-space: nowrap;
+}
 
 /* Busy: o conteúdo original permanece no fluxo para travar largura e altura;
    só o spinner e o rótulo de progresso ficam visíveis. */
