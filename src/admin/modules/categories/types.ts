@@ -79,6 +79,8 @@ export type CategoryListItem = {
   updatedAt?: string | null
   productCount: number
   depth: number
+  /** Tem ao menos um filho visível na lista atual — só para tipografia pai/folha. */
+  hasChildren?: boolean
 }
 
 export type CategoryDetail = CategoryListItem & {
