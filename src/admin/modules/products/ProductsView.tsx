@@ -166,7 +166,9 @@ export async function ProductsView(props: AdminViewServerProps) {
             { nodeType: { not_equals: 'group' } },
           ],
         },
-        select: { id: true, title: true, slug: true, image: true },
+        // `parent` (aditivo) alimenta a seleção automática de ancestrais
+        // elegíveis no seletor hierárquico do popup de criação.
+        select: { id: true, title: true, slug: true, image: true, parent: true },
       }),
     ])
 

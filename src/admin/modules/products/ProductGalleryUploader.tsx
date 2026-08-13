@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react'
 
-import { Button, Field, InlineFeedback, SavingState, Status } from '../../design-system'
+import { Button, EmptyState, InlineFeedback, SavingState, Status } from '../../design-system'
 import { expectAdminResponse, normalizeAdminError } from '../../state/asyncState'
 import { imageURL, relationId, roleLabels, type ProductGalleryItem } from './types'
 
@@ -24,6 +24,7 @@ export function ProductGalleryUploader({
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [rollback, setRollback] = useState(false)
+  const [fileName, setFileName] = useState('')
   const fileRef = useRef<HTMLInputElement | null>(null)
   const lastSaved = useRef<ProductGalleryItem[]>([])
 
@@ -62,6 +63,7 @@ export function ProductGalleryUploader({
       const body = await expectAdminResponse<GalleryResponse>(response, 'Não foi possível adicionar a imagem à galeria.')
       commit(body.gallery || [])
       setFeedback('Imagem adicionada à galeria.')
+      setFileName('')
       if (fileRef.current) fileRef.current.value = ''
     } catch (error) {
       setRollback(true)
@@ -131,9 +133,25 @@ export function ProductGalleryUploader({
   return (
     <div className="esmera-product-gallery-uploader">
       <form className="esmera-product-gallery-uploader__add" onSubmit={addImage}>
-        <Field label="Adicionar imagem" hint="Código de mídia, capa e texto alternativo são gerados automaticamente.">
-          <input ref={fileRef} className="esmera-input" type="file" accept="image/*" disabled={busy} />
-        </Field>
+        <div className="esmera-file-upload-field">
+          <span className="esmera-field-label">Adicionar imagem</span>
+          {/* Input real fica visualmente oculto mas focável; o rótulo estilizado
+              é a área de envio. Teclado: Tab foca o input, Enter/Espaço abre o
+              seletor de arquivo — mesmo mecanismo, sem o controle nativo cru. */}
+          <label className={`esmera-file-upload${busy ? ' is-disabled' : ''}`}>
+            <input
+              ref={fileRef}
+              className="esmera-file-upload__input"
+              type="file"
+              accept="image/*"
+              disabled={busy}
+              onChange={(event) => setFileName(event.target.files?.[0]?.name ?? '')}
+            />
+            <span className="esmera-file-upload__button" aria-hidden="true">Escolher imagem</span>
+            <span className="esmera-file-upload__name">{fileName || 'Nenhuma imagem selecionada'}</span>
+          </label>
+          <span className="esmera-field-hint">Código de mídia, capa e texto alternativo são gerados automaticamente.</span>
+        </div>
         <Button type="submit" busy={busy}>Enviar imagem</Button>
       </form>
 
@@ -162,7 +180,7 @@ export function ProductGalleryUploader({
           })}
         </ol>
       ) : (
-        <div className="esmera-empty"><strong>Galeria vazia</strong><span>Envie a primeira imagem acima. Ela vira a capa automaticamente.</span></div>
+        <EmptyState system title="Galeria vazia" copy="Envie a primeira imagem acima. Ela vira a capa automaticamente." />
       )}
 
       {busy ? <SavingState state="saving" message="Salvando galeria…" /> : null}
