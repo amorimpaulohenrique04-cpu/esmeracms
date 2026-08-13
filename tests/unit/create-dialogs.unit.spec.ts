@@ -33,7 +33,7 @@ describe('Popups de criação e responsividade', () => {
     expect(salesView).toContain('<SaleCreateDialog products={productsResult.docs} />')
     expect(categoriesView).toContain('<CategoryCreateDialog categories={allResult.docs} />')
     expect(categoriesView).not.toContain('/admin/collections/categories/create')
-    expect(productsView).toContain('<ProductCreateDialog />')
+    expect(productsView).toContain('<ProductCreateDialog categories={eligibleCategoryResult.docs} />')
     expect(productsView).not.toContain('/admin/collections/products/create')
     expect(productsWorkspace).toContain('action={<ProductCreateDialog />}')
   })
@@ -67,12 +67,32 @@ describe('Popups de criação e responsividade', () => {
     expect(dialog).toContain('router.push(`/admin/categories?category=${body.id}&tab=general`)')
   })
 
-  it('cria produtos mínimos como rascunho e abre o detalhe customizado', () => {
+  it('cria produtos como rascunho num popup de 2 estágios com categorias e galeria', () => {
     const route = source('src/app/(payload)/api/admin-products/route.ts')
+    const media = source('src/app/(payload)/api/admin-product-media/route.ts')
     const dialog = source('src/admin/modules/products/ProductCreateDialog.tsx')
+    const picker = source('src/admin/modules/products/ProductCategoryPicker.tsx')
+    const uploader = source('src/admin/modules/products/ProductGalleryUploader.tsx')
+    // Estágio 1 cria o rascunho (action create de main), estágio 2 organiza e publica.
     expect(route).toContain("action === 'create'")
     expect(route).toContain("data: { title, priceMode, basePriceCents, _status: 'draft' }")
-    expect(dialog).toContain('router.push(`/admin/products?product=${body.id}`)')
+    expect(route).toContain("action === 'set-categories'")
+    expect(dialog).toContain("'essential'")
+    expect(dialog).toContain("'details'")
+    expect(dialog).toContain("action: 'create'")
+    expect(dialog).toContain("action: 'save-and-publish'")
+    expect(dialog).toContain('requires_confirmation')
+    expect(dialog).toContain('<ProductCategoryPicker')
+    expect(dialog).toContain('<ProductGalleryUploader')
+    expect(dialog).toContain('size="wide"')
+    // Seletor visual grava set-categories com otimista-com-rollback.
+    expect(picker).toContain("action: 'set-categories'")
+    expect(picker).toContain('onSelectedChange(previous)')
+    // Uploader reaproveita add-gallery-image (mediaKey/capa/alt gerados no servidor).
+    expect(media).toContain("collection: 'media'")
+    expect(media).toContain('canManageSite')
+    expect(uploader).toContain('/api/admin-product-media')
+    expect(uploader).toContain("action: 'add-gallery-image'")
   })
 
   it('mantém busca responsiva e separa o z-index do rail peek', () => {

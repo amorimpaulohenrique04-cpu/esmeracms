@@ -20,6 +20,7 @@ import type {
   ProductDetail,
   ProductDocumentTab,
   ProductListItem,
+  ProductPickerCategory,
   ProductsViewMode,
   ProductWorkspaceFilters,
 } from './types'
@@ -119,7 +120,7 @@ export async function ProductsView(props: AdminViewServerProps) {
     }
 
     const filters = filtersFrom(params)
-    const [result, categoryResult] = await Promise.all([
+    const [result, categoryResult, eligibleCategoryResult] = await Promise.all([
       findDocs<ProductListItem>(props.initPageResult.req, 'products', {
         sort: '-updatedAt',
         limit: filters.limit,
@@ -151,10 +152,26 @@ export async function ProductsView(props: AdminViewServerProps) {
         depth: 0,
         select: { id: true, title: true, slug: true },
       }),
+      // Só as categorias selecionáveis por um produto (mesmo filtro de
+      // Products.categories.filterOptions), com a imagem de Descoberta para os
+      // cards visuais do seletor no popup de criação.
+      findDocs<ProductPickerCategory>(props.initPageResult.req, 'categories', {
+        sort: 'order',
+        limit: 200,
+        depth: 1,
+        where: {
+          and: [
+            { status: { equals: 'active' } },
+            { _status: { equals: 'published' } },
+            { nodeType: { not_equals: 'group' } },
+          ],
+        },
+        select: { id: true, title: true, slug: true, image: true },
+      }),
     ])
 
     return <ViewFrame props={props}>
-      <PageHeader eyebrow="Catálogo" title="Produtos" subtitle="Operação do catálogo com filtros, prontidão, publicação, grid, ações em lote e acesso ao documento editorial completo." actions={<><ProductCreateDialog /><ProductImportDialog /></>} />
+      <PageHeader eyebrow="Catálogo" title="Produtos" subtitle="Operação do catálogo com filtros, prontidão, publicação, grid, ações em lote e acesso ao documento editorial completo." actions={<><ProductCreateDialog categories={eligibleCategoryResult.docs} /><ProductImportDialog /></>} />
       <ProductsWorkspaceClient products={result.docs} categories={categoryResult.docs} filters={filters} totalDocs={result.totalDocs} totalPages={result.totalPages} />
     </ViewFrame>
   } catch (error) {

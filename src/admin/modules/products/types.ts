@@ -30,6 +30,16 @@ export type ProductCategory = {
   slug?: string | null
 }
 
+// Categoria elegível para seleção no popup de criação: só as ativas, publicadas
+// e não-agrupadoras (mesmo filtro de Products.categories.filterOptions), já com
+// a imagem de Descoberta para os cards visuais do seletor.
+export type ProductPickerCategory = {
+  id: string | number
+  title?: string | null
+  slug?: string | null
+  image?: ProductMedia | string | number | null
+}
+
 export type ProductOptionValue = {
   id?: string | number | null
   value?: string | null
