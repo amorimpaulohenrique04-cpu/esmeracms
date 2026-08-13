@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const migrationName = '20260813_020000_gallery_media_size'
 const migrationSource = readFileSync(
-  new URL(`../../src/migrations/${migrationName}.ts`, import.meta.url),
+  resolve(process.cwd(), 'src', 'migrations', `${migrationName}.ts`),
   'utf8',
 )
-const migrationIndex = readFileSync(new URL('../../src/migrations/index.ts', import.meta.url), 'utf8')
+const migrationIndex = readFileSync(resolve(process.cwd(), 'src', 'migrations', 'index.ts'), 'utf8')
 
 describe('gallery media database migration', () => {
   it('registers the gallery migration in the production migration index', () => {
