@@ -50,6 +50,15 @@ export default defineConfig([
     },
   },
   {
+    files: [
+      'src/admin/modules/products/ProductCategoryPicker.tsx',
+      'src/admin/modules/products/ProductGalleryUploader.tsx',
+    ],
+    rules: {
+      '@next/next/no-img-element': 'off',
+    },
+  },
+  {
     files: ['src/admin/modules/products/ProductDocumentView.tsx'],
     rules: {
       '@next/next/no-img-element': 'off',
