@@ -243,6 +243,18 @@ test.describe('Admin Panel', () => {
     await expect(childRow).toBeVisible()
     await expect(childRow.getByText('1 prod.', { exact: true })).toBeVisible()
 
+    // Hierarquia visível: a filha carrega a profundidade e o conector de ramo, e
+    // aparece logo após a mãe na pré-ordem da lista.
+    await expect(childRow).toHaveAttribute('data-depth', '1')
+    await expect(childRow.locator('.esmera-category-branch')).toHaveCount(1)
+    const orderKeys = await page.locator('.esmera-category-row').evaluateAll(
+      (nodes) => nodes.map((node) => node.getAttribute('data-esmera-context-key')),
+    )
+    const parentIndex = orderKeys.indexOf(`category-${parentId}`)
+    const childIndex = orderKeys.indexOf(`category-${childId}`)
+    expect(parentIndex).toBeGreaterThanOrEqual(0)
+    expect(parentIndex).toBeLessThan(childIndex)
+
     await page.goto(`http://localhost:3000/admin/categories?status=active&q=${encodeURIComponent(synonym)}`)
     await expect(page.getByRole('link', { name: childTitle })).toBeVisible()
     await expect(page.getByRole('link', { name: parentTitle })).toHaveCount(0)
