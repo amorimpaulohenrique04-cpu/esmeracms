@@ -318,6 +318,7 @@ describe('limite de escopo — a conversão 400→422 não vaza para o Payload n
     // um ValidationError lançado por eles continua saindo como 400 nativo.
     expect(callers).toEqual([
       'src/app/(payload)/api/admin-categories/route.ts',
+      'src/app/(payload)/api/admin-product-media/route.ts',
       'src/app/(payload)/api/admin-products/route.ts',
     ])
   })

@@ -228,6 +228,7 @@
 .esmera-dialog,
 .esmera-drawer { pointer-events: auto; border: 1px solid var(--esmera-line-default); background: var(--esmera-surface-panel); box-shadow: var(--esmera-shadow-floating); color: var(--esmera-text); }
 .esmera-dialog { width: min(560px, 100%); max-height: calc(100dvh - 40px); overflow: auto; border-radius: var(--esmera-panel-radius); }
+.esmera-dialog--wide { width: min(920px, 100%); }
 .esmera-drawer-viewport { justify-items: end; }
 .esmera-drawer { width: min(520px, 100vw); height: 100%; overflow: auto; border-radius: 0; }
 

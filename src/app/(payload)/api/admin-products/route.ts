@@ -37,6 +37,7 @@ type ProductAction =
   | 'archive'
   | 'restore'
   | 'add-category'
+  | 'set-categories'
   | 'set-availability'
   | 'save-draft'
   | 'reorder-gallery'
@@ -48,6 +49,7 @@ type RequestBody = {
   items?: BulkPublicationItemInput[]
   id?: string | number
   categoryId?: string | number
+  categories?: Array<string | number>
   availability?: string
   data?: Record<string, unknown>
   gallery?: Array<Record<string, unknown>>
@@ -367,6 +369,27 @@ export async function POST(request: Request) {
         user,
       })
       return NextResponse.json({ updated: 1, gallery: document.gallery || [] })
+    }
+
+    // `set-categories` substitui o array inteiro de categorias de um produto (o
+    // seletor visual marca/desmarca por produto), diferente de `add-category`,
+    // que é aditivo e em lote. Mesmo padrão de `add-gallery-image`.
+    if (action === 'set-categories') {
+      if (body.id === undefined || body.id === null || !Array.isArray(body.categories)) {
+        return adminCodedError('invalid_request', { summary: 'Categorias inválidas.' })
+      }
+      const current = await payload.findByID({ collection: 'products', id: body.id, draft: true, depth: 0, overrideAccess: false, user })
+      const mutated = await payload.update({
+        collection: 'products',
+        id: body.id,
+        data: { categories: body.categories } as never,
+        draft: (current as { _status?: string })._status !== 'published',
+        depth: 2,
+        overrideAccess: false,
+        user,
+      })
+      await stampPublishedDocumentMetadata({ payload, entity: 'product', collection: 'products', id: body.id, user, document: mutated })
+      return NextResponse.json({ updated: 1, categories: (mutated as { categories?: unknown[] }).categories || [] })
     }
 
     if (action === 'reorder-gallery') {

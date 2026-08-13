@@ -22,16 +22,20 @@ function useOverlayContext() {
   return { open, onOpenChange }
 }
 
-export function DialogPanel({ trigger, triggerClassName = '', title, description, children }: { trigger: React.ReactNode; triggerClassName?: string; title: string; description?: string; children: React.ReactNode }) {
+export function DialogPanel({ trigger, triggerClassName = '', title, description, size = 'default', children }: { trigger: React.ReactNode; triggerClassName?: string; title: string; description?: string; size?: 'default' | 'wide'; children: React.ReactNode | ((close: () => void) => React.ReactNode) }) {
   const context = useOverlayContext()
   const contextKey = `dialog-${useId()}`
+  // O conteúdo pode receber `close` para se encerrar após uma ação assíncrona
+  // (ex.: publicar e fechar), sem o consumidor controlar o estado do overlay.
+  const close = () => context.onOpenChange(false)
+  const content = typeof children === 'function' ? children(close) : children
   return (
     <Dialog.Root open={context.open} onOpenChange={context.onOpenChange}>
       <Dialog.Trigger className={`esmera-button${triggerClassName ? ` ${triggerClassName}` : ''}`} data-esmera-context-key={contextKey}>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="esmera-overlay-backdrop" />
         <Dialog.Viewport className="esmera-dialog-viewport">
-          <Dialog.Popup className="esmera-dialog">
+          <Dialog.Popup className={`esmera-dialog${size === 'wide' ? ' esmera-dialog--wide' : ''}`}>
             <div className="esmera-overlay-header">
               <div>
                 <Dialog.Title>{title}</Dialog.Title>
@@ -39,7 +43,7 @@ export function DialogPanel({ trigger, triggerClassName = '', title, description
               </div>
               <Dialog.Close className="esmera-icon-button" aria-label="Fechar">×</Dialog.Close>
             </div>
-            <div className="esmera-overlay-body">{children}</div>
+            <div className="esmera-overlay-body">{content}</div>
           </Dialog.Popup>
         </Dialog.Viewport>
       </Dialog.Portal>

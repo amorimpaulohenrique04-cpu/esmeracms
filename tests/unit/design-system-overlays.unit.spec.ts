@@ -82,6 +82,15 @@ describe('PR-10 — overlays continuam no Base UI', () => {
     }
   })
 
+  it('oferece a variante wide e conteúdo com close controlado', () => {
+    // Conteúdo do diálogo pode ser função e receber `close` para se encerrar após
+    // uma ação assíncrona (ex.: publicar produto e fechar), sem controlar o overlay.
+    expect(overlays).toContain("typeof children === 'function'")
+    expect(overlays).toContain("size === 'wide'")
+    expect(overlays).toContain('esmera-dialog--wide')
+    expect(designSystem).toContain('.esmera-dialog--wide')
+  })
+
   it('reage aos atributos reais de transição emitidos pelo Base UI', () => {
     expect(designSystem).toContain('[data-starting-style]')
     expect(designSystem).toContain('[data-ending-style]')
