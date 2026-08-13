@@ -11,9 +11,9 @@
   }
 }
 
-/* Product filters: native select chrome and module load order must not change geometry. */
-.esmera-products-filter-panel .esmera-input,
-.esmera-products-filter-panel .esmera-filter-panel__actions .esmera-button {
+/* Product filters: native select chrome and module load order must not change geometry.
+   (Botões desta barra herdam a altura padrão do primitive em design-system.scss.) */
+.esmera-products-filter-panel .esmera-input {
   height: var(--esmera-control-standard);
   min-height: var(--esmera-control-standard);
   box-sizing: border-box;
@@ -215,13 +215,8 @@
   align-items: end;
 }
 
-.esmera-after-sales-filters__primary > .esmera-button,
-.esmera-after-sales-filters__primary > [data-root] > .esmera-button,
-.esmera-after-sales-filters__primary > button {
-  height: 38px;
-  min-height: 38px;
-  white-space: nowrap;
-}
+/* Botões do pós-venda: altura consolidada no primitive (design-system.scss),
+   trocando o antigo literal fixo por var(--esmera-control-standard). */
 
 .esmera-after-sales-filters > .esmera-filter-panel__advanced {
   position: relative;
@@ -233,9 +228,9 @@
   align-items: end;
 }
 
-/* Reports: input and submit controls share one explicit visual height. */
-.esmera-report-filter-period .esmera-input,
-.esmera-report-filter-primary > .esmera-button {
+/* Reports: input controls share the standard control height.
+   (O botão de submissão herda a altura padrão do primitive em design-system.scss.) */
+.esmera-report-filter-period .esmera-input {
   height: var(--esmera-control-standard);
   min-height: var(--esmera-control-standard);
   box-sizing: border-box;
