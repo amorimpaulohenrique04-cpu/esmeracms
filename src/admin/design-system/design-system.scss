@@ -212,6 +212,9 @@
   padding: var(--esmera-space-3) 0;
 }
 .esmera-bulk-bar { position: sticky; bottom: var(--esmera-space-4); z-index: var(--esmera-z-sticky); justify-content: space-between; padding: var(--esmera-space-3); border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-panel-radius); background: color-mix(in srgb, var(--esmera-surface-panel) 96%, transparent); box-shadow: var(--esmera-shadow-floating); backdrop-filter: blur(var(--esmera-blur-overlay)); }
+/* A barra de ações em lote pode ter muitos controles (Produtos): a área de ações
+   ocupa a largura da barra e quebra em linhas, em vez de estourar para fora. */
+.esmera-bulk-bar .esmera-actions { flex: 1 1 auto; min-width: 0; justify-content: flex-start; }
 
 .esmera-data-table-wrap { width: 100%; overflow: auto; border-top: 1px solid var(--esmera-line-default); }
 .esmera-data-table { width: 100%; border-collapse: collapse; color: var(--esmera-text); font-size: var(--esmera-font-body); font-variant-numeric: tabular-nums; }
