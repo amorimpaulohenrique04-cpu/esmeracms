@@ -51,7 +51,7 @@ type WorkspaceProps = {
 
 // 'publish' saiu daqui: a publicação em lote passa pelo coordenador e usa
 // items[] com token de concorrência por produto, não ids[].
-type MutationAction = 'unpublish' | 'archive' | 'restore' | 'add-category' | 'set-availability'
+type MutationAction = 'unpublish' | 'archive' | 'restore' | 'delete' | 'add-category' | 'set-availability'
 
 type PublishItemRequest = {
   id: string | number
@@ -275,6 +275,8 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
   const [reportFeedback, setReportFeedback] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState('')
   const [bulkAvailability, setBulkAvailability] = useState('')
+  // Exclusão é destrutiva: exige um segundo clique (armada) para confirmar.
+  const [deleteArmed, setDeleteArmed] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     return new URLSearchParams(window.location.search).get('inspect')
@@ -353,6 +355,10 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
   const selectedIds = table.getSelectedRowModel().rows.map((row) => row.original.id)
   const selectedProduct = products.find((product) => String(product.id) === selectedProductId)
+
+  // Mudar a seleção desarma a exclusão: a confirmação vale só para o conjunto
+  // que o usuário viu ao armar.
+  useEffect(() => { setDeleteArmed(false) }, [selectedIds.length])
 
   async function publishSelected(override?: PublishItemRequest[]) {
     if (busy) return
@@ -456,6 +462,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
 
   async function mutate(action: MutationAction) {
     if (!selectedIds.length || busy) return
+    if (action !== 'delete') setDeleteArmed(false)
     if (action === 'add-category' && !categoryId) {
       setFeedback('Escolha uma categoria antes de aplicar.')
       return
@@ -475,8 +482,10 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
       })
       const body = await response.json() as { updated?: number; errors?: Array<{ id: string | number; message: string }>; error?: string }
       if (!response.ok) throw new Error(body.error || 'Não foi possível atualizar os produtos.')
-      const errorSuffix = body.errors?.length ? ` ${body.errors.length} item(ns) não foram alterados.` : ''
-      setFeedback(`${body.updated || 0} produto(s) atualizados.${errorSuffix}`)
+      const failWord = action === 'delete' ? 'não foram excluídos' : 'não foram alterados'
+      const errorSuffix = body.errors?.length ? ` ${body.errors.length} item(ns) ${failWord}.` : ''
+      const doneWord = action === 'delete' ? 'excluído(s)' : 'atualizados'
+      setFeedback(`${body.updated || 0} produto(s) ${doneWord}.${errorSuffix}`)
       setSelection({})
       router.refresh()
     } catch (error) {
@@ -484,6 +493,18 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     } finally {
       setBusy(false)
     }
+  }
+
+  // Exclusão em dois cliques: o primeiro arma e avisa; o segundo executa.
+  function requestDelete() {
+    if (!selectedIds.length || busy) return
+    if (!deleteArmed) {
+      setDeleteArmed(true)
+      setFeedback(`Excluir ${selectedIds.length} produto(s) é permanente e não pode ser desfeito. Clique em “Confirmar exclusão” para continuar.`)
+      return
+    }
+    setDeleteArmed(false)
+    void mutate('delete')
   }
 
   const master = <>
@@ -656,6 +677,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
         <Button disabled={busy || !categoryId} onClick={() => void mutate('add-category')}>Adicionar categoria</Button>
         <label className="esmera-products-bulk-category"><span>Disponibilidade</span><select className="esmera-input" value={bulkAvailability} onChange={(event) => setBulkAvailability(event.target.value)}><option value="">Escolher…</option>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <Button disabled={busy || !bulkAvailability} onClick={() => void mutate('set-availability')}>Aplicar disponibilidade</Button>
+        <Button tone="danger" disabled={busy} onClick={requestDelete} aria-label={deleteArmed ? `Confirmar exclusão de ${selectedIds.length} produto(s)` : `Excluir ${selectedIds.length} produto(s)`}>{deleteArmed ? 'Confirmar exclusão' : 'Excluir'}</Button>
       </BulkActionBar>
     ) : null}
   </>

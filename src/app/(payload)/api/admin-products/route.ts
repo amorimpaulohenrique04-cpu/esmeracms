@@ -36,6 +36,7 @@ type ProductAction =
   | 'unpublish'
   | 'archive'
   | 'restore'
+  | 'delete'
   | 'add-category'
   | 'set-categories'
   | 'set-availability'
@@ -427,6 +428,11 @@ export async function POST(request: Request) {
 
         if (action === 'unpublish') {
           await payload.update({ collection: 'products', id, data: { _status: 'draft' } as never, draft: true, overrideAccess: false, user })
+        } else if (action === 'delete') {
+          // Exclusão permanente: o access control da collection é aplicado
+          // (overrideAccess: false) e a autorização canManageSite já foi checada
+          // no topo. Falhas por vínculo/permissão caem no catch por-id abaixo.
+          await payload.delete({ collection: 'products', id, overrideAccess: false, user })
         } else if (action === 'archive' || action === 'restore') {
           const currentStatus = (current as { _status?: string })._status
           const mutated = await payload.update({
