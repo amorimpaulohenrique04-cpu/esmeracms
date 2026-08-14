@@ -130,11 +130,14 @@ export async function POST(request: Request) {
     const basePriceCents = priceMode === 'fixed' && typeof body.data?.basePriceCents === 'number'
       ? body.data.basePriceCents
       : null
+    // Disponibilidade opcional na criação: cai no padrão 'available' quando
+    // ausente ou fora do enum conhecido (mesmo conjunto de set-availability).
+    const availability = availabilities.has(String(body.data?.availability)) ? String(body.data?.availability) : 'available'
 
     try {
       const product = await payload.create({
         collection: 'products',
-        data: { title, priceMode, basePriceCents, _status: 'draft' } as never,
+        data: { title, priceMode, basePriceCents, availability, _status: 'draft' } as never,
         draft: true,
         depth: 0,
         overrideAccess: false,

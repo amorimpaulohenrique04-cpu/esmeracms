@@ -7,7 +7,7 @@ import { Button, DialogPanel, ErrorSummary, Field, InlineFeedback } from '../../
 import { expectAdminResponse, normalizeAdminError, type AdminFieldError } from '../../state/asyncState'
 import { ProductCategoryPicker } from './ProductCategoryPicker'
 import { ProductGalleryUploader } from './ProductGalleryUploader'
-import type { ProductGalleryItem, ProductPickerCategory } from './types'
+import { availabilityLabels, type ProductGalleryItem, type ProductPickerCategory } from './types'
 
 type CreateResponse = { id?: string | number }
 
@@ -38,7 +38,7 @@ function currencyInputToCents(value: string): number | null {
 function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCategory[]; onDone: () => void }) {
   const [stage, setStage] = useState<'essential' | 'details'>('essential')
   const [productId, setProductId] = useState<string | number | null>(null)
-  const [draft, setDraft] = useState({ title: '', priceMode: 'inquiry', price: '' })
+  const [draft, setDraft] = useState({ title: '', priceMode: 'inquiry', price: '', availability: 'available' })
   const [selectedCategories, setSelectedCategories] = useState<Array<string | number>>([])
   const [galleryCount, setGalleryCount] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -71,6 +71,7 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
             title,
             priceMode: draft.priceMode,
             basePriceCents: draft.priceMode === 'fixed' ? currencyInputToCents(draft.price) : null,
+            availability: draft.availability,
           },
         }),
       })
@@ -103,6 +104,7 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
             title: draft.title.trim(),
             priceMode: draft.priceMode,
             basePriceCents: draft.priceMode === 'fixed' ? currencyInputToCents(draft.price) : null,
+            availability: draft.availability,
           },
           // Rascunho recém-criado num único fluxo: sem trava de concorrência, já
           // que categorias e galeria foram gravadas ao vivo entre criar e publicar.
@@ -138,6 +140,11 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
           <select className="esmera-input" value={draft.priceMode} onChange={(event) => setDraft({ ...draft, priceMode: event.target.value })}>
             <option value="inquiry">Sob consulta</option>
             <option value="fixed">Preço fixo</option>
+          </select>
+        </Field>
+        <Field label="Disponibilidade">
+          <select className="esmera-input" value={draft.availability} onChange={(event) => setDraft({ ...draft, availability: event.target.value })}>
+            {Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </Field>
         {draft.priceMode === 'fixed' ? (

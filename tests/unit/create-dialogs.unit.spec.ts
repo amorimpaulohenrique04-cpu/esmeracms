@@ -75,7 +75,7 @@ describe('Popups de criação e responsividade', () => {
     const uploader = source('src/admin/modules/products/ProductGalleryUploader.tsx')
     // Estágio 1 cria o rascunho (action create de main), estágio 2 organiza e publica.
     expect(route).toContain("action === 'create'")
-    expect(route).toContain("data: { title, priceMode, basePriceCents, _status: 'draft' }")
+    expect(route).toContain("data: { title, priceMode, basePriceCents, availability, _status: 'draft' }")
     expect(route).toContain("action === 'set-categories'")
     expect(dialog).toContain("'essential'")
     expect(dialog).toContain("'details'")
