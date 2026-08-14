@@ -26,6 +26,19 @@
 .esmera-leads-filters__actions { display: flex; flex: 0 0 auto; gap: 8px; }
 .esmera-leads-filters__actions .esmera-button { min-height: 38px; white-space: nowrap; }
 
+/* Alinha a largura de .esmera-split-workspace com .esmera-funnel-stepper ol:
+   os pisos fixos em px do primitivo padrão (320px/380px) somam 700px, o que
+   podia deixar as colunas com uma largura total ligeiramente diferente dos
+   100% que o stepper ocupa. Fica escopado à página de leads (via className)
+   para não afetar clientes/produtos, que também usam SplitWorkspace. Abaixo
+   de 900px o colapso em coluna única já definido em design-system.scss
+   continua valendo — aqui só ajusta a proporção acima desse ponto. */
+@container esmera-workspace (min-width: 901px) {
+  .esmera-leads-split {
+    grid-template-columns: minmax(0, .8fr) var(--esmera-detail-width, minmax(0, 1.15fr));
+  }
+}
+
 @container esmera-workspace (max-width: 720px) {
   .esmera-leads-table__date { display: none; }
 }
