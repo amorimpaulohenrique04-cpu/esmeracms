@@ -49,6 +49,9 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState<string | number | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
+  // Exclusão é destrutiva: exige um segundo clique (armada) para confirmar,
+  // mesmo padrão usado na exclusão de produtos.
+  const [deleteArmed, setDeleteArmed] = useState(false)
 
   const { data } = useQuery({ queryKey: ['leads', 'list'], queryFn: async () => leads, initialData: leads, staleTime: Infinity })
 
@@ -66,7 +69,37 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
     onError: (error) => setFeedback(error instanceof Error ? error.message : 'Não foi possível qualificar o lead.'),
   })
 
+  const deleteOperation = useMutation({
+    mutationFn: postLeads,
+    onSuccess: () => {
+      queryClient.setQueryData<LeadRecord[]>(['leads', 'list'], (current = []) => current.filter((item) => String(item.id) !== String(selectedId)))
+      setFeedback('Lead excluído.')
+      setSelectedId(null)
+      setDeleteArmed(false)
+      router.refresh()
+    },
+    onError: (error) => setFeedback(error instanceof Error ? error.message : 'Não foi possível excluir o lead.'),
+  })
+
   const selected = useMemo(() => data.find((item) => String(item.id) === String(selectedId)) || null, [data, selectedId])
+
+  // Trocar a seleção desarma a exclusão: a confirmação vale só para o lead que estava aberto.
+  function selectLead(id: string | number | null) {
+    setSelectedId(id)
+    setDeleteArmed(false)
+  }
+
+  function requestDelete() {
+    if (!selected) return
+    if (!deleteArmed) {
+      setDeleteArmed(true)
+      setFeedback('Excluir este lead move o registro para a lixeira. Clique em “Confirmar exclusão” para continuar.')
+      return
+    }
+    setDeleteArmed(false)
+    setFeedback(null)
+    void deleteOperation.mutate({ action: 'delete-lead', id: selected.id })
+  }
 
   return (
     <>
@@ -78,6 +111,8 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
       </div>
     </form>
     <SplitWorkspace
+      className="esmera-leads-split"
+      detailWidth="minmax(0, 1.15fr)"
       master={
         data.length ? (
           <DataTable label="Leads" className="esmera-leads-table">
@@ -87,7 +122,7 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
                 <tr
                   key={String(lead.id)}
                   className={String(lead.id) === String(selectedId) ? 'is-selected' : ''}
-                  onClick={() => setSelectedId(lead.id)}
+                  onClick={() => selectLead(lead.id)}
                   style={{ cursor: 'pointer' }}
                 >
                   <td><strong>{lead.name || 'Sem nome'}</strong></td>
@@ -108,7 +143,7 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
         >
           <Inspector
             footer={<div className="esmera-actions">
-              <button className="esmera-button" type="button" onClick={() => setSelectedId(null)}>Fechar</button>
+              <button className="esmera-button" type="button" onClick={() => selectLead(null)}>Fechar</button>
               {opportunityId(selected.opportunity) ? (
                 <Link className="esmera-button esmera-button--primary" href={`/admin/opportunities?view=list&q=${encodeURIComponent(String(opportunityId(selected.opportunity)))}`}>Ver oportunidade</Link>
               ) : (
@@ -118,6 +153,14 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
                   onClick={() => { setFeedback(null); void operation.mutate({ action: 'qualify', id: selected.id }) }}
                 >{operation.isPending ? 'Convertendo…' : 'Converter em Oportunidade'}</Button>
               )}
+              <Button
+                type="button"
+                tone="danger"
+                busy={deleteOperation.isPending}
+                busyLabel="Excluindo…"
+                onClick={requestDelete}
+                aria-label={deleteArmed ? 'Confirmar exclusão do lead' : 'Excluir lead'}
+              >{deleteArmed ? 'Confirmar exclusão' : 'Excluir lead'}</Button>
             </div>}
           >
             <dl className="esmera-leads-facts">

@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 
 import { canManageBusiness } from '../../../../access/roles'
-import { createLead, qualifyLead } from '../../../../server/domain/leads/operations'
+import { createLead, deleteLead, qualifyLead } from '../../../../server/domain/leads/operations'
 
 export const dynamic = 'force-dynamic'
 
-type Action = 'create-lead' | 'qualify'
+type Action = 'create-lead' | 'qualify' | 'delete-lead'
 
 type Body = {
   action?: Action
@@ -55,6 +55,11 @@ export async function POST(request: Request) {
     if (body.action === 'qualify') {
       if (body.id === undefined) return NextResponse.json({ error: 'O lead é obrigatório.' }, { status: 400 })
       return NextResponse.json(await qualifyLead(payload, user, body.id))
+    }
+
+    if (body.action === 'delete-lead') {
+      if (body.id === undefined) return NextResponse.json({ error: 'O lead é obrigatório.' }, { status: 400 })
+      return NextResponse.json(await deleteLead(payload, user, body.id))
     }
 
     return NextResponse.json({ error: 'Ação não suportada.' }, { status: 400 })

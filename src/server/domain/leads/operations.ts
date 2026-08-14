@@ -49,6 +49,16 @@ export async function createLead(payload: Payload, user: WorkflowUser, input: Cr
   return { lead }
 }
 
+export async function deleteLead(payload: Payload, user: WorkflowUser, leadId: string | number) {
+  await payload.delete({
+    collection: 'leads',
+    id: leadId,
+    overrideAccess: false,
+    user: userOption(user),
+  })
+  return { id: leadId }
+}
+
 export async function qualifyLead(payload: Payload, user: WorkflowUser, leadId: string | number) {
   const lead = await payload.findByID({
     collection: 'leads',

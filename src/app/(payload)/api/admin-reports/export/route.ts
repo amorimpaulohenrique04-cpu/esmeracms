@@ -77,6 +77,11 @@ async function createRecord(
     delivery: 'sync' | 'job'
     filters: ReturnType<typeof normalizedExportFilters>
     identity: ReportExportIdentity
+    // ID cru do usuário autenticado (número no Postgres). `identity.id` é uma
+    // string pensada para exibição no PDF; passá-la para o campo relationship
+    // `requestedBy` falha a validação de tipo do Payload (espera number aqui),
+    // que aparece na UI como "O campo a seguir está inválido: Requested By".
+    userId: string | number
     filename: string
   },
 ) {
@@ -89,7 +94,7 @@ async function createRecord(
       delivery: input.delivery,
       requestedAt: new Date().toISOString(),
       startedAt: input.status === 'processing' ? new Date().toISOString() : null,
-      requestedBy: input.identity.id,
+      requestedBy: input.userId,
       requestedByName: input.identity.name,
       requestedByEmail: input.identity.email,
       filename: input.filename,
@@ -156,12 +161,12 @@ export async function POST(request: Request) {
     const filename = reportExportFilename(filters)
 
     if (shouldQueueBeforeSnapshot(filters)) {
-      record = await createRecord(req, { status: 'queued', delivery: 'job', filters, identity, filename })
+      record = await createRecord(req, { status: 'queued', delivery: 'job', filters, identity, userId: user.id, filename })
       await queueExport(req, record)
       return queuedResponse(record)
     }
 
-    record = await createRecord(req, { status: 'processing', delivery: 'sync', filters, identity, filename })
+    record = await createRecord(req, { status: 'processing', delivery: 'sync', filters, identity, userId: user.id, filename })
     const snapshot = await getReportingSnapshot(req, filters)
     const estimatedRows = estimateReportRows(snapshot)
 
