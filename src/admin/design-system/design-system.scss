@@ -292,9 +292,6 @@
   .esmera-bulk-group:nth-child(3) { padding-left: 0; border-left: 0; }
   .esmera-bulk-group + .esmera-bulk-group { padding-top: var(--esmera-space-3); border-top: 1px solid var(--esmera-line-subtle); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .esmera-bulk-panel__toggle svg { transition: none; }
-}
 
 .esmera-data-table-wrap { width: 100%; overflow: auto; border-top: 1px solid var(--esmera-line-default); }
 .esmera-data-table { width: 100%; border-collapse: collapse; color: var(--esmera-text); font-size: var(--esmera-font-body); font-variant-numeric: tabular-nums; }
