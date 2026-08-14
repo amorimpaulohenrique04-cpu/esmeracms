@@ -148,7 +148,7 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
           </select>
         </Field>
         {draft.priceMode === 'fixed' ? (
-          <Field label="Valor (R$)" hint="Opcional na criação; use vírgula para os centavos.">
+          <Field label="Valor (R$)" hint="Opcional na criação; use vírgula para os centavos." className="esmera-product-create-price">
             <input className="esmera-input" inputMode="decimal" value={draft.price} onChange={(event) => setDraft({ ...draft, price: normalizeCurrencyInput(event.target.value) })} placeholder="0,00" />
           </Field>
         ) : null}

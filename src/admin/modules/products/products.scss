@@ -163,6 +163,21 @@
 .esmera-product-create-dialog__actions { grid-column: 1 / -1; }
 .esmera-product-create-dialog__actions { display: flex; justify-content: flex-end; }
 
+/* Etapa 1: entrada escalonada dos campos ao abrir o popup e revelação suave do
+   campo condicional de preço ao alternar para "Preço fixo". `both` mantém o
+   estado inicial durante o atraso, então cada campo surge na sua vez. */
+@keyframes esmera-create-field-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.esmera-product-create-dialog > * { animation: esmera-create-field-in var(--esmera-motion-component) var(--esmera-ease-enter) both; }
+.esmera-product-create-dialog > *:nth-child(2) { animation-delay: 45ms; }
+.esmera-product-create-dialog > *:nth-child(3) { animation-delay: 90ms; }
+.esmera-product-create-dialog > *:nth-child(4) { animation-delay: 135ms; }
+.esmera-product-create-dialog > *:nth-child(n + 5) { animation-delay: 180ms; }
+/* Preço fixo aparece na hora ao alternar (sem herdar o atraso do stagger). */
+.esmera-product-create-dialog > .esmera-product-create-price { animation-delay: 0ms; }
+
 .esmera-product-media-manager { min-width: 0; }
 .esmera-product-media-upload-input { display: none; }
 .esmera-product-media-actions { display: flex; align-items: center; gap: var(--esmera-space-2); }
@@ -250,6 +265,7 @@
   .esmera-product-tile__select,
   .esmera-product-tile__inspect,
   .esmera-products-workspace .esmera-data-table .esmera-product-row-action { transition: none; opacity: 1; }
+  .esmera-product-create-dialog > * { animation: none; }
 }
 
 /* Popup de criação de produto — estágio 2 (categorias + galeria) */
