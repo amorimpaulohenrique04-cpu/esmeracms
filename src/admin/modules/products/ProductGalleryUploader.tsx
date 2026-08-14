@@ -132,27 +132,27 @@ export function ProductGalleryUploader({
 
   return (
     <div className="esmera-product-gallery-uploader">
+      {/* Grid: rótulo e dica ocupam a linha inteira; o controle de arquivo e o
+          botão "Enviar" dividem a mesma linha, alinhados na mesma baseline. */}
       <form className="esmera-product-gallery-uploader__add" onSubmit={addImage}>
-        <div className="esmera-file-upload-field">
-          <span className="esmera-field-label">Adicionar imagem</span>
-          {/* Input real fica visualmente oculto mas focável; o rótulo estilizado
-              é a área de envio. Teclado: Tab foca o input, Enter/Espaço abre o
-              seletor de arquivo — mesmo mecanismo, sem o controle nativo cru. */}
-          <label className={`esmera-file-upload${busy ? ' is-disabled' : ''}`}>
-            <input
-              ref={fileRef}
-              className="esmera-file-upload__input"
-              type="file"
-              accept="image/*"
-              disabled={busy}
-              onChange={(event) => setFileName(event.target.files?.[0]?.name ?? '')}
-            />
-            <span className="esmera-file-upload__button" aria-hidden="true">Escolher imagem</span>
-            <span className="esmera-file-upload__name">{fileName || 'Nenhuma imagem selecionada'}</span>
-          </label>
-          <span className="esmera-field-hint">Código de mídia, capa e texto alternativo são gerados automaticamente.</span>
-        </div>
+        <span className="esmera-field-label esmera-product-gallery-uploader__label">Adicionar imagem</span>
+        {/* Input real fica visualmente oculto mas focável; o rótulo estilizado
+            é a área de envio. Teclado: Tab foca o input, Enter/Espaço abre o
+            seletor de arquivo — mesmo mecanismo, sem o controle nativo cru. */}
+        <label className={`esmera-file-upload${busy ? ' is-disabled' : ''}`}>
+          <input
+            ref={fileRef}
+            className="esmera-file-upload__input"
+            type="file"
+            accept="image/*"
+            disabled={busy}
+            onChange={(event) => setFileName(event.target.files?.[0]?.name ?? '')}
+          />
+          <span className="esmera-file-upload__button" aria-hidden="true">Escolher imagem</span>
+          <span className="esmera-file-upload__name">{fileName || 'Nenhuma imagem selecionada'}</span>
+        </label>
         <Button type="submit" busy={busy}>Enviar imagem</Button>
+        <span className="esmera-field-hint esmera-product-gallery-uploader__hint">Código de mídia, capa e texto alternativo são gerados automaticamente.</span>
       </form>
 
       {gallery.length ? (

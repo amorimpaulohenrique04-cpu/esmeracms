@@ -329,7 +329,9 @@
 .esmera-product-category-node__via { display: block; margin-top: 2px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 
 .esmera-product-gallery-uploader { display: grid; gap: var(--esmera-space-3); }
-.esmera-product-gallery-uploader__add { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--esmera-space-3); }
+.esmera-product-gallery-uploader__add { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px var(--esmera-space-3); }
+.esmera-product-gallery-uploader__label,
+.esmera-product-gallery-uploader__hint { grid-column: 1 / -1; }
 .esmera-product-gallery-uploader__add .esmera-button { min-height: var(--esmera-control-standard); }
 
 /* Controle de upload estilizado: input nativo oculto (mas focável) + rótulo com

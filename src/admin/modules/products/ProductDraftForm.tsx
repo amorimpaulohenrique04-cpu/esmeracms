@@ -408,6 +408,23 @@ export function ProductDraftForm({
           }}
         />
       ) : undefined}
+      footer={
+        <ActionBar
+          dirty={dirty}
+          saving={saving}
+          published={published}
+          publicationBlocked={feedback?.code === 'publication_blocked'}
+          publishLabel={confirmationToken ? 'Confirmar publicação' : 'Salvar e publicar'}
+          onSave={() => void enqueueSave(draft, true)}
+          onPublish={() => void publish(confirmationToken)}
+          onUnpublish={() => void legacyAction('unpublish')}
+          secondary={
+            <Button disabled={saving} onClick={() => void legacyAction(archived ? 'restore' : 'archive')}>
+              {archived ? 'Restaurar no catálogo' : 'Arquivar'}
+            </Button>
+          }
+        />
+      }
     >
       {feedback?.tone === 'danger' ? (
         <ErrorSummary
@@ -507,22 +524,6 @@ export function ProductDraftForm({
           <InlineFeedback tone="warning">Publicação aguardando sua confirmação dos avisos.</InlineFeedback>
         ) : null}
       </div>
-
-      <ActionBar
-        dirty={dirty}
-        saving={saving}
-        published={published}
-        publicationBlocked={feedback?.code === 'publication_blocked'}
-        publishLabel={confirmationToken ? 'Confirmar publicação' : 'Salvar e publicar'}
-        onSave={() => void enqueueSave(draft, true)}
-        onPublish={() => void publish(confirmationToken)}
-        onUnpublish={() => void legacyAction('unpublish')}
-        secondary={
-          <Button disabled={saving} onClick={() => void legacyAction(archived ? 'restore' : 'archive')}>
-            {archived ? 'Restaurar no catálogo' : 'Arquivar'}
-          </Button>
-        }
-      />
     </FormShell>
   )
 }
