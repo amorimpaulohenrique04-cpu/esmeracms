@@ -69,8 +69,12 @@
   flex: 0 0 auto;
   align-items: flex-start;
   gap: 8px;
+  /* O filtro primário tem um rótulo (11px + 5px de gap) acima de cada
+     controle; o bloco de ações não tem rótulo, então recebe o mesmo
+     deslocamento para os botões casarem a baseline com .esmera-after-sales-filters__primary. */
+  padding-top: 19px;
 }
-.esmera-after-sales-actions > .esmera-button { min-height: 38px; white-space: nowrap; }
+.esmera-after-sales-actions > .esmera-button { min-height: var(--esmera-control-standard); white-space: nowrap; }
 
 .esmera-after-sales-filters label,
 .esmera-after-sales-form label,
@@ -86,7 +90,7 @@
 }
 
 .esmera-after-sales-filters .esmera-input,
-.esmera-after-sales-filters .esmera-button { min-height: 38px; }
+.esmera-after-sales-filters .esmera-button { min-height: var(--esmera-control-standard); }
 
 .esmera-after-sales-advanced { position: relative; width: fit-content; }
 .esmera-after-sales-advanced summary {
@@ -315,7 +319,7 @@
   .esmera-after-sales-toolbar { align-items: stretch; flex-direction: column; }
   .esmera-after-sales-filters__primary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .esmera-after-sales-search { grid-column: 1 / -1; }
-  .esmera-after-sales-actions { width: 100%; }
+  .esmera-after-sales-actions { width: 100%; padding-top: 0; }
   .esmera-after-sales-actions > .esmera-button { flex: 1 1 0; width: 100%; }
   .esmera-after-sales-workspace,
   .esmera-after-sales-workspace.has-inspector { display: block; }
