@@ -126,9 +126,6 @@
 .esmera-products-bulk-result__list > li { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--esmera-space-3); padding: var(--esmera-space-3); border-left: 2px solid var(--esmera-warning); background: var(--esmera-surface-hover); }
 .esmera-products-bulk-result__list p { margin: 4px 0 0; color: var(--esmera-text-secondary); font-size: var(--esmera-font-meta); line-height: var(--esmera-line-body); }
 .esmera-products-bulk-result__status { display: block; margin-top: 2px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
-.esmera-products-bulk-category { min-width: 190px; display: grid; grid-template-columns: auto minmax(120px, 1fr); align-items: center; gap: 7px; }
-.esmera-products-bulk-category span { color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
-.esmera-products-bulk-category .esmera-input { min-height: var(--esmera-control-compact); }
 
 .esmera-product-document-status { display: flex; flex-wrap: wrap; gap: 7px; margin: calc(var(--esmera-space-4) * -1) 0 var(--esmera-space-5); }
 .esmera-product-tabs { display: flex; overflow-x: auto; gap: 0; margin-bottom: var(--esmera-space-5); border-bottom: 1px solid var(--esmera-line-default); scrollbar-width: thin; overscroll-behavior-inline: contain; }

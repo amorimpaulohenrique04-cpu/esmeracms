@@ -216,6 +216,82 @@
    ocupa a largura da barra e quebra em linhas, em vez de estourar para fora. */
 .esmera-bulk-bar .esmera-actions { flex: 1 1 auto; min-width: 0; justify-content: flex-start; }
 
+/* Painel de ações em lote (BulkActionBar): <details> recolhível com cabeçalho,
+   corpo em seções rotuladas e rodapé de status. Sticky como a barra simples. */
+.esmera-bulk-panel {
+  position: sticky;
+  bottom: var(--esmera-space-4);
+  z-index: var(--esmera-z-sticky);
+  overflow: hidden;
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-panel-radius);
+  background: var(--esmera-surface-panel);
+  box-shadow: var(--esmera-shadow-floating);
+}
+.esmera-bulk-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esmera-space-4);
+  padding: var(--esmera-space-4) var(--esmera-space-5);
+  cursor: pointer;
+  list-style: none;
+}
+.esmera-bulk-panel__header::-webkit-details-marker { display: none; }
+.esmera-bulk-panel__header:focus-visible { outline: 2px solid var(--esmera-focus); outline-offset: -3px; }
+.esmera-bulk-panel__heading { min-width: 0; display: grid; gap: 2px; }
+.esmera-bulk-panel__heading strong { color: var(--esmera-text); font-size: var(--esmera-font-subtitle); font-weight: var(--esmera-weight-semibold); }
+.esmera-bulk-panel__subtitle { color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); }
+.esmera-bulk-panel__toggle {
+  flex: 0 0 auto;
+  width: var(--esmera-control-standard);
+  height: var(--esmera-control-standard);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--esmera-line-default);
+  border-radius: var(--esmera-control-radius);
+  background: var(--esmera-surface-panel);
+  color: var(--esmera-text-secondary);
+}
+.esmera-bulk-panel__toggle svg { width: 18px; height: 18px; transition: transform var(--esmera-motion-fast) var(--esmera-ease-standard); }
+.esmera-bulk-panel:not([open]) .esmera-bulk-panel__toggle svg { transform: rotate(180deg); }
+.esmera-bulk-panel__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(200px, 1fr) minmax(200px, 1fr);
+  gap: var(--esmera-space-5);
+  padding: var(--esmera-space-2) var(--esmera-space-5) var(--esmera-space-5);
+}
+.esmera-bulk-group { min-width: 0; display: grid; gap: var(--esmera-space-3); align-content: start; }
+.esmera-bulk-group + .esmera-bulk-group { padding-left: var(--esmera-space-5); border-left: 1px solid var(--esmera-line-subtle); }
+.esmera-bulk-group__label { color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); font-weight: var(--esmera-weight-semibold); letter-spacing: .06em; text-transform: uppercase; }
+.esmera-bulk-group__controls { display: flex; flex-wrap: wrap; gap: var(--esmera-space-2); }
+.esmera-bulk-group__controls--stack { flex-direction: column; align-items: stretch; }
+.esmera-bulk-group__controls .esmera-input { min-height: var(--esmera-control-standard); }
+.esmera-bulk-add { justify-content: center; border-color: transparent; background: var(--esmera-primary-soft); color: var(--esmera-primary); }
+.esmera-bulk-add:hover:not(:disabled) { border-color: transparent; background: color-mix(in srgb, var(--esmera-primary-soft) 82%, var(--esmera-primary)); }
+.esmera-bulk-panel__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--esmera-space-2);
+  padding: var(--esmera-space-3) var(--esmera-space-5);
+  border-top: 1px solid var(--esmera-line-subtle);
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-meta);
+}
+.esmera-bulk-status { display: inline-flex; align-items: center; gap: 6px; }
+.esmera-bulk-status .esmera-button__icon { color: var(--esmera-success); }
+
+/* Ícone decorativo dentro de botões (ações em lote). */
+.esmera-button__icon { width: 16px; height: 16px; flex: 0 0 auto; }
+
+@media (max-width: 880px) {
+  .esmera-bulk-panel__body { grid-template-columns: 1fr; }
+  .esmera-bulk-group + .esmera-bulk-group { padding-left: 0; border-left: 0; padding-top: var(--esmera-space-4); border-top: 1px solid var(--esmera-line-subtle); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .esmera-bulk-panel__toggle svg { transition: none; }
+}
+
 .esmera-data-table-wrap { width: 100%; overflow: auto; border-top: 1px solid var(--esmera-line-default); }
 .esmera-data-table { width: 100%; border-collapse: collapse; color: var(--esmera-text); font-size: var(--esmera-font-body); font-variant-numeric: tabular-nums; }
 .esmera-data-table th { padding: 11px 14px; border-bottom: 1px solid var(--esmera-line-default); color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); font-weight: var(--esmera-weight-semibold); text-align: left; white-space: nowrap; }
