@@ -291,13 +291,23 @@
   }
 }
 
-@media (max-width: 900px) {
+/*
+ * Container query, não viewport: o corpo com aside (checklist de produto) só
+ * existe dentro de .esmera-view (container-name: esmera-workspace, definido em
+ * views.scss), cuja largura real varia com sidebar/rail. Um @media aqui
+ * mantinha as duas colunas forçadas mesmo quando o espaço real (descontada a
+ * navegação) já não cabia confortavelmente — a coluna de conteúdo ficava
+ * espremida contra o checklist. @container reage à largura real do workspace.
+ */
+@container esmera-workspace (max-width: 900px) {
   .esmera-form-shell__body.has-aside {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 700px) {
+/* Empilhamento do cabeçalho (título × status) reage à largura real do
+   workspace — mesmo motivo do container query acima. */
+@container esmera-workspace (max-width: 700px) {
   .esmera-form-shell__header {
     align-items: stretch;
     flex-direction: column;
@@ -306,7 +316,11 @@
   .esmera-form-shell__header-actions {
     width: 100%;
   }
+}
 
+/* Alvo de toque das abas: correlaciona com o dispositivo/viewport, não com o
+   espaço disponível do workspace — permanece @media de propósito. */
+@media (max-width: 700px) {
   .esmera-form-shell__tab {
     min-height: 44px;
     padding-inline: var(--esmera-space-3);
