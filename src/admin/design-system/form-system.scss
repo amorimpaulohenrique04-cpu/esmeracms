@@ -207,6 +207,24 @@
   background: var(--esmera-surface-panel);
 }
 
+.esmera-form-shell__footer {
+  min-width: 0;
+}
+
+/*
+ * Com um `aside` (checklist), o corpo vira duas colunas e a barra de ações não
+ * cabe mais na coluna de conteúdo sem parecer solta ao lado do checklist alto.
+ * O rodapé a leva para baixo das duas colunas, rente às bordas do painel
+ * (cancela o padding do shell), como um rodapé de largura total.
+ */
+.esmera-product-document-full .esmera-form-shell__footer {
+  margin: var(--esmera-space-5) calc(-1 * var(--esmera-space-5)) calc(-1 * var(--esmera-space-5));
+}
+
+.esmera-product-document-full .esmera-form-shell__footer .esmera-action-bar {
+  border-radius: 0 0 var(--esmera-panel-radius) var(--esmera-panel-radius);
+}
+
 .esmera-action-bar {
   min-width: 0;
   display: flex;

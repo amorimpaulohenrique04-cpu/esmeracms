@@ -28,6 +28,7 @@ export function FormShell({
   children,
   aside,
   actions,
+  footer,
 }: {
   title: string
   description?: string
@@ -37,6 +38,12 @@ export function FormShell({
   children: React.ReactNode
   aside?: React.ReactNode
   actions?: React.ReactNode
+  /**
+   * Rodapé opcional renderizado ABAIXO do corpo, ocupando a largura inteira do
+   * shell (fora do grid `has-aside`). É onde mora a barra de ações quando existe
+   * um `aside` — senão ela ficaria presa na coluna de conteúdo ao lado do aside.
+   */
+  footer?: React.ReactNode
 }) {
   return (
     <section className="esmera-form-shell">
@@ -79,6 +86,7 @@ export function FormShell({
         <div className="esmera-form-shell__content">{children}</div>
         {aside ? <aside className="esmera-form-shell__aside">{aside}</aside> : null}
       </div>
+      {footer ? <div className="esmera-form-shell__footer">{footer}</div> : null}
     </section>
   )
 }
