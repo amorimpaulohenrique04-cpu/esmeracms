@@ -683,11 +683,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     </nav>
 
     {selectedIds.length ? (
-      <BulkActionBar
-        count={selectedIds.length}
-        subtitle="Ações em lote para o item selecionado"
-        footer={<span className="esmera-bulk-status" aria-live="polite">{bulkIcons.publish} {selectedIds.length} {selectedIds.length === 1 ? 'item selecionado' : 'itens selecionados'}</span>}
-      >
+      <BulkActionBar count={selectedIds.length} subtitle="Ações em lote para o item selecionado">
         <section className="esmera-bulk-group">
           <span className="esmera-bulk-group__label">Ações</span>
           <div className="esmera-bulk-group__controls">
@@ -695,7 +691,6 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
             <Button disabled={busy} onClick={() => void mutate('unpublish')}>{bulkIcons.unpublish}Despublicar</Button>
             <Button disabled={busy} onClick={() => void mutate('archive')}>{bulkIcons.archive}Arquivar</Button>
             <Button disabled={busy} onClick={() => void mutate('restore')}>{bulkIcons.restore}Restaurar</Button>
-            <Button disabled={busy || !bulkAvailability} onClick={() => void mutate('set-availability')}>{bulkIcons.availability}Aplicar disponibilidade</Button>
             <Button tone="danger" disabled={busy} onClick={requestDelete} aria-label={deleteArmed ? `Confirmar exclusão de ${selectedIds.length} produto(s)` : `Excluir ${selectedIds.length} produto(s)`}>{bulkIcons.delete}{deleteArmed ? 'Confirmar exclusão' : 'Excluir'}</Button>
           </div>
         </section>
@@ -710,6 +705,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
           <span className="esmera-bulk-group__label">Disponibilidade</span>
           <div className="esmera-bulk-group__controls esmera-bulk-group__controls--stack">
             <select className="esmera-input" aria-label="Disponibilidade" value={bulkAvailability} onChange={(event) => setBulkAvailability(event.target.value)}><option value="">Escolher disponibilidade</option>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <Button className="esmera-bulk-add" disabled={busy || !bulkAvailability} onClick={() => void mutate('set-availability')}>{bulkIcons.availability}Aplicar disponibilidade</Button>
           </div>
         </section>
       </BulkActionBar>

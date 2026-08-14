@@ -25,13 +25,11 @@ export function Inspector({ header, children, footer, className = '' }: { header
 export function BulkActionBar({
   count,
   subtitle,
-  footer,
   children,
   className = '',
 }: {
   count: number
   subtitle?: React.ReactNode
-  footer?: React.ReactNode
   children: React.ReactNode
   className?: string
 }) {
@@ -51,7 +49,6 @@ export function BulkActionBar({
         </span>
       </summary>
       <div className="esmera-bulk-panel__body">{children}</div>
-      {footer ? <div className="esmera-bulk-panel__footer">{footer}</div> : null}
     </details>
   )
 }
