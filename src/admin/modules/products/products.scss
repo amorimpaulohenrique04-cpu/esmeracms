@@ -150,6 +150,105 @@
 .esmera-product-draft-form__save-feedback,
 .esmera-product-publication-feedback { min-height: 24px; }
 
+/* =========================================================
+ * Edição rápida do rascunho — redesign visual (CSS only).
+ * Escopado sob .esmera-product-document-full para não afetar o
+ * FormShell/PublicationChecklist compartilhado com Categorias.
+ * ========================================================= */
+.esmera-product-document-full > .esmera-form-shell {
+  max-width: 1600px;
+  margin-inline: auto;
+}
+
+.esmera-product-document-full .esmera-form-shell__header {
+  align-items: center;
+  padding-bottom: var(--esmera-space-5);
+  margin-bottom: var(--esmera-space-2);
+  border-bottom: 1px solid var(--esmera-line-subtle);
+}
+
+.esmera-product-document-full .esmera-form-shell__header h2 {
+  font-size: 28px;
+  letter-spacing: -.02em;
+}
+
+.esmera-product-document-full .esmera-form-shell__header p {
+  max-width: 60ch;
+  margin-top: var(--esmera-space-2);
+  line-height: 1.7;
+}
+
+.esmera-product-document-full .esmera-form-shell__tabs {
+  margin-top: var(--esmera-space-2);
+  margin-bottom: var(--esmera-space-5);
+}
+
+.esmera-product-document-full .esmera-form-shell__tab {
+  min-height: 52px;
+  padding-inline: var(--esmera-space-5);
+}
+
+.esmera-product-document-full .esmera-form-shell__tab.is-active::after {
+  height: 3px;
+}
+
+.esmera-product-document-full .esmera-form-shell__body.has-aside {
+  grid-template-columns: minmax(0, 1.85fr) minmax(280px, 1fr);
+  gap: var(--esmera-space-6);
+}
+
+/* Título e Subtítulo empilhados (não lado a lado) mesmo no grid de 3
+   colunas do restante do formulário. */
+.esmera-product-document-full .esmera-product-draft-grid [data-field-path='title'],
+.esmera-product-document-full .esmera-product-draft-grid [data-field-path='subtitle'] {
+  grid-column: 1 / -1;
+}
+
+/* Painel de validação com mais presença: fundo levemente esverdeado
+   quando pronto, check maior. */
+.esmera-product-document-full .esmera-publication-checklist {
+  align-self: start;
+}
+
+.esmera-product-document-full .esmera-form-shell__aside:has(output.is-ready) .esmera-publication-checklist {
+  border-color: color-mix(in srgb, var(--esmera-success) 35%, var(--esmera-line-default));
+  background: var(--esmera-success-soft);
+}
+
+.esmera-product-document-full .esmera-publication-checklist output {
+  min-width: 40px;
+  min-height: 40px;
+  font-size: var(--esmera-font-section);
+}
+
+/* "Rascunho sincronizado." interno vira um status pequeno e discreto,
+   com um check — só no tom neutro (é o único usado para esse texto). */
+.esmera-product-document-full .esmera-product-draft-form__save-feedback .esmera-inline-feedback.is-neutral {
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border-left: 0;
+  background: transparent;
+  color: var(--esmera-text-muted);
+  font-size: var(--esmera-font-meta);
+}
+
+.esmera-product-document-full .esmera-product-draft-form__save-feedback .esmera-inline-feedback.is-neutral::before {
+  content: '✓';
+  color: var(--esmera-success);
+  font-weight: var(--esmera-weight-semibold);
+}
+
+/* Rodapé com botões maiores e hierarquia mais clara. */
+.esmera-product-document-full .esmera-form-shell__footer .esmera-action-bar {
+  padding-block: var(--esmera-space-5);
+}
+
+.esmera-product-document-full .esmera-form-shell__footer .esmera-button {
+  min-height: 46px;
+  padding-inline: var(--esmera-space-5);
+}
+
 .esmera-product-options { display: grid; gap: var(--esmera-space-4); }
 .esmera-product-options strong { display: block; margin-bottom: 8px; font-size: var(--esmera-font-body); }
 .esmera-product-option-chip { display: inline-flex; align-items: center; gap: 6px; margin: 0 6px 6px 0; padding: 6px 8px; border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-control-radius); font-size: var(--esmera-font-meta); }
