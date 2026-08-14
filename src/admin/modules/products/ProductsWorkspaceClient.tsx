@@ -53,6 +53,21 @@ type WorkspaceProps = {
 // items[] com token de concorrência por produto, não ids[].
 type MutationAction = 'unpublish' | 'archive' | 'restore' | 'delete' | 'add-category' | 'set-availability'
 
+// Ícones decorativos das ações em lote (aria-hidden; o rótulo textual carrega o
+// significado). Traço em currentColor para acompanhar o tom de cada botão.
+function BulkIcon({ path }: { path: React.ReactNode }) {
+  return <svg className="esmera-button__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{path}</svg>
+}
+const bulkIcons = {
+  publish: <BulkIcon path={<path d="M4 12l5 5L20 6" />} />,
+  unpublish: <BulkIcon path={<><path d="m3 3 18 18" /><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.9 5.1A8.8 8.8 0 0 1 12 5c6 0 9 7 9 7a15 15 0 0 1-2 2.9M6.3 6.3A14.7 14.7 0 0 0 3 12s3 7 9 7a8.5 8.5 0 0 0 2.6-.4" /></>} />,
+  archive: <BulkIcon path={<><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" /></>} />,
+  restore: <BulkIcon path={<><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></>} />,
+  availability: <BulkIcon path={<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>} />,
+  delete: <BulkIcon path={<><path d="M4 7h16" /><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /><path d="M6 7v13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7" /></>} />,
+  add: <BulkIcon path={<path d="M12 5v14M5 12h14" />} />,
+}
+
 type PublishItemRequest = {
   id: string | number
   expectedUpdatedAt: string
@@ -668,16 +683,35 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     </nav>
 
     {selectedIds.length ? (
-      <BulkActionBar count={selectedIds.length}>
-        <Button disabled={busy} onClick={() => void publishSelected()} tone="primary">Publicar</Button>
-        <Button disabled={busy} onClick={() => void mutate('unpublish')}>Despublicar</Button>
-        <Button disabled={busy} onClick={() => void mutate('archive')}>Arquivar</Button>
-        <Button disabled={busy} onClick={() => void mutate('restore')}>Restaurar</Button>
-        <label className="esmera-products-bulk-category"><span>Categoria</span><select className="esmera-input" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Escolher…</option>{categories.map((category) => <option key={String(category.id)} value={String(category.id)}>{category.title || category.slug || category.id}</option>)}</select></label>
-        <Button disabled={busy || !categoryId} onClick={() => void mutate('add-category')}>Adicionar categoria</Button>
-        <label className="esmera-products-bulk-category"><span>Disponibilidade</span><select className="esmera-input" value={bulkAvailability} onChange={(event) => setBulkAvailability(event.target.value)}><option value="">Escolher…</option>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <Button disabled={busy || !bulkAvailability} onClick={() => void mutate('set-availability')}>Aplicar disponibilidade</Button>
-        <Button tone="danger" disabled={busy} onClick={requestDelete} aria-label={deleteArmed ? `Confirmar exclusão de ${selectedIds.length} produto(s)` : `Excluir ${selectedIds.length} produto(s)`}>{deleteArmed ? 'Confirmar exclusão' : 'Excluir'}</Button>
+      <BulkActionBar
+        count={selectedIds.length}
+        subtitle="Ações em lote para o item selecionado"
+        footer={<span className="esmera-bulk-status" aria-live="polite">{bulkIcons.publish} {selectedIds.length} {selectedIds.length === 1 ? 'item selecionado' : 'itens selecionados'}</span>}
+      >
+        <section className="esmera-bulk-group">
+          <span className="esmera-bulk-group__label">Ações</span>
+          <div className="esmera-bulk-group__controls">
+            <Button disabled={busy} onClick={() => void publishSelected()} tone="primary">{bulkIcons.publish}Publicar</Button>
+            <Button disabled={busy} onClick={() => void mutate('unpublish')}>{bulkIcons.unpublish}Despublicar</Button>
+            <Button disabled={busy} onClick={() => void mutate('archive')}>{bulkIcons.archive}Arquivar</Button>
+            <Button disabled={busy} onClick={() => void mutate('restore')}>{bulkIcons.restore}Restaurar</Button>
+            <Button disabled={busy || !bulkAvailability} onClick={() => void mutate('set-availability')}>{bulkIcons.availability}Aplicar disponibilidade</Button>
+            <Button tone="danger" disabled={busy} onClick={requestDelete} aria-label={deleteArmed ? `Confirmar exclusão de ${selectedIds.length} produto(s)` : `Excluir ${selectedIds.length} produto(s)`}>{bulkIcons.delete}{deleteArmed ? 'Confirmar exclusão' : 'Excluir'}</Button>
+          </div>
+        </section>
+        <section className="esmera-bulk-group">
+          <span className="esmera-bulk-group__label">Categoria</span>
+          <div className="esmera-bulk-group__controls esmera-bulk-group__controls--stack">
+            <select className="esmera-input" aria-label="Categoria" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Escolher categoria</option>{categories.map((category) => <option key={String(category.id)} value={String(category.id)}>{category.title || category.slug || category.id}</option>)}</select>
+            <Button className="esmera-bulk-add" disabled={busy || !categoryId} onClick={() => void mutate('add-category')}>{bulkIcons.add}Adicionar categoria</Button>
+          </div>
+        </section>
+        <section className="esmera-bulk-group">
+          <span className="esmera-bulk-group__label">Disponibilidade</span>
+          <div className="esmera-bulk-group__controls esmera-bulk-group__controls--stack">
+            <select className="esmera-input" aria-label="Disponibilidade" value={bulkAvailability} onChange={(event) => setBulkAvailability(event.target.value)}><option value="">Escolher disponibilidade</option>{Object.entries(availabilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          </div>
+        </section>
       </BulkActionBar>
     ) : null}
   </>

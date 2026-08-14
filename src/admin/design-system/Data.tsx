@@ -22,11 +22,36 @@ export function Inspector({ header, children, footer, className = '' }: { header
   )
 }
 
-export function BulkActionBar({ count, children, className = '' }: { count: number; children: React.ReactNode; className?: string }) {
+export function BulkActionBar({
+  count,
+  subtitle,
+  footer,
+  children,
+  className = '',
+}: {
+  count: number
+  subtitle?: React.ReactNode
+  footer?: React.ReactNode
+  children: React.ReactNode
+  className?: string
+}) {
+  const title = `${count} ${count === 1 ? 'item selecionado' : 'itens selecionados'}`
+  // Painel recolhível nativo (<details>): sem JS/estado, o cabeçalho é o
+  // disclosure acessível e o corpo agrupa as ações em seções rotuladas em vez
+  // de uma fileira única que estoura a largura.
   return (
-    <div className={`esmera-bulk-bar${className ? ` ${className}` : ''}`} role="region" aria-label="Ações em lote">
-      <strong>{count} {count === 1 ? 'item selecionado' : 'itens selecionados'}</strong>
-      <div className="esmera-actions">{children}</div>
-    </div>
+    <details className={`esmera-bulk-panel${className ? ` ${className}` : ''}`} open aria-label="Ações em lote">
+      <summary className="esmera-bulk-panel__header">
+        <span className="esmera-bulk-panel__heading">
+          <strong>{title}</strong>
+          {subtitle ? <span className="esmera-bulk-panel__subtitle">{subtitle}</span> : null}
+        </span>
+        <span className="esmera-bulk-panel__toggle" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6" /></svg>
+        </span>
+      </summary>
+      <div className="esmera-bulk-panel__body">{children}</div>
+      {footer ? <div className="esmera-bulk-panel__footer">{footer}</div> : null}
+    </details>
   )
 }
