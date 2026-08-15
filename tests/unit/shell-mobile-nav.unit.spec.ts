@@ -93,8 +93,8 @@ describe('PR-11 — GlobalCreateMenu', () => {
     const productItem = items.find((item) => (item.textContent || '').includes('Novo produto'))
     expect(productItem).not.toBeUndefined()
     fireEvent.click(productItem as HTMLElement)
-    expect(navigationFeedback.beginNavigation).toHaveBeenCalledWith('/admin/collections/products/create')
-    expect(push).toHaveBeenCalledWith('/admin/collections/products/create')
+    expect(navigationFeedback.beginNavigation).toHaveBeenCalledWith('/admin/products?novo=produto')
+    expect(push).toHaveBeenCalledWith('/admin/products?novo=produto')
   })
 
   it('Escape fecha o menu', async () => {

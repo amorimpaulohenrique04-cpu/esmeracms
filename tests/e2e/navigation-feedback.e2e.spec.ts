@@ -75,25 +75,26 @@ test.describe('Feedback de navegação do Admin (F12)', () => {
     await expect(page.getByTestId('esmera-route-skeleton')).toHaveCount(0)
   })
 
-  test('skeleton aparece (variante form) quando a navegação demora e some ao concluir', async () => {
-    await page.goto('http://localhost:3000/admin/products')
-    await delayRoute(page, '/admin/collections/products/create', 900)
+  test('skeleton aparece (variante list) quando a navegação demora e some ao concluir', async () => {
+    await page.goto('http://localhost:3000/admin/opportunities')
+    await delayRoute(page, '/admin/products?novo=produto', 900)
 
     await page.getByTestId('esmera-global-create').click()
     await page.getByRole('menuitem', { name: /Novo produto/i }).click()
 
     const skeleton = page.getByTestId('esmera-route-skeleton')
     await expect(skeleton).toBeVisible({ timeout: 700 })
-    await expect(skeleton).toHaveAttribute('data-variant', 'form')
+    await expect(skeleton).toHaveAttribute('data-variant', 'list')
     await expect(skeleton).toHaveAttribute('aria-busy', 'true')
 
-    await expect(page).toHaveURL(/\/admin\/collections\/products\/create$/, { timeout: 2000 })
+    await expect(page).toHaveURL(/\/admin\/products$/, { timeout: 2000 })
     await expect(skeleton).toHaveCount(0)
+    await expect(page.getByRole('dialog', { name: 'Novo produto' })).toBeVisible()
   })
 
   test('texto discreto só aparece perto de 1,2s e nunca em navegação curta', async () => {
-    await page.goto('http://localhost:3000/admin/products')
-    await delayRoute(page, '/admin/collections/products/create', 1500)
+    await page.goto('http://localhost:3000/admin/opportunities')
+    await delayRoute(page, '/admin/products?novo=produto', 1500)
 
     await page.getByTestId('esmera-global-create').click()
     await page.getByRole('menuitem', { name: /Novo produto/i }).click()
@@ -104,7 +105,7 @@ test.describe('Feedback de navegação do Admin (F12)', () => {
     await expect(srText).toHaveText('', { timeout: 500 })
     await expect(srText).toHaveText(/Preparando/, { timeout: 1500 })
 
-    await expect(page).toHaveURL(/\/admin\/collections\/products\/create$/, { timeout: 2000 })
+    await expect(page).toHaveURL(/\/admin\/products$/, { timeout: 2000 })
   })
 
   test('header e sidebar permanecem estáveis durante navegação lenta', async () => {

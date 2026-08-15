@@ -9,6 +9,7 @@ import type { EsmeraRole } from '../../access/roles'
 import { useNavigationFeedback } from '../navigation/NavigationFeedbackProvider'
 import { acquisitionChannelOptions as leadSourceOptions } from '../../businessRules/shared/acquisitionChannels'
 import { ADMIN_CREATE_EVENT } from '../state/AdminStateProvider'
+import { createIntentHref } from './createIntent'
 import { ShellIcon } from './ShellIcon'
 
 type CreateAction = {
@@ -96,10 +97,10 @@ export function GlobalCreateMenu({ role }: { role: EsmeraRole | null }) {
 
   const actions = useMemo<CreateAction[]>(() => [
     { label: 'Novo lead', shortLabel: 'Lead', description: 'Passo 1 — registrar entrada e qualificação', area: 'business', icon: 'person', contexts: ['/admin/collections/leads', '/admin/leads'], step: 1, kind: 'popup', open: () => setLeadDialogOpen(true) },
-    { label: 'Nova oportunidade', shortLabel: 'Oportunidade', description: 'Passo 2 — iniciar negociação comercial', area: 'business', icon: 'receipt', contexts: ['/admin/sales', '/admin/opportunities', '/admin/reports'], step: 2, kind: 'link', href: '/admin/collections/opportunities/create' },
+    { label: 'Nova oportunidade', shortLabel: 'Oportunidade', description: 'Passo 2 — iniciar negociação comercial', area: 'business', icon: 'receipt', contexts: ['/admin/sales', '/admin/opportunities', '/admin/reports'], step: 2, kind: 'link', href: createIntentHref('/admin/opportunities', 'oportunidade') },
     { label: 'Nova venda', shortLabel: 'Venda', description: 'Vendas nascem de uma oportunidade ganha — feche a negociação no Passo 2', area: 'business', icon: 'receipt', contexts: [], step: 3, kind: 'disabled', disabledReason: 'Vendas nascem de uma oportunidade ganha' },
-    { label: 'Novo cliente', shortLabel: 'Cliente', description: 'Cadastrar relacionamento comercial', area: 'business', icon: 'users', contexts: ['/admin/customers', '/admin/privacy'], kind: 'link', href: '/admin/collections/customers/create' },
-    { label: 'Novo produto', shortLabel: 'Produto', description: 'Criar um item do catálogo', area: 'site', icon: 'box', contexts: ['/admin/products', '/admin/categories'], kind: 'link', href: '/admin/collections/products/create' },
+    { label: 'Novo cliente', shortLabel: 'Cliente', description: 'Cadastrar relacionamento comercial', area: 'business', icon: 'users', contexts: ['/admin/customers', '/admin/privacy'], kind: 'link', href: createIntentHref('/admin/customers', 'cliente') },
+    { label: 'Novo produto', shortLabel: 'Produto', description: 'Criar um item do catálogo', area: 'site', icon: 'box', contexts: ['/admin/products', '/admin/categories'], kind: 'link', href: createIntentHref('/admin/products', 'produto') },
   ], [])
 
   const visible = useMemo(() => {

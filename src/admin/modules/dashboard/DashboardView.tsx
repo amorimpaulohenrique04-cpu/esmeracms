@@ -34,6 +34,7 @@ import {
   TechnicalLink,
   ViewFrame,
 } from '../../views/shared'
+import { createIntentHref } from '../../shell/createIntent'
 import './dashboard.scss'
 
 type DashboardUser = {
@@ -150,8 +151,8 @@ export default async function DashboardView(props: AdminViewServerProps) {
     const pipelineMax = reporting ? Math.max(0, ...reporting.pipeline.map((item) => item.volume)) : 0
     const dashboardUser = user as DashboardUser
     const actions = snapshot.permissions.business
-      ? <><TechnicalLink href="/admin/collections/opportunities/create" primary>Nova oportunidade</TechnicalLink>{snapshot.permissions.site ? <TechnicalLink href="/admin/collections/products/create">Novo produto</TechnicalLink> : null}</>
-      : <TechnicalLink href="/admin/collections/products/create" primary>Novo produto</TechnicalLink>
+      ? <><TechnicalLink href={createIntentHref('/admin/opportunities', 'oportunidade')} primary>Nova oportunidade</TechnicalLink>{snapshot.permissions.site ? <TechnicalLink href={createIntentHref('/admin/products', 'produto')}>Novo produto</TechnicalLink> : null}</>
+      : <TechnicalLink href={createIntentHref('/admin/products', 'produto')} primary>Novo produto</TechnicalLink>
 
     const metricColumns = reporting && tasks ? 4 : snapshot.permissions.site ? 2 : 1
 

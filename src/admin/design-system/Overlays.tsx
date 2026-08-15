@@ -7,13 +7,15 @@ import { Popover } from '@base-ui/react/popover'
 import { Tooltip } from '@base-ui/react/tooltip'
 import React, { useId, useRef, useState } from 'react'
 
-function useOverlayContext() {
-  const [open, setOpen] = useState(false)
+function useOverlayContext(controlledOpen?: boolean, controlledOnOpenChange?: (open: boolean) => void) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
   const scroll = useRef({ x: 0, y: 0 })
 
   const onOpenChange = (nextOpen: boolean) => {
     if (nextOpen) scroll.current = { x: window.scrollX, y: window.scrollY }
-    setOpen(nextOpen)
+    if (controlledOnOpenChange) controlledOnOpenChange(nextOpen)
+    else setInternalOpen(nextOpen)
     if (!nextOpen) {
       window.requestAnimationFrame(() => window.scrollTo(scroll.current.x, scroll.current.y))
     }
@@ -22,8 +24,11 @@ function useOverlayContext() {
   return { open, onOpenChange }
 }
 
-export function DialogPanel({ trigger, triggerClassName = '', title, description, size = 'default', children }: { trigger: React.ReactNode; triggerClassName?: string; title: string; description?: string; size?: 'default' | 'wide'; children: React.ReactNode | ((close: () => void) => React.ReactNode) }) {
-  const context = useOverlayContext()
+// `open`/`onOpenChange` são opcionais: sem eles o painel controla seu próprio
+// estado (uso normal). Passe os dois para abrir o popup a partir de fora —
+// ex.: navegação vinda de outra página via useCreateIntent.
+export function DialogPanel({ trigger, triggerClassName = '', title, description, size = 'default', open, onOpenChange, children }: { trigger: React.ReactNode; triggerClassName?: string; title: string; description?: string; size?: 'default' | 'wide'; open?: boolean; onOpenChange?: (open: boolean) => void; children: React.ReactNode | ((close: () => void) => React.ReactNode) }) {
+  const context = useOverlayContext(open, onOpenChange)
   const contextKey = `dialog-${useId()}`
   // O conteúdo pode receber `close` para se encerrar após uma ação assíncrona
   // (ex.: publicar e fechar), sem o consumidor controlar o estado do overlay.

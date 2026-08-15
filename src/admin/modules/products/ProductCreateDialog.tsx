@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import React, { useState } from 'react'
 
 import { Button, DialogPanel, ErrorSummary, Field, InlineFeedback } from '../../design-system'
+import { useCreateIntent } from '../../shell/useCreateIntent'
 import { expectAdminResponse, normalizeAdminError, type AdminFieldError } from '../../state/asyncState'
 import { ProductCategoryPicker } from './ProductCategoryPicker'
 import { ProductGalleryUploader } from './ProductGalleryUploader'
@@ -213,6 +214,7 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
 
 export function ProductCreateDialog({ categories = [] }: { categories?: ProductPickerCategory[] }) {
   const router = useRouter()
+  const [open, setOpen] = useCreateIntent('produto')
   return (
     <DialogPanel
       trigger="Novo produto"
@@ -220,6 +222,8 @@ export function ProductCreateDialog({ categories = [] }: { categories?: ProductP
       size="wide"
       title="Novo produto"
       description="Crie o essencial, organize em categorias e envie as primeiras imagens sem sair daqui."
+      open={open}
+      onOpenChange={setOpen}
     >
       {(close) => <ProductCreateFlow categories={categories} onDone={() => { close(); router.refresh() }} />}
     </DialogPanel>
