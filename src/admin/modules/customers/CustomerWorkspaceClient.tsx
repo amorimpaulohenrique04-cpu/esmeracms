@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import React, { useEffect, useRef, useState } from 'react'
 
 import { Button, DialogPanel, EmptyState, Field, Status } from '../../design-system'
+import { useCreateIntent } from '../../shell/useCreateIntent'
 import {
   customerOriginLabels,
   customerStatusLabels,
@@ -52,6 +53,7 @@ function customerHref(filters: CustomerFilters, id: string | number) {
 
 export function CustomerCreateDialog() {
   const router = useRouter()
+  const [open, setOpen] = useCreateIntent('cliente')
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<ApiBody['candidates']>([])
@@ -73,7 +75,7 @@ export function CustomerCreateDialog() {
     }
   }
 
-  return <DialogPanel trigger="Novo cliente" title="Novo cliente" description="O CMS normaliza telefone e e-mail e procura possíveis duplicados antes da criação.">
+  return <DialogPanel trigger="Novo cliente" title="Novo cliente" description="O CMS normaliza telefone e e-mail e procura possíveis duplicados antes da criação." open={open} onOpenChange={setOpen}>
     <form className="esmera-customer-dialog-form" onSubmit={(event) => { event.preventDefault(); void submit(false) }}>
       <Field label="Nome"><input className="esmera-input" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></Field>
       <Field label="Empresa"><input className="esmera-input" value={draft.company} onChange={(event) => setDraft({ ...draft, company: event.target.value })} /></Field>

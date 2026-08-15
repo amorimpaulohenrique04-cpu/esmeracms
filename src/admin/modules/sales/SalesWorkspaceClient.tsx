@@ -41,6 +41,7 @@ import {
   InlineFeedback,
   Status,
 } from '../../design-system'
+import { useCreateIntent } from '../../shell/useCreateIntent'
 import type {
   ActivityRecord,
   CustomerRef,
@@ -607,6 +608,7 @@ function maskedCurrency(digits: string) {
 
 export function OpportunityCreateDialog({ products, users }: { products: ProductRef[]; users: UserRef[] }) {
   const router = useRouter()
+  const [dialogOpen, setDialogOpen] = useCreateIntent('oportunidade')
   const closeRef = useRef<HTMLButtonElement>(null)
   const portalContainerRef = useRef<HTMLFormElement>(null)
   const [customer, setCustomer] = useState<CustomerRef | null>(null)
@@ -698,7 +700,7 @@ export function OpportunityCreateDialog({ products, users }: { products: Product
     }
   }
 
-  return <DialogPanel trigger="Nova oportunidade" triggerClassName="esmera-button--primary" title="Nova oportunidade" description="Preencha o negócio em um único fluxo, sem navegar entre abas.">
+  return <DialogPanel trigger="Nova oportunidade" triggerClassName="esmera-button--primary" title="Nova oportunidade" description="Preencha o negócio em um único fluxo, sem navegar entre abas." open={dialogOpen} onOpenChange={setDialogOpen}>
     <form ref={portalContainerRef} className="esmera-sales-create-form esmera-opportunity-create-form" onSubmit={submit}>
       <section className="esmera-opportunity-create-section">
         <div><span className="esmera-eyebrow">1</span><h3>Cliente e Negócio</h3></div>
