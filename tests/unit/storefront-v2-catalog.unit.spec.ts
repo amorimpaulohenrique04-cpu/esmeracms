@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 
-import { buildCollectionV2, buildNavigationV2, buildProductsV2 } from '../../src/server/storefront-v2/catalog'
+import { buildCollectionV2, buildNavigationV2, buildProductDetailV2, buildProductsV2 } from '../../src/server/storefront-v2/catalog'
 
 type RecordValue = Record<string, unknown>
 
@@ -178,6 +178,53 @@ describe('storefront V2 catalog builders', () => {
     expect(result.body.catalog).toMatchObject({ title: 'Coleções', visibleFilters: expect.arrayContaining(['material', 'price']) })
     expect(find.mock.calls.find(([args]) => args.collection === 'products')?.[0].where).toMatchObject({
       and: expect.arrayContaining([{ categories: { contains: '2' } }]),
+    })
+  })
+
+  it('preserves the original aspect ratio derivative in product detail galleries', async () => {
+    const product = {
+      id: 12,
+      slug: 'vaso-horizontal',
+      code: 'OBJ-012',
+      title: 'Horizonte',
+      material: 'Esmeralda',
+      availability: 'available',
+      priceMode: 'fixed',
+      basePriceCents: 79000,
+      gallery: [{
+        role: 'cover',
+        alt: 'Horizonte em composição horizontal',
+        image: {
+          id: 53,
+          url: '/media/horizonte-original.jpg',
+          alt: 'Horizonte',
+          width: 2400,
+          height: 1600,
+          sizes: {
+            productCard: { url: '/media/horizonte-900x1200.jpg', width: 900, height: 1200 },
+            gallery: { url: '/media/horizonte-1800x1200.jpg', width: 1800, height: 1200 },
+          },
+        },
+      }],
+      categories: [{ ...child }],
+      updatedAt: '2026-08-06T12:00:00.000Z',
+    }
+    const { payload } = payloadStub({
+      categories: [root, child],
+      products: [product],
+    })
+
+    const result = await buildProductDetailV2(payload, 'vaso-horizontal')
+
+    expect(result.body.product.image).toMatchObject({
+      url: '/media/horizonte-900x1200.jpg',
+      width: 900,
+      height: 1200,
+    })
+    expect(result.body.product.gallery[0]).toMatchObject({
+      url: '/media/horizonte-1800x1200.jpg',
+      width: 1800,
+      height: 1200,
     })
   })
 })
