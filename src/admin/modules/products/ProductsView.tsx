@@ -51,7 +51,7 @@ function filtersFrom(params: Record<string, string | string[] | undefined>): Pro
     publication: first(params.publication) || 'all',
     category: first(params.category) || 'all',
     page: integer(first(params.page), 1),
-    limit: limitValue === 100 ? 100 : 50,
+    limit: limitValue === 25 ? 25 : limitValue === 100 ? 100 : 50,
     view: viewValue === 'grid' ? 'grid' : 'list' as ProductsViewMode,
   }
 }

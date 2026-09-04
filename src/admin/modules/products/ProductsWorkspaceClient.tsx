@@ -357,7 +357,6 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
       cell: ({ row }) => <Button className="esmera-product-row-action" type="button" onClick={(event) => openInspector(row.original.id, event.currentTarget)}>Inspecionar</Button>,
     },
   ], [filters])
-
   const table = useReactTable({
     data: products,
     columns,
@@ -551,7 +550,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
           <SegmentedControlLink selected={filters.view === 'list'} href={listHref(filters, { view: 'list', page: 1 })}>Lista</SegmentedControlLink>
           <SegmentedControlLink selected={filters.view === 'grid'} href={listHref(filters, { view: 'grid', page: 1 })}>Grid</SegmentedControlLink>
         </SegmentedControl>
-        <label className="esmera-products-limit"><span>Por página</span><select className="esmera-input" value={filters.limit} onChange={(event) => router.push(listHref(filters, { limit: Number(event.target.value) as 50 | 100, page: 1 }))}><option value="50">50</option><option value="100">100</option></select></label>
+        <label className="esmera-products-limit"><span>Por página</span><select className="esmera-input" value={filters.limit} onChange={(event) => router.push(listHref(filters, { limit: Number(event.target.value) as 25 | 50 | 100, page: 1 }))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
       </div>
     </div>
 

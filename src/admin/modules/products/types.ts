@@ -123,7 +123,7 @@ export type ProductWorkspaceFilters = {
   publication: string
   category: string
   page: number
-  limit: 50 | 100
+  limit: 25 | 50 | 100
   view: ProductsViewMode
 }
 
