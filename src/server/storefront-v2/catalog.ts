@@ -155,6 +155,23 @@ function publicCardMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 |
   return publicMedia(value, explicitAlt)
 }
 
+// A galeria do detalhe deve preservar a proporção do arquivo. `gallery` é
+// gerada apenas com largura máxima no Payload; portanto não aplica crop.
+function publicGalleryMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 | null {
+  const media = record(value)
+  if (!media) return null
+  const gallery = record(record(media.sizes)?.gallery)
+  const url = text(gallery?.url) || text(media.url)
+  if (!url) return null
+  return {
+    id: String(media.id || url),
+    url,
+    alt: text(explicitAlt) || text(media.alt) || text(media.filename),
+    width: numberValue(gallery?.width) ?? numberValue(media.width),
+    height: numberValue(gallery?.height) ?? numberValue(media.height),
+  }
+}
+
 function fold(value: unknown) {
   return text(value).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('pt-BR')
 }
@@ -497,7 +514,6 @@ function slugValues(category: UnknownRecord, key: string, fallback: string[] = [
   const group = record(category[key])
   return group ? records(group.materials).map((item) => text(item.value)).filter(Boolean) : fallback
 }
-
 function buildRulesWhere(category: UnknownRecord): Where | null {
   const rules = record(category.listingRules)
   if (!rules) return null
@@ -1146,7 +1162,7 @@ export async function buildProductDetailV2(payload: Payload, slug: string): Prom
 
   const card = publicProduct(doc, paymentTerms)
   const gallery = records(doc.gallery)
-    .map((item) => publicCardMedia(item.image, item.alt))
+    .map((item) => publicGalleryMedia(item.image, item.alt))
     .filter((item): item is PublicMediaV2 => Boolean(item))
 
   const base = {
