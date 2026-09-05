@@ -47,6 +47,7 @@ const payloadSecret = process.env.PAYLOAD_SECRET || ''
 const databaseURL = requireDatabaseURL()
 const isTest = process.env.NODE_ENV === 'test'
 const isProduction = process.env.NODE_ENV === 'production'
+const isVercel = process.env.VERCEL === '1'
 
 if (isProduction && payloadSecret.length < 24) {
   throw new Error('PAYLOAD_SECRET deve possuir pelo menos 24 caracteres em produção.')
@@ -196,7 +197,9 @@ export default buildConfig({
     },
     tasks: [...esmeraJobTasks, GenerateReportExportJob, ProductImportJob],
     enableConcurrencyControl: true,
-    shouldAutoRun: async () => process.env.PAYLOAD_JOBS_AUTORUN === 'true',
+    // Payload autorun is intended for a dedicated persistent worker. On Vercel
+    // every warm serverless instance could otherwise schedule the same queues.
+    shouldAutoRun: async () => !isVercel && process.env.PAYLOAD_JOBS_AUTORUN === 'true',
     autoRun: [
       { cron: '* * * * *', queue: 'operational', limit: 25 },
       { cron: '*/5 * * * *', queue: 'integrations', limit: 10 },
@@ -253,7 +256,8 @@ export default buildConfig({
       // Os testes continuam com pool maior para o bootstrap do Payload.
       max: isTest ? 20 : isProduction ? 1 : 5,
       idleTimeoutMillis: isProduction ? 5_000 : 10_000,
-      connectionTimeoutMillis: isTest ? 30_000 : 5_000,
+      connectionTimeoutMillis: isTest ? 30_000 : isProduction ? 15_000 : 5_000,
+      allowExitOnIdle: isProduction,
     },
   }),
   sharp,
