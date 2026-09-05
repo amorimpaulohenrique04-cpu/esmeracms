@@ -65,7 +65,7 @@ describe('product import against Payload', () => {
     await payload.delete({ collection: 'users', id: userId, overrideAccess: true }).catch(() => undefined)
   })
 
-  it('detecta duplicata/categoria por chave normalizada e interpreta preço brasileiro', async () => {
+  it('detecta produto existente/categoria por chave normalizada e agenda atualização', async () => {
     const user = await payload.findByID({ collection: 'users', id: userId, overrideAccess: true })
     const foldedCode = code.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
     const categoryWithoutAccent = `Ceramica ${suffix}`
@@ -79,6 +79,7 @@ describe('product import against Payload', () => {
     expect(preview.rows).toHaveLength(1)
     expect(preview.rows[0]?.isDuplicate).toBe(true)
     expect(preview.rows[0]?.existingProductId).toBe(productId)
+    expect(preview.rows[0]?.action).toBe('update')
     expect(preview.rows[0]?.issues.some((issue) => issue.code === 'category_missing')).toBe(false)
     expect(preview.rows[0]?.issues.find((issue) => issue.code === 'price_ambiguous')?.severity).toBe('warning')
     expect(preview.blockingCount).toBe(0)
@@ -108,6 +109,7 @@ describe('product import against Payload', () => {
     }])
 
     expect(report.updated).toBe(1)
+    expect(report.skipped).toBe(0)
     expect(report.errored).toBe(0)
 
     const updated = await payload.findByID({ collection: 'products', id: productId, overrideAccess: true })
