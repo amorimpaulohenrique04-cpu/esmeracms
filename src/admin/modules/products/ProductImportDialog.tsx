@@ -86,7 +86,7 @@ type ImportStatusResponse = {
   errorCsvUrl?: string | null
 }
 
-type RowFilter = 'all' | 'pending' | 'new' | 'conflicts'
+type RowFilter = 'all' | 'pending' | 'new' | 'existing'
 
 type ProgressState = {
   importId: string
@@ -253,11 +253,8 @@ export function ProductImportDialog() {
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  function applyPreview(data: PreviewResponse, keepActions?: Map<string, 'create' | 'update' | 'skip'>) {
-    setRows(data.rows.map((row) => ({
-      ...row,
-      action: keepActions?.get(row.values.code?.trim().toUpperCase()) || row.action,
-    })))
+  function applyPreview(data: PreviewResponse) {
+    setRows(data.rows)
     setUnknownHeaders(data.unknownHeaders)
     setDelimiter(data.delimiter)
     setFilter('all')
@@ -268,7 +265,7 @@ export function ProductImportDialog() {
     setStep('preview')
   }
 
-  async function runPreview(text: string, keepActions?: Map<string, 'create' | 'update' | 'skip'>) {
+  async function runPreview(text: string) {
     setBusy(true)
     setResolving(true)
     setError(null)
@@ -278,10 +275,10 @@ export function ProductImportDialog() {
     const serverPromise = callImportApi<PreviewResponse>({ action: 'preview', text })
     try {
       const local = await parseLocally(text)
-      if (local) applyPreview(local, keepActions)
+      if (local) applyPreview(local)
 
       const data = await serverPromise
-      applyPreview(data, keepActions)
+      applyPreview(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível pré-visualizar.')
     } finally {
@@ -393,14 +390,8 @@ export function ProductImportDialog() {
     idempotencyRef.current = null
   }
 
-  function setConflictAction(rowIndex: number, action: 'update' | 'skip') {
-    setRows((current) => current.map((row) => row.rowIndex === rowIndex ? { ...row, action } : row))
-    idempotencyRef.current = null
-  }
-
   async function revalidate() {
-    const actions = new Map(rows.map((row) => [row.values.code?.trim().toUpperCase(), row.action]))
-    await runPreview(sheetFromRows(rows), actions)
+    await runPreview(sheetFromRows(rows))
   }
 
   const blockingCount = rows.reduce((sum, row) => sum + blockingIssueCount(row.issues), 0)
@@ -408,7 +399,7 @@ export function ProductImportDialog() {
   const visibleRows = useMemo(() => rows.filter((row) => {
     if (filter === 'pending') return blockingIssueCount(row.issues) > 0
     if (filter === 'new') return !row.isDuplicate
-    if (filter === 'conflicts') return row.isDuplicate
+    if (filter === 'existing') return row.isDuplicate
     return true
   }), [filter, rows])
   const pageCount = Math.max(1, Math.ceil(visibleRows.length / PREVIEW_WINDOW))
@@ -497,7 +488,7 @@ export function ProductImportDialog() {
         rowIndex: row.rowIndex,
         sourceLine: row.sourceLine,
         values: row.values,
-        onConflict: row.isDuplicate && row.action === 'update' ? 'update' : 'skip',
+        onConflict: row.isDuplicate ? 'update' : 'skip',
       }))
       idempotencyRef.current ||= crypto.randomUUID()
       const data = await callImportApi<CommitResponse | QueuedResponse>({
@@ -699,7 +690,7 @@ export function ProductImportDialog() {
               </div>
 
               {resolving ? <p className="esmera-products-import__resolving" aria-live="polite">
-                Preview local pronto. Conferindo duplicatas, categorias e slugs no catálogo…
+                Preview local pronto. Conferindo produtos existentes, categorias e slugs no catálogo…
               </p> : null}
               {unknownHeaders.length ? <p className="esmera-products-import__warning">
                 Colunas não reconhecidas (ignoradas): {unknownHeaders.join(', ')}
@@ -727,7 +718,7 @@ export function ProductImportDialog() {
                 <button type="button" className={filter === 'all' ? 'is-active' : ''} onClick={() => selectFilter('all')}>Todas ({rows.length})</button>
                 <button type="button" className={filter === 'pending' ? 'is-active' : ''} onClick={() => selectFilter('pending')}>Só pendências ({pendingRows.length})</button>
                 <button type="button" className={filter === 'new' ? 'is-active' : ''} onClick={() => selectFilter('new')}>Só novas ({rows.filter((row) => !row.isDuplicate).length})</button>
-                <button type="button" className={filter === 'conflicts' ? 'is-active' : ''} onClick={() => selectFilter('conflicts')}>Só conflitos ({rows.filter((row) => row.isDuplicate).length})</button>
+                <button type="button" className={filter === 'existing' ? 'is-active' : ''} onClick={() => selectFilter('existing')}>Já cadastrados ({rows.filter((row) => row.isDuplicate).length})</button>
                 {pendingRows.length ? <>
                   <button type="button" onClick={() => focusPending(-1)} aria-label="Pendência anterior">↑ anterior</button>
                   <button type="button" onClick={() => focusPending(1)} aria-label="Próxima pendência">↓ próxima</button>
@@ -762,7 +753,7 @@ export function ProductImportDialog() {
                     {importColumns.map((column) => <th key={column} data-col={column}>
                       {importColumnLabels[column]}{importColumnRequired[column] ? ' *' : ''}
                     </th>)}
-                    <th>Conflito</th>
+                    <th>Ação</th>
                     <th />
                   </tr></thead>
                   <tbody>{windowRows.map((row, windowIndex) => <tr
@@ -795,16 +786,7 @@ export function ProductImportDialog() {
                         {issue ? <small id={errorID} className="esmera-products-import-table__error">{issue.message}</small> : null}
                       </td>
                     })}
-                    <td>{row.isDuplicate ? <select
-                      className="esmera-input"
-                      aria-label={`Conflito, linha ${row.sourceLine}`}
-                      value={row.action}
-                      disabled={busy}
-                      onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}
-                    >
-                      <option value="skip">Ignorar</option>
-                      <option value="update">Atualizar</option>
-                    </select> : <span>Novo</span>}</td>
+                    <td><span>{row.isDuplicate ? 'Atualizar' : 'Criar'}</span></td>
                     <td><button
                       type="button"
                       className="esmera-icon-button"
@@ -824,7 +806,7 @@ export function ProductImportDialog() {
                 >
                   <summary>
                     <span><strong>Linha {row.sourceLine}</strong><small>{row.values.title || 'Sem nome'} · {row.values.code || 'sem código'}</small></span>
-                    <span>{blockingIssueCount(row.issues) ? `${blockingIssueCount(row.issues)} pendência(s)` : row.isDuplicate ? 'Conflito' : 'Novo'}</span>
+                    <span>{blockingIssueCount(row.issues) ? `${blockingIssueCount(row.issues)} pendência(s)` : row.isDuplicate ? 'Atualizar' : 'Criar'}</span>
                   </summary>
                   <div className="esmera-products-import__card-fields">
                     {importColumns.map((column) => {
@@ -844,18 +826,7 @@ export function ProductImportDialog() {
                         {issue ? <small id={errorID}>{issue.message}</small> : null}
                       </label>
                     })}
-                    {row.isDuplicate ? <label>
-                      <span>Conflito</span>
-                      <select
-                        className="esmera-input"
-                        value={row.action}
-                        disabled={busy}
-                        onChange={(event) => setConflictAction(row.rowIndex, event.target.value as 'update' | 'skip')}
-                      >
-                        <option value="skip">Ignorar</option>
-                        <option value="update">Atualizar</option>
-                      </select>
-                    </label> : null}
+                    <p><strong>Ação:</strong> {row.isDuplicate ? 'Atualizar produto existente' : 'Criar novo produto'}</p>
                     <button type="button" className="esmera-button esmera-button--quiet" disabled={busy} onClick={() => removeRow(row.rowIndex)}>
                       Remover linha
                     </button>
