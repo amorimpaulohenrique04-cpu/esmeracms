@@ -507,7 +507,7 @@ function sortForPayload(sort: string) {
   if (sort === 'price_asc') return ['basePriceCents', 'id']
   if (sort === 'price_desc') return ['-basePriceCents', 'id']
   if (sort === 'name_asc') return ['title', 'id']
-  return ['title', 'id']
+  return ['order', 'id']
 }
 
 function slugValues(category: UnknownRecord, key: string, fallback: string[] = []) {
