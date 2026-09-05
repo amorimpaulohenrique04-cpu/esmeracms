@@ -146,7 +146,7 @@ export function EsmeraNav() {
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
     >
-      <Link className="esmera-nav-brand" href="/admin" aria-label="Esméra CMS — Dashboard">
+      <Link className="esmera-nav-brand" href="/admin" prefetch={false} aria-label="Esméra CMS — Dashboard">
         <EsmeraIcon />
         <div><strong>Esméra CMS</strong><span>Management Portal</span></div>
       </Link>
@@ -162,6 +162,7 @@ export function EsmeraNav() {
               <Link
                 className={`esmera-nav-link${active ? ' is-active' : ''}`}
                 href={item.href}
+                prefetch={false}
                 title={item.label}
                 aria-current={active ? 'page' : undefined}
               >
@@ -184,6 +185,7 @@ export function EsmeraNav() {
             <Link
               className={`esmera-nav-link${active ? ' is-active' : ''}`}
               href={item.href}
+              prefetch={false}
               key={item.href}
               title={item.label}
               aria-current={active ? 'page' : undefined}
@@ -197,7 +199,7 @@ export function EsmeraNav() {
       </> : null}
 
       <div className="esmera-nav-footer">
-        <Link className="esmera-user" href="/admin/account" title={`${name} · ${roleLabel}`}>
+        <Link className="esmera-user" href="/admin/account" prefetch={false} title={`${name} · ${roleLabel}`}>
           <span className="esmera-avatar">{name.slice(0, 2).toUpperCase()}</span>
           <span className="esmera-user-copy"><strong>{name}</strong><small>{roleLabel}</small></span>
         </Link>
