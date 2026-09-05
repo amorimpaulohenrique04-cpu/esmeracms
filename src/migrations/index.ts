@@ -11,6 +11,7 @@ import * as migration_20260808_180000_reservations_locked_documents from './2026
 import * as migration_20260810_000000_provenance_step_media from './20260810_000000_provenance_step_media'
 import * as migration_20260811_153500_territory_media_size from './20260811_153500_territory_media_size'
 import * as migration_20260813_020000_gallery_media_size from './20260813_020000_gallery_media_size'
+import * as migration_20260905_101500_product_editorial_order from './20260905_101500_product_editorial_order'
 
 export const migrations = [
   {
@@ -77,5 +78,10 @@ export const migrations = [
     up: migration_20260813_020000_gallery_media_size.up,
     down: migration_20260813_020000_gallery_media_size.down,
     name: '20260813_020000_gallery_media_size',
+  },
+  {
+    up: migration_20260905_101500_product_editorial_order.up,
+    down: migration_20260905_101500_product_editorial_order.down,
+    name: '20260905_101500_product_editorial_order',
   },
 ]

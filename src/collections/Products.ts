@@ -66,7 +66,7 @@ export const Products: CollectionConfig = {
   admin: {
     group: 'Site',
     useAsTitle: 'title',
-    defaultColumns: ['title', 'code', 'catalogStatus', 'availability', '_status', 'updatedAt'],
+    defaultColumns: ['title', 'code', 'order', 'catalogStatus', 'availability', '_status', 'updatedAt'],
     listSearchableFields: ['title', 'subtitle', 'code', 'material'],
   },
   access: {
@@ -188,6 +188,19 @@ export const Products: CollectionConfig = {
     ],
   },
   fields: [
+    {
+      name: 'order',
+      type: 'number',
+      label: 'Ordem editorial',
+      defaultValue: 100000,
+      min: 0,
+      index: true,
+      admin: {
+        description: 'Controlada pela ordenação por arrastar na tela de produtos.',
+        position: 'sidebar',
+        readOnly: true,
+      },
+    },
     {
       type: 'tabs',
       tabs: [

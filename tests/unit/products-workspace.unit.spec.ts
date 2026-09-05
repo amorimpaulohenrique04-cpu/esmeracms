@@ -26,6 +26,15 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href, ...props }, children),
 }))
 
+vi.mock('@dnd-kit/react', () => ({
+  DragDropProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+}))
+
+vi.mock('@dnd-kit/react/sortable', () => ({
+  isSortable: () => false,
+  useSortable: () => ({ ref: () => undefined, handleRef: () => undefined, isDragging: false }),
+}))
+
 const { ProductsWorkspaceClient } = await import('../../src/admin/modules/products/ProductsWorkspaceClient')
 
 const LIST_UPDATED_AT = '2026-01-01T10:00:00.000Z'
@@ -141,6 +150,19 @@ afterEach(() => {
 })
 
 describe('ProductsWorkspaceClient — painel de publicação em lote', () => {
+  it('move um produto e persiste a ordem editorial completa', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ updated: products.length }) })
+
+    renderWorkspace()
+    fireEvent.change(screen.getByLabelText('Mover Anel Solar para posição'), { target: { value: '2' } })
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string) as { action: string; orderedIds: number[] }
+    expect(body).toEqual({ action: 'reorder', orderedIds: [2, 1, 3, 4, 5] })
+    expect(await screen.findByText(/Anel Solar movido para a posição 2/)).toBeTruthy()
+    expect(refresh).toHaveBeenCalled()
+  })
+
   it('lote totalmente publicado mantém os sucessos visíveis e não move o foco', async () => {
     const result = bulk([
       { id: 1, title: 'Anel Solar', status: 'published', message: 'Produto publicado.' },

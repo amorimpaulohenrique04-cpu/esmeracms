@@ -42,6 +42,7 @@ type ProductAction =
   | 'set-availability'
   | 'save-draft'
   | 'reorder-gallery'
+  | 'reorder'
   | 'add-gallery-image'
 
 type RequestBody = {
@@ -54,6 +55,7 @@ type RequestBody = {
   availability?: string
   data?: Record<string, unknown>
   gallery?: Array<Record<string, unknown>>
+  orderedIds?: Array<string | number>
   mediaId?: string | number
   expectedRevision?: string | null
   expectedUpdatedAt?: string | null
@@ -348,6 +350,45 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (action === 'reorder') {
+      const orderedIds = Array.from(new Set((body.orderedIds || []).filter((id): id is string | number => typeof id === 'string' || typeof id === 'number')))
+      const current = await payload.find({
+        collection: 'products',
+        depth: 0,
+        draft: true,
+        limit: 1000,
+        pagination: false,
+        sort: ['order', 'createdAt', 'id'],
+        overrideAccess: false,
+        user,
+        select: { id: true, order: true, _status: true },
+      })
+
+      const currentIds = current.docs.map((doc) => String(doc.id))
+      const incomingIds = orderedIds.map(String)
+      const sameSet = incomingIds.length === currentIds.length && currentIds.every((id) => incomingIds.includes(id))
+      if (!sameSet) return adminCodedError('revision_conflict', { summary: 'A ordenação precisa conter exatamente todos os produtos atuais.' })
+
+      const byId = new Map(current.docs.map((doc) => [String(doc.id), doc]))
+      for (let index = 0; index < orderedIds.length; index += 1) {
+        const id = orderedIds[index]
+        const doc = byId.get(String(id))
+        const nextOrder = (index + 1) * 100
+        if (!doc || doc.order === nextOrder) continue
+        const mutated = await payload.update({
+          collection: 'products',
+          id,
+          data: { order: nextOrder } as never,
+          draft: doc._status !== 'published',
+          depth: 2,
+          overrideAccess: false,
+          user,
+        })
+        await stampPublishedDocumentMetadata({ payload, entity: 'product', collection: 'products', id, user, document: mutated })
+      }
+      return NextResponse.json({ updated: orderedIds.length })
+    }
+
     if (action === 'add-gallery-image') {
       if (body.id === undefined || body.id === null) return adminInputError('Produto não informado.')
       if (body.mediaId === undefined || body.mediaId === null) return adminInputError('Mídia não informada.')

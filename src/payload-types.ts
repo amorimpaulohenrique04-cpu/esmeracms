@@ -264,6 +264,22 @@ export interface Media {
       filesize?: number | null;
       filename?: string | null;
     };
+    gallery?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    territory?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
   };
 }
 /**
@@ -472,6 +488,10 @@ export interface Category {
  */
 export interface Product {
   id: number;
+  /**
+   * Controlada pela ordenação por arrastar na tela de produtos.
+   */
+  order?: number | null;
   title: string;
   subtitle?: string | null;
   slug: string;
@@ -784,37 +804,28 @@ export interface Customer {
 export interface Opportunity {
   id: number;
   /**
-   * Gerado automaticamente pelo domínio comercial.
-   */
-  code: string;
-  /**
-   * Pode permanecer vazio durante qualificação; torna-se obrigatório ao ganhar.
+   * Busque um cliente existente ou use o cadastro rápido no workspace de Oportunidades.
    */
   customer?: (number | null) | Customer;
   source: 'instagram' | 'referral' | 'site' | 'architect' | 'organic' | 'whatsapp' | 'other';
-  stage: 'new' | 'curation' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  /**
-   * Usado para ordenar cards no Pipeline.
-   */
-  rank: number;
   owner?: (number | null) | User;
-  priority?: ('low' | 'normal' | 'high' | 'urgent') | null;
   interestedProducts?: (number | Product)[] | null;
   /**
-   * Valor informado pelo operador. Nunca é estimado automaticamente.
+   * Informe o valor em reais. O CMS mantém o armazenamento interno em centavos.
    */
   estimatedValueCents?: number | null;
+  stage: 'new' | 'curation' | 'proposal' | 'negotiation' | 'won' | 'lost';
   nextAction?: string | null;
   nextActionAt?: string | null;
+  priority?: ('low' | 'normal' | 'high' | 'urgent') | null;
+  code: string;
+  rank: number;
   expectedCloseAt?: string | null;
   closedAt?: string | null;
   lossReason?:
     ('price' | 'budget' | 'timing' | 'no_response' | 'product_fit' | 'competitor' | 'changed_mind' | 'other') | null;
   lossNotes?: string | null;
   wonSale?: (number | null) | Sale;
-  /**
-   * Vínculo mantido durante o ciclo de compatibilidade.
-   */
   sourceLead?: (number | null) | Lead;
   migrationVersion?: string | null;
   migratedAt?: string | null;
@@ -1463,6 +1474,26 @@ export interface MediaSelect<T extends boolean = true> {
               filesize?: T;
               filename?: T;
             };
+        gallery?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        territory?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
       };
 }
 /**
@@ -1665,6 +1696,7 @@ export interface CategoriesSelect<T extends boolean = true> {
  * via the `definition` "products_select".
  */
 export interface ProductsSelect<T extends boolean = true> {
+  order?: T;
   title?: T;
   subtitle?: T;
   slug?: T;
@@ -1922,17 +1954,17 @@ export interface ClientInterestsSelect<T extends boolean = true> {
  * via the `definition` "opportunities_select".
  */
 export interface OpportunitiesSelect<T extends boolean = true> {
-  code?: T;
   customer?: T;
   source?: T;
-  stage?: T;
-  rank?: T;
   owner?: T;
-  priority?: T;
   interestedProducts?: T;
   estimatedValueCents?: T;
+  stage?: T;
   nextAction?: T;
   nextActionAt?: T;
+  priority?: T;
+  code?: T;
+  rank?: T;
   expectedCloseAt?: T;
   closedAt?: T;
   lossReason?: T;

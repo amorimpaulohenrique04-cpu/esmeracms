@@ -1,10 +1,13 @@
-/* eslint-disable react-hooks/incompatible-library -- TanStack Table exposes stateful helpers that React Compiler intentionally does not memoize. */
+/* eslint-disable react-hooks/incompatible-library, react-hooks/refs -- TanStack Table and dnd-kit expose imperative table helpers and callback refs that are intentionally consumed while composing rows. */
 'use client'
 
+import { DragDropProvider } from '@dnd-kit/react'
+import { isSortable, useSortable } from '@dnd-kit/react/sortable'
 import {
   flexRender,
   getCoreRowModel,
   type ColumnDef,
+  type Row,
   type RowSelectionState,
   useReactTable,
 } from '@tanstack/react-table'
@@ -43,6 +46,7 @@ import {
 
 type WorkspaceProps = {
   products: ProductListItem[]
+  allOrderIds?: Array<string | number>
   categories: ProductCategory[]
   filters: ProductWorkspaceFilters
   totalDocs: number
@@ -277,7 +281,74 @@ function InspectorContent({ product, filters }: { product: ProductListItem; filt
   )
 }
 
-export function ProductsWorkspaceClient({ products, categories, filters, totalDocs, totalPages }: WorkspaceProps) {
+function SortableProductRow({ row, index, total, selectedProductId, disabled, onMove }: {
+  row: Row<ProductListItem>
+  index: number
+  total: number
+  selectedProductId: string | null
+  disabled: boolean
+  onMove: (from: number, to: number) => void
+}) {
+  const product = row.original
+  const title = product.title || 'Produto sem título'
+  const sortable = useSortable({ id: String(product.id), index })
+  const rowClass = [
+    String(product.id) === selectedProductId ? 'is-selected' : '',
+    row.getIsSelected() ? 'is-checked' : '',
+    sortable.isDragging ? 'is-dragging' : '',
+  ].filter(Boolean).join(' ')
+
+  return (
+    <tr ref={sortable.ref} className={rowClass}>
+      {row.getVisibleCells().map((cell) => cell.column.id === 'reorder' ? (
+        <td key={cell.id}>
+          <div className="esmera-product-order-control">
+            <button ref={sortable.handleRef} className="esmera-product-drag" type="button" disabled={disabled} aria-label={`Reordenar ${title}`}><span aria-hidden="true">⋮⋮</span></button>
+            <label><span className="esmera-sr-only">Mover {title} para posição</span><select className="esmera-product-position" value={index + 1} disabled={disabled} aria-label={`Mover ${title} para posição`} onChange={(event) => onMove(index, Number(event.target.value) - 1)}>{Array.from({ length: total }, (_, target) => <option key={target + 1} value={target + 1}>{target + 1}</option>)}</select></label>
+          </div>
+        </td>
+      ) : <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}
+    </tr>
+  )
+}
+
+function SortableProductTile({ product, row, index, total, filters, selectedProductId, disabled, onMove, onInspect }: {
+  product: ProductListItem
+  row: Row<ProductListItem>
+  index: number
+  total: number
+  filters: ProductWorkspaceFilters
+  selectedProductId: string | null
+  disabled: boolean
+  onMove: (from: number, to: number) => void
+  onInspect: (id: string | number, trigger: HTMLButtonElement) => void
+}) {
+  const sortable = useSortable({ id: String(product.id), index })
+  const cover = coverItem(product.gallery)
+  const coverURL = imageURL(cover)
+  const checked = row.getIsSelected()
+  const title = product.title || 'Produto sem título'
+  const tileClass = [
+    'esmera-product-tile',
+    String(product.id) === selectedProductId ? 'is-selected' : '',
+    checked ? 'is-checked' : '',
+    sortable.isDragging ? 'is-dragging' : '',
+  ].filter(Boolean).join(' ')
+
+  return <article ref={sortable.ref} className={tileClass}>
+    <div className="esmera-product-tile__order">
+      <button ref={sortable.handleRef} className="esmera-product-drag" type="button" disabled={disabled} aria-label={`Reordenar ${title}`}><span aria-hidden="true">⋮⋮</span></button>
+      <label><span className="esmera-sr-only">Mover {title} para posição</span><select className="esmera-product-position" value={index + 1} disabled={disabled} aria-label={`Mover ${title} para posição`} onChange={(event) => onMove(index, Number(event.target.value) - 1)}>{Array.from({ length: total }, (_, target) => <option key={target + 1} value={target + 1}>{target + 1}</option>)}</select></label>
+    </div>
+    <span className="esmera-product-tile__select"><input aria-label={`Selecionar ${product.title || 'produto'}`} type="checkbox" checked={checked} onChange={row.getToggleSelectedHandler()} /></span>
+    <Link className="esmera-product-tile__media" href={productHref(filters, product.id)}>{coverURL ? <img src={coverURL} alt={cover?.alt || product.title || ''} /> : <span>Sem imagem</span>}</Link>
+    <div className="esmera-product-tile__body"><div><Link href={productHref(filters, product.id)}>{title}</Link><small>{product.code || 'Sem código'}</small></div><Readiness product={product} /></div>
+    <div className="esmera-product-tile__meta"><span>{availabilityLabels[product.availability || ''] || '—'}</span><span>{product.priceMode === 'fixed' ? money(product.basePriceCents) : 'Sob consulta'}</span></div>
+    <Button className="esmera-product-tile__inspect" type="button" onClick={(event) => onInspect(product.id, event.currentTarget)}>Inspecionar</Button>
+  </article>
+}
+
+export function ProductsWorkspaceClient({ products, allOrderIds, categories, filters, totalDocs, totalPages }: WorkspaceProps) {
   const router = useRouter()
   const inspectorTrigger = useRef<HTMLButtonElement | null>(null)
   const [selection, setSelection] = useState<RowSelectionState>({})
@@ -290,6 +361,10 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
   const [reportFeedback, setReportFeedback] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState('')
   const [bulkAvailability, setBulkAvailability] = useState('')
+  const [orderedProducts, setOrderedProducts] = useState(products)
+  const [fullOrder, setFullOrder] = useState(() => allOrderIds || products.map((product) => product.id))
+  const [reorderSaving, setReorderSaving] = useState(false)
+  const [reorderRollback, setReorderRollback] = useState(false)
   // Exclusão é destrutiva: exige um segundo clique (armada) para confirmar.
   const [deleteArmed, setDeleteArmed] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
@@ -303,6 +378,11 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     if (!bulkFocusToken) return
     bulkPanel.current?.focus()
   }, [bulkFocusToken])
+
+  useEffect(() => {
+    setOrderedProducts(products)
+    setFullOrder(allOrderIds || products.map((product) => product.id))
+  }, [allOrderIds, products])
 
   const openInspector = (id: string | number, trigger: HTMLButtonElement) => {
     inspectorTrigger.current = trigger
@@ -321,6 +401,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
   }
 
   const columns = useMemo<ColumnDef<ProductListItem>[]>(() => [
+    { id: 'reorder', header: 'Ordem', size: 72, cell: () => null },
     {
       id: 'select',
       header: ({ table }) => <input aria-label="Selecionar página" type="checkbox" checked={table.getIsAllPageRowsSelected()} onChange={table.getToggleAllPageRowsSelectedHandler()} />,
@@ -358,7 +439,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
     },
   ], [filters])
   const table = useReactTable({
-    data: products,
+    data: orderedProducts,
     columns,
     state: { rowSelection: selection },
     onRowSelectionChange: setSelection,
@@ -368,7 +449,51 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
   })
 
   const selectedIds = table.getSelectedRowModel().rows.map((row) => row.original.id)
-  const selectedProduct = products.find((product) => String(product.id) === selectedProductId)
+  const selectedProduct = orderedProducts.find((product) => String(product.id) === selectedProductId)
+
+  function mergedFullOrder(nextVisible: ProductListItem[]) {
+    const visible = new Set(orderedProducts.map((product) => String(product.id)))
+    let cursor = 0
+    return fullOrder.map((id) => visible.has(String(id)) ? nextVisible[cursor++].id : id)
+  }
+
+  async function persistOrder(nextVisible: ProductListItem[], nextFull: Array<string | number>, movedTitle: string, position: number) {
+    const previousProducts = orderedProducts
+    const previousFull = fullOrder
+    setOrderedProducts(nextVisible)
+    setFullOrder(nextFull)
+    setReorderSaving(true)
+    setReorderRollback(false)
+    setFeedback(null)
+    try {
+      const response = await fetch('/api/admin-products', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'reorder', orderedIds: nextFull }),
+      })
+      const body = await response.json() as { error?: string | { summary?: string }; result?: { message?: string } }
+      const errorMessage = typeof body.error === 'string' ? body.error : body.error?.summary
+      if (!response.ok) throw new Error(errorMessage || body.result?.message || 'Não foi possível salvar a ordem.')
+      setFeedback(`Ordem editorial salva. ${movedTitle} movido para a posição ${position}.`)
+      router.refresh()
+    } catch (error) {
+      setOrderedProducts(previousProducts)
+      setFullOrder(previousFull)
+      setReorderRollback(true)
+      setFeedback(`${error instanceof Error ? error.message : 'Não foi possível salvar a ordem.'} A posição anterior foi restaurada.`)
+    } finally {
+      setReorderSaving(false)
+    }
+  }
+
+  function moveProduct(from: number, to: number) {
+    if (busy || reorderSaving || from === to || to < 0 || to >= orderedProducts.length) return
+    const next = [...orderedProducts]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    void persistOrder(next, mergedFullOrder(next), moved.title || 'Produto', to + 1)
+  }
 
   // Mudar a seleção desarma a exclusão: a confirmação vale só para o conjunto
   // que o usuário viu ao armar.
@@ -554,7 +679,7 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
       </div>
     </div>
 
-    {feedback ? <InlineFeedback busy={busy} tone={feedback.includes('não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
+    {feedback ? <InlineFeedback busy={busy || reorderSaving} tone={reorderRollback || feedback.includes('não') ? 'danger' : 'success'}>{feedback}</InlineFeedback> : null}
 
     {/* Região live sempre montada: só recebe texto quando o foco NÃO se move. */}
     <p className="esmera-sr-only" role="status" aria-live="polite">{bulkAnnouncement}</p>
@@ -639,41 +764,29 @@ export function ProductsWorkspaceClient({ products, categories, filters, totalDo
       </section>
     ) : null}
 
-    {!products.length ? (
+    {!orderedProducts.length ? (
       <EmptyState title="Nenhum produto encontrado" copy="Ajuste os filtros ou crie um novo produto para iniciar o catálogo." action={<ProductCreateDialog />} />
-    ) : filters.view === 'list' ? (
-      <DataTable label="Produtos do catálogo">
-        <thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead>
-        <tbody>{table.getRowModel().rows.map((row) => {
-          const rowClass = [
-            String(row.original.id) === selectedProductId ? 'is-selected' : '',
-            row.getIsSelected() ? 'is-checked' : '',
-          ].filter(Boolean).join(' ')
-          return <tr key={row.id} className={rowClass}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>
-        })}</tbody>
-      </DataTable>
     ) : (
-      <div className="esmera-products-grid">
-        {products.map((product) => {
-          const cover = coverItem(product.gallery)
-          const coverURL = imageURL(cover)
-          const row = table.getRow(String(product.id))
-          const checked = row.getIsSelected()
-          const tileClass = [
-            'esmera-product-tile',
-            String(product.id) === selectedProductId ? 'is-selected' : '',
-            checked ? 'is-checked' : '',
-          ].filter(Boolean).join(' ')
-          return <article className={tileClass} key={String(product.id)}>
-            <span className="esmera-product-tile__select"><input aria-label={`Selecionar ${product.title || 'produto'}`} type="checkbox" checked={checked} onChange={row.getToggleSelectedHandler()} /></span>
-            <Link className="esmera-product-tile__media" href={productHref(filters, product.id)}>{coverURL ? <img src={coverURL} alt={cover?.alt || product.title || ''} /> : <span>Sem imagem</span>}</Link>
-            <div className="esmera-product-tile__body"><div><Link href={productHref(filters, product.id)}>{product.title || 'Produto sem título'}</Link><small>{product.code || 'Sem código'}</small></div><Readiness product={product} /></div>
-            <div className="esmera-product-tile__meta"><span>{availabilityLabels[product.availability || ''] || '—'}</span><span>{product.priceMode === 'fixed' ? money(product.basePriceCents) : 'Sob consulta'}</span></div>
-            <Button className="esmera-product-tile__inspect" type="button" onClick={(event) => openInspector(product.id, event.currentTarget)}>Inspecionar</Button>
-          </article>
-        })}
-      </div>
+      <DragDropProvider onDragEnd={(event) => {
+        if (event.canceled) return
+        const { source } = event.operation
+        if (!isSortable(source) || source.initialIndex === source.index) return
+        moveProduct(source.initialIndex, source.index)
+      }}>
+        {filters.view === 'list' ? (
+          <DataTable label="Produtos do catálogo">
+            <thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead>
+            <tbody>{table.getRowModel().rows.map((row, index) => <SortableProductRow key={row.id} row={row} index={index} total={orderedProducts.length} selectedProductId={selectedProductId} disabled={busy || reorderSaving} onMove={moveProduct} />)}</tbody>
+          </DataTable>
+        ) : (
+          <div className="esmera-products-grid">
+            {orderedProducts.map((product, index) => <SortableProductTile key={String(product.id)} product={product} row={table.getRow(String(product.id))} index={index} total={orderedProducts.length} filters={filters} selectedProductId={selectedProductId} disabled={busy || reorderSaving} onMove={moveProduct} onInspect={openInspector} />)}
+          </div>
+        )}
+      </DragDropProvider>
     )}
+
+    <p className="esmera-products-order-hint">Arraste pelo controle de ordem ou escolha uma posição. A ordem é salva automaticamente.</p>
 
     <nav className="esmera-products-pagination" aria-label="Paginação de produtos">
       <Link className={`esmera-button${filters.page <= 1 ? ' is-disabled' : ''}`} aria-disabled={filters.page <= 1} tabIndex={filters.page <= 1 ? -1 : undefined} href={listHref(filters, { page: Math.max(1, filters.page - 1) })}>Anterior</Link>

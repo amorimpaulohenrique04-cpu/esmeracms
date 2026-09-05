@@ -52,6 +52,14 @@
 .esmera-product-cell small { display: block; margin-top: 4px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 .esmera-product-list-thumb { width: 52px; height: 52px; flex: 0 0 auto; overflow: hidden; border-radius: var(--esmera-control-radius); background: var(--esmera-surface-selected); display: grid; place-items: center; color: var(--esmera-text-muted); }
 .esmera-product-list-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--esmera-motion-slow) var(--esmera-ease); }
+.esmera-product-order-control { display: inline-flex; align-items: center; gap: 6px; }
+.esmera-product-drag { width: 30px; height: 30px; display: inline-grid; place-items: center; border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-control-radius); background: var(--esmera-surface-panel); color: var(--esmera-text-muted); cursor: grab; }
+.esmera-product-drag:active { cursor: grabbing; }
+.esmera-product-drag:hover:not(:disabled),
+.esmera-product-drag:focus-visible { border-color: var(--esmera-primary); color: var(--esmera-primary); }
+.esmera-product-drag:disabled { cursor: wait; opacity: .55; }
+.esmera-product-position { width: 48px; min-height: 30px; border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-control-radius); background: var(--esmera-surface-panel); color: var(--esmera-text); font: inherit; font-size: var(--esmera-font-caption); }
+.esmera-products-workspace .esmera-data-table tr.is-dragging { position: relative; z-index: 2; opacity: .72; box-shadow: var(--esmera-shadow-interactive); }
 .esmera-products-workspace .esmera-data-table tr.is-selected td { background: var(--esmera-surface-selected); }
 .esmera-products-workspace .esmera-data-table tr.is-checked td { background: var(--esmera-primary-soft); }
 .esmera-products-workspace .esmera-data-table tr.is-checked td:first-child { box-shadow: inset 3px 0 0 var(--esmera-selection-bar); }
@@ -71,6 +79,8 @@
 .esmera-product-tile { position: relative; min-width: 0; overflow: hidden; border: 1px solid var(--esmera-line-default); border-radius: var(--esmera-panel-radius); background: var(--esmera-surface-panel); transition: border-color var(--esmera-motion-fast) var(--esmera-ease), box-shadow var(--esmera-motion-fast) var(--esmera-ease); }
 .esmera-product-tile.is-selected { border-color: var(--esmera-primary); box-shadow: inset 2px 0 0 var(--esmera-selection-bar); }
 .esmera-product-tile.is-checked { border-color: var(--esmera-primary); background: var(--esmera-primary-soft); box-shadow: inset 2px 0 0 var(--esmera-selection-bar); }
+.esmera-product-tile.is-dragging { z-index: 2; opacity: .76; box-shadow: var(--esmera-shadow-interactive); }
+.esmera-product-tile__order { position: absolute; top: 8px; right: 8px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; padding: 4px; border-radius: var(--esmera-control-radius); background: var(--esmera-surface-panel); box-shadow: var(--esmera-shadow-min); }
 .esmera-product-tile__select { position: absolute; top: 8px; left: 8px; z-index: 1; display: inline-flex; padding: 5px; border-radius: var(--esmera-radius-round); background: var(--esmera-surface-panel); box-shadow: var(--esmera-shadow-min); }
 .esmera-product-tile__select input { margin: 0; }
 .esmera-product-tile__media { aspect-ratio: 4 / 5; display: grid; place-items: center; overflow: hidden; background: var(--esmera-surface-selected); color: var(--esmera-text-muted); text-decoration: none; }
@@ -82,6 +92,7 @@
 .esmera-product-tile__body small { display: block; margin-top: 4px; color: var(--esmera-text-muted); font-size: var(--esmera-font-caption); }
 .esmera-product-tile__meta { display: flex; justify-content: space-between; gap: 12px; padding: 0 14px 12px; color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); }
 .esmera-product-tile > .esmera-button { width: calc(100% - 28px); margin: 0 14px 14px; }
+.esmera-products-order-hint { margin: var(--esmera-space-3) 0 0; color: var(--esmera-text-muted); font-size: var(--esmera-font-meta); }
 
 @media (hover: hover) and (pointer: fine) {
   .esmera-product-tile:hover { box-shadow: var(--esmera-shadow-min); }

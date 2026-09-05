@@ -120,9 +120,9 @@ export async function ProductsView(props: AdminViewServerProps) {
     }
 
     const filters = filtersFrom(params)
-    const [result, categoryResult, eligibleCategoryResult] = await Promise.all([
+    const [result, allOrderResult, categoryResult, eligibleCategoryResult] = await Promise.all([
       findDocs<ProductListItem>(props.initPageResult.req, 'products', {
-        sort: '-updatedAt',
+        sort: ['order', 'createdAt', 'id'],
         limit: filters.limit,
         page: filters.page,
         depth: 1,
@@ -130,6 +130,7 @@ export async function ProductsView(props: AdminViewServerProps) {
         where: whereFrom(filters),
         select: {
           id: true,
+          order: true,
           title: true,
           subtitle: true,
           slug: true,
@@ -145,6 +146,13 @@ export async function ProductsView(props: AdminViewServerProps) {
           basePriceCents: true,
           updatedAt: true,
         },
+      }),
+      findDocs<Pick<ProductListItem, 'id' | 'order'>>(props.initPageResult.req, 'products', {
+        sort: ['order', 'createdAt', 'id'],
+        limit: 1000,
+        depth: 0,
+        draft: true,
+        select: { id: true, order: true },
       }),
       findDocs<ProductCategory>(props.initPageResult.req, 'categories', {
         sort: 'order',
@@ -174,7 +182,7 @@ export async function ProductsView(props: AdminViewServerProps) {
 
     return <ViewFrame props={props}>
       <PageHeader eyebrow="Catálogo" title="Produtos" subtitle="Operação do catálogo com filtros, prontidão, publicação, grid, ações em lote e acesso ao documento editorial completo." actions={<><ProductCreateDialog categories={eligibleCategoryResult.docs} /><ProductImportDialog /></>} />
-      <ProductsWorkspaceClient products={result.docs} categories={categoryResult.docs} filters={filters} totalDocs={result.totalDocs} totalPages={result.totalPages} />
+      <ProductsWorkspaceClient products={result.docs} allOrderIds={allOrderResult.docs.map((product) => product.id)} categories={categoryResult.docs} filters={filters} totalDocs={result.totalDocs} totalPages={result.totalPages} />
     </ViewFrame>
   } catch (error) {
     return <ViewFrame props={props}><PageHeader title="Produtos" subtitle="Catálogo" /><QueryError title="Não foi possível consultar produtos" error={error} /></ViewFrame>

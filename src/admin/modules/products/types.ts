@@ -81,6 +81,7 @@ export type ProductSEO = {
 
 export type ProductListItem = {
   id: string | number
+  order?: number | null
   title?: string | null
   subtitle?: string | null
   code?: string | null

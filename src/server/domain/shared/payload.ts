@@ -4,7 +4,7 @@ import { measureServerOperation } from '../../performance'
 
 export type FindOptions = {
   where?: Where
-  sort?: string
+  sort?: string | string[]
   limit?: number
   page?: number
   depth?: number
