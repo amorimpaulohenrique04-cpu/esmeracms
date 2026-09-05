@@ -4,24 +4,64 @@ import config from '@payload-config'
 import { getPayload } from 'payload'
 
 const COLLECTIONS_ROOT_SLUG = 'colecoes'
-const LEGACY_FUCHSITA_SLUG = 'colecao-fucshita'
 
 const DESIRED_COLLECTIONS = [
-  { title: 'Coleção Fuchsita', slug: 'colecao-fuchsita' },
-  { title: 'Coleção Esmeralda', slug: 'colecao-esmeralda' },
-  { title: 'Coleção Bege Bahia', slug: 'colecao-bege-bahia' },
-  { title: 'Coleção Essência', slug: 'colecao-essencia' },
-  { title: 'Coleção Fé', slug: 'colecao-fe' },
-  { title: 'Coleção Alento', slug: 'colecao-alento' },
-  { title: 'Coleção Serpentinita', slug: 'colecao-serpentinita' },
-  { title: 'Coleção Ônix Calcário', slug: 'colecao-onix-calcario' },
+  {
+    title: 'Dolomita amarela',
+    slug: 'colecao-dolomita-amarela',
+    aliases: [],
+  },
+  {
+    title: 'Dolomita laranja',
+    slug: 'colecao-dolomita-laranja',
+    aliases: [],
+  },
+  {
+    title: 'Jadeíta',
+    slug: 'colecao-jadeita',
+    aliases: [],
+  },
+  {
+    title: 'Rocha de esmeralda',
+    slug: 'colecao-rocha-de-esmeralda',
+    aliases: ['colecao-esmeralda'],
+  },
+  {
+    title: 'Bege Bahia',
+    slug: 'colecao-bege-bahia',
+    aliases: [],
+  },
+  {
+    title: 'Fuschita',
+    slug: 'colecao-fuschita',
+    aliases: ['colecao-fuchsita', 'colecao-fucshita'],
+  },
+  {
+    title: 'Serpentinita',
+    slug: 'colecao-serpentinita',
+    aliases: [],
+  },
+  {
+    title: 'Ônix',
+    slug: 'colecao-onix',
+    aliases: ['colecao-onix-calcario'],
+  },
+  {
+    title: 'Outras',
+    slug: 'colecao-outras',
+    aliases: [],
+  },
 ] as const
 
 type CategoryRow = {
   id: string | number
+  title?: string | null
   slug?: string | null
   status?: string | null
+  taxonomyAxis?: string | null
+  parent?: unknown
   order?: number | null
+  _status?: string | null
 }
 
 async function main() {
@@ -43,22 +83,31 @@ async function main() {
     throw new Error(`Categoria raiz não encontrada: ${COLLECTIONS_ROOT_SLUG}`)
   }
 
-  const desiredSlugs = DESIRED_COLLECTIONS.map((collection) => collection.slug)
+  const lookupSlugs = DESIRED_COLLECTIONS.flatMap((collection) => [collection.slug, ...collection.aliases])
   const existingResult = await payload.find({
     collection: 'categories',
     depth: 0,
     draft: true,
-    limit: 100,
+    limit: 200,
     pagination: false,
     overrideAccess: true,
-    where: { slug: { in: desiredSlugs as unknown as string[] } },
-    select: { id: true, slug: true },
+    where: { slug: { in: lookupSlugs as unknown as string[] } },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      status: true,
+      taxonomyAxis: true,
+      parent: true,
+      order: true,
+      _status: true,
+    },
   })
 
-  const existingSlugs = new Set(
+  const existingBySlug = new Map(
     (existingResult.docs as unknown as CategoryRow[])
-      .map((category) => category.slug)
-      .filter((slug): slug is string => Boolean(slug)),
+      .filter((category) => category.slug)
+      .map((category) => [category.slug as string, category]),
   )
 
   const childrenResult = await payload.find({
@@ -69,7 +118,15 @@ async function main() {
     pagination: false,
     overrideAccess: true,
     where: { parent: { equals: root.id } },
-    select: { id: true, order: true },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      status: true,
+      taxonomyAxis: true,
+      order: true,
+      _status: true,
+    },
   })
 
   let nextOrder = Math.max(
@@ -78,11 +135,39 @@ async function main() {
   )
 
   const created: string[] = []
+  const renamed: string[] = []
   const reused: string[] = []
+  const canonicalIDs = new Set<string | number>()
 
   for (const desired of DESIRED_COLLECTIONS) {
-    if (existingSlugs.has(desired.slug)) {
-      reused.push(desired.slug)
+    const canonical = existingBySlug.get(desired.slug)
+    const alias = desired.aliases
+      .map((slug) => existingBySlug.get(slug))
+      .find((category): category is CategoryRow => Boolean(category))
+    const found = canonical || alias
+
+    if (found) {
+      await payload.update({
+        collection: 'categories',
+        id: found.id,
+        depth: 0,
+        draft: false,
+        overrideAccess: true,
+        data: {
+          title: desired.title,
+          slug: desired.slug,
+          status: 'active',
+          nodeType: 'collection',
+          taxonomyAxis: 'collection',
+          parent: root.id,
+          menu: { showInMenu: true, label: desired.title, visibility: 'all' },
+          listingMode: 'assigned',
+          _status: 'published',
+        } as never,
+      })
+      canonicalIDs.add(found.id)
+      if (found.slug === desired.slug && found.title === desired.title) reused.push(desired.slug)
+      else renamed.push(`${found.slug || found.id} -> ${desired.slug}`)
       continue
     }
 
@@ -121,32 +206,36 @@ async function main() {
       overrideAccess: true,
       data: { _status: 'published' } as never,
     })
+    canonicalIDs.add(category.id)
     created.push(desired.slug)
   }
 
-  const legacyResult = await payload.find({
+  const refreshedChildren = await payload.find({
     collection: 'categories',
     depth: 0,
     draft: true,
-    limit: 1,
+    limit: 500,
     pagination: false,
     overrideAccess: true,
-    where: { slug: { equals: LEGACY_FUCHSITA_SLUG } },
-    select: { id: true, slug: true, status: true },
+    where: { parent: { equals: root.id } },
+    select: { id: true, title: true, slug: true, status: true, taxonomyAxis: true, _status: true },
   })
 
-  const archivedLegacy: string[] = []
-  const legacy = legacyResult.docs[0] as CategoryRow | undefined
-  if (legacy && legacy.status !== 'archive') {
+  const archived: string[] = []
+  for (const category of refreshedChildren.docs as unknown as CategoryRow[]) {
+    if (category.taxonomyAxis !== 'collection') continue
+    if (canonicalIDs.has(category.id)) continue
+    if (category.status === 'archive') continue
+
     await payload.update({
       collection: 'categories',
-      id: legacy.id,
+      id: category.id,
       depth: 0,
       draft: false,
       overrideAccess: true,
       data: { status: 'archive', _status: 'published' } as never,
     })
-    archivedLegacy.push(LEGACY_FUCHSITA_SLUG)
+    archived.push(category.slug || String(category.id))
   }
 
   payload.logger.info({
@@ -154,8 +243,9 @@ async function main() {
     root: COLLECTIONS_ROOT_SLUG,
     desired: DESIRED_COLLECTIONS.length,
     created,
+    renamed,
     reused,
-    archivedLegacy,
+    archived,
   })
 }
 
