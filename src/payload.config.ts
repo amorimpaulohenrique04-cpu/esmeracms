@@ -251,10 +251,11 @@ export default buildConfig({
     push: !isProduction,
     pool: {
       connectionString: databaseURL,
-      // Vercel escala horizontalmente; limitar cada instância de produção a
-      // uma conexão evita multiplicar o pool até esgotar o limite do Postgres.
+      // O adaptador Postgres do Payload mantém uma conexão reservada para
+      // monitorar o banco. Em produção, três conexões deixam duas disponíveis
+      // para requisições sem multiplicar excessivamente o pool na Vercel.
       // Os testes continuam com pool maior para o bootstrap do Payload.
-      max: isTest ? 20 : isProduction ? 1 : 5,
+      max: isTest ? 20 : isProduction ? 3 : 5,
       idleTimeoutMillis: isProduction ? 5_000 : 10_000,
       connectionTimeoutMillis: isTest ? 30_000 : isProduction ? 15_000 : 5_000,
       allowExitOnIdle: isProduction,
