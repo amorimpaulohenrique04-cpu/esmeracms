@@ -18,21 +18,8 @@ const DESIRED_COLLECTIONS = [
 
 type CategoryRow = {
   id: string | number
-  title?: string | null
   slug?: string | null
-  status?: string | null
-  parent?: unknown
   order?: number | null
-  _status?: string | null
-}
-
-function relationshipID(value: unknown): string | number | null {
-  if (typeof value === 'string' || typeof value === 'number') return value
-  if (value && typeof value === 'object' && 'id' in value) {
-    const id = (value as { id?: unknown }).id
-    if (typeof id === 'string' || typeof id === 'number') return id
-  }
-  return null
 }
 
 async function main() {
@@ -46,7 +33,7 @@ async function main() {
     pagination: false,
     overrideAccess: true,
     where: { slug: { equals: COLLECTIONS_ROOT_SLUG } },
-    select: { id: true, slug: true, title: true, status: true, _status: true },
+    select: { id: true, slug: true },
   })
 
   const root = rootResult.docs[0] as CategoryRow | undefined
@@ -63,11 +50,13 @@ async function main() {
     pagination: false,
     overrideAccess: true,
     where: { slug: { in: desiredSlugs as unknown as string[] } },
-    select: { id: true, title: true, slug: true, status: true, parent: true, order: true, _status: true },
+    select: { id: true, slug: true },
   })
 
-  const existing = new Map(
-    (existingResult.docs as unknown as CategoryRow[]).map((category) => [category.slug || '', category]),
+  const existingSlugs = new Set(
+    (existingResult.docs as unknown as CategoryRow[])
+      .map((category) => category.slug)
+      .filter((slug): slug is string => Boolean(slug)),
   )
 
   const childrenResult = await payload.find({
@@ -87,42 +76,11 @@ async function main() {
   )
 
   const created: string[] = []
-  const normalized: string[] = []
   const reused: string[] = []
 
   for (const desired of DESIRED_COLLECTIONS) {
-    const found = existing.get(desired.slug)
-
-    if (found) {
-      const parentID = relationshipID(found.parent)
-      const needsNormalization =
-        found.title !== desired.title ||
-        parentID !== root.id ||
-        found.status !== 'active' ||
-        found._status !== 'published'
-
-      if (needsNormalization) {
-        await payload.update({
-          collection: 'categories',
-          id: found.id,
-          depth: 0,
-          draft: false,
-          overrideAccess: true,
-          data: {
-            title: desired.title,
-            parent: root.id,
-            status: 'active',
-            nodeType: 'collection',
-            taxonomyAxis: 'collection',
-            menu: { showInMenu: true, label: desired.title, visibility: 'all' },
-            listingMode: 'assigned',
-            _status: 'published',
-          } as never,
-        })
-        normalized.push(desired.slug)
-      } else {
-        reused.push(desired.slug)
-      }
+    if (existingSlugs.has(desired.slug)) {
+      reused.push(desired.slug)
       continue
     }
 
@@ -169,7 +127,6 @@ async function main() {
     root: COLLECTIONS_ROOT_SLUG,
     desired: DESIRED_COLLECTIONS.length,
     created,
-    normalized,
     reused,
   })
 }
