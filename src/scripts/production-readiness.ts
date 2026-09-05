@@ -1,7 +1,7 @@
 import 'dotenv/config'
 
 import { parseDecoCorsOrigins } from '../server/env/cors'
-import { parsePostgresConnection } from '../server/env/postgres'
+import { parsePostgresConnection, resolveRuntimeDatabaseURL } from '../server/env/postgres'
 
 const issues: string[] = []
 
@@ -26,9 +26,17 @@ try {
 
 if (siteURL && !siteURL.startsWith('https://')) issues.push('NEXT_PUBLIC_SITE_URL deve usar HTTPS em produção.')
 let databaseTarget = ''
+let configuredDatabaseMode = ''
+let runtimeDatabaseMode = ''
+let runtimeDatabasePort = ''
 if (databaseURL) {
   try {
-    databaseTarget = parsePostgresConnection(databaseURL).targetKey
+    const configured = parsePostgresConnection(databaseURL)
+    const runtime = parsePostgresConnection(resolveRuntimeDatabaseURL(databaseURL, 'production'))
+    databaseTarget = configured.targetKey
+    configuredDatabaseMode = configured.mode
+    runtimeDatabaseMode = runtime.mode
+    runtimeDatabasePort = runtime.port
   } catch (error) {
     issues.push(error instanceof Error ? error.message : String(error))
   }
@@ -65,4 +73,5 @@ if (issues.length) {
   process.exitCode = 1
 } else {
   console.info('Gate de produção aprovado: banco, secrets e armazenamento remoto estão declarados.')
+  console.info(`Postgres: configurado=${configuredDatabaseMode}; runtime=${runtimeDatabaseMode}; porta=${runtimeDatabasePort}.`)
 }
