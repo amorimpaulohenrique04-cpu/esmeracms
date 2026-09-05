@@ -91,6 +91,25 @@ export function parsePostgresConnection(value: string | undefined, name = 'DATAB
   }
 }
 
+export function resolveRuntimeDatabaseURL(
+  value: string | undefined,
+  environment = process.env.NODE_ENV,
+): string {
+  const connection = parsePostgresConnection(value)
+
+  // Supabase Session Pooler (5432) keeps one backend session per client and is
+  // inappropriate for horizontally scaled serverless runtimes such as Vercel.
+  // Reuse the same credentials/host through the Transaction Pooler (6543),
+  // which multiplexes short-lived clients and avoids exhausting client slots.
+  if (environment === 'production' && connection.mode === 'session-pooler') {
+    const transactionURL = new URL(connection.url)
+    transactionURL.port = '6543'
+    return transactionURL.toString()
+  }
+
+  return connection.url
+}
+
 export function requireDatabaseURL(): string {
-  return parsePostgresConnection(process.env.DATABASE_URL).url
+  return resolveRuntimeDatabaseURL(process.env.DATABASE_URL)
 }
