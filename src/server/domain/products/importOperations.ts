@@ -266,7 +266,7 @@ export async function previewImport(
       issues,
       isDuplicate: existingId !== null,
       existingProductId: existingId,
-      action: existingDoc?.deletedAt ? 'update' : existingId !== null ? 'skip' : 'create',
+      action: existingId !== null ? 'update' : 'create',
     }
   })
 
