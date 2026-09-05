@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { getPayload } from 'payload'
 
 const COLLECTIONS_ROOT_SLUG = 'colecoes'
+const LEGACY_FUCHSITA_SLUG = 'colecao-fucshita'
 
 const DESIRED_COLLECTIONS = [
   { title: 'Coleção Fuchsita', slug: 'colecao-fuchsita' },
@@ -19,6 +20,7 @@ const DESIRED_COLLECTIONS = [
 type CategoryRow = {
   id: string | number
   slug?: string | null
+  status?: string | null
   order?: number | null
 }
 
@@ -122,12 +124,38 @@ async function main() {
     created.push(desired.slug)
   }
 
+  const legacyResult = await payload.find({
+    collection: 'categories',
+    depth: 0,
+    draft: true,
+    limit: 1,
+    pagination: false,
+    overrideAccess: true,
+    where: { slug: { equals: LEGACY_FUCHSITA_SLUG } },
+    select: { id: true, slug: true, status: true },
+  })
+
+  const archivedLegacy: string[] = []
+  const legacy = legacyResult.docs[0] as CategoryRow | undefined
+  if (legacy && legacy.status !== 'archive') {
+    await payload.update({
+      collection: 'categories',
+      id: legacy.id,
+      depth: 0,
+      draft: false,
+      overrideAccess: true,
+      data: { status: 'archive', _status: 'published' } as never,
+    })
+    archivedLegacy.push(LEGACY_FUCHSITA_SLUG)
+  }
+
   payload.logger.info({
     event: 'catalog-collections.ensure.completed',
     root: COLLECTIONS_ROOT_SLUG,
     desired: DESIRED_COLLECTIONS.length,
     created,
     reused,
+    archivedLegacy,
   })
 }
 
