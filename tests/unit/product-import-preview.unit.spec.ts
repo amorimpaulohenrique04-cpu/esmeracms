@@ -39,7 +39,7 @@ function payloadFixture() {
 }
 
 describe('product import preview', () => {
-  it('C3/C9: resolve produto e categoria ignorando caixa e acento', async () => {
+  it('C3/C9: resolve produto e categoria ignorando caixa e acento e agenda atualização', async () => {
     const text = [
       'nome;codigo;categoria;preco;modo_preco;disponibilidade;status;imagens;material;descricao;slug',
       'Vaso atualizado;OBJ-A01;ceramica;1.490;Fixo;Disponível;Ativo;;;Nova descrição;vaso-existente',
@@ -50,6 +50,7 @@ describe('product import preview', () => {
     expect(result.rows).toHaveLength(1)
     expect(result.rows[0]?.isDuplicate).toBe(true)
     expect(result.rows[0]?.existingProductId).toBe(41)
+    expect(result.rows[0]?.action).toBe('update')
     expect(result.rows[0]?.issues.some((issue) => issue.code === 'category_missing')).toBe(false)
     expect(result.rows[0]?.issues.find((issue) => issue.code === 'price_ambiguous')?.severity).toBe('warning')
     expect(result.blockingCount).toBe(0)
