@@ -46,8 +46,9 @@ const dirname = path.dirname(filename)
 const payloadSecret = process.env.PAYLOAD_SECRET || ''
 const databaseURL = requireDatabaseURL()
 const isTest = process.env.NODE_ENV === 'test'
+const isProduction = process.env.NODE_ENV === 'production'
 
-if (process.env.NODE_ENV === 'production' && payloadSecret.length < 24) {
+if (isProduction && payloadSecret.length < 24) {
   throw new Error('PAYLOAD_SECRET deve possuir pelo menos 24 caracteres em produção.')
 }
 
@@ -244,13 +245,14 @@ export default buildConfig({
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
   db: postgresAdapter({
-    push: process.env.NODE_ENV !== 'production',
+    push: !isProduction,
     pool: {
       connectionString: databaseURL,
-      // Payload's test bootstrap introspects many tables concurrently. A pool of
-      // five can deadlock that startup in CI even with serial Vitest files.
-      max: isTest ? 20 : 5,
-      idleTimeoutMillis: 10_000,
+      // Vercel escala horizontalmente; limitar cada instância de produção a
+      // uma conexão evita multiplicar o pool até esgotar o limite do Postgres.
+      // Os testes continuam com pool maior para o bootstrap do Payload.
+      max: isTest ? 20 : isProduction ? 1 : 5,
+      idleTimeoutMillis: isProduction ? 5_000 : 10_000,
       connectionTimeoutMillis: isTest ? 30_000 : 5_000,
     },
   }),
