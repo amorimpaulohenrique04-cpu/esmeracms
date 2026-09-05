@@ -44,7 +44,7 @@
     "test:unit": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts tests/unit",
     "test:e2e": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.config.ts",
     "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts",
-    "baseline:prepare": "pnpm baseline:prepare && cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.baseline.config.ts && pnpm baseline:finalize",
+    "baseline:prepare": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/prepare-visual-baseline.ts",
     "baseline:finalize": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/finalize-visual-baseline.ts",
     "baseline:capture": "pnpm baseline:prepare && cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.baseline.config.ts && pnpm baseline:finalize",
     "baseline:compare": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/compare-visual-baseline.ts"
@@ -76,7 +76,7 @@
     "@testing-library/react": "16.3.0",
     "@types/node": "22.19.9",
     "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.6",
+    "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "4.5.2",
     "eslint": "^9.16.0",
     "eslint-config-next": "16.2.11",
