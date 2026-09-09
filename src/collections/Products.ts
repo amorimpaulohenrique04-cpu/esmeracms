@@ -212,7 +212,6 @@ export const Products: CollectionConfig = {
               type: 'text',
               label: 'Título',
               required: true,
-              unique: true,
             },
             {
               name: 'subtitle',
