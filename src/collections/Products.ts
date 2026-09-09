@@ -86,9 +86,36 @@ export const Products: CollectionConfig = {
       async ({ data, originalDoc, req }) => {
         if (!data) return data
         const id = originalDoc?.id as number | string | undefined
-        if (data?.title && !data.slug) data.slug = slugify(String(data.title))
         if (!data.code && !originalDoc?.code) data.code = productCode()
         if (data?.code) data.code = String(data.code).trim().toUpperCase()
+        if (data?.title && !data.slug) {
+          const title = String(data.title).trim()
+          const previousTitle = String(originalDoc?.title ?? '').trim()
+          if (originalDoc?.slug && title === previousTitle) {
+            data.slug = originalDoc.slug
+          } else {
+            const baseSlug = slugify(title)
+            let candidate = baseSlug
+            let suffix = 2
+            while (candidate) {
+              const conditions: Where[] = [{ slug: { equals: candidate } }]
+              if (id !== undefined && id !== null) conditions.push({ id: { not_equals: id } })
+              const conflict = await req.payload.find({
+                collection: 'products',
+                depth: 0,
+                limit: 1,
+                pagination: false,
+                overrideAccess: true,
+                req,
+                where: { and: conditions },
+              })
+              if (!conflict.docs.length) break
+              candidate = `${baseSlug}-${suffix}`
+              suffix += 1
+            }
+            data.slug = candidate
+          }
+        }
         if (Array.isArray(data.gallery)) {
           const title = String(data.title ?? originalDoc?.title ?? '').trim()
           const usedMediaKeys = new Set<string>()
@@ -212,7 +239,6 @@ export const Products: CollectionConfig = {
               type: 'text',
               label: 'Título',
               required: true,
-              unique: true,
             },
             {
               name: 'subtitle',
