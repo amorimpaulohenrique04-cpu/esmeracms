@@ -15,7 +15,7 @@ async function normalize(data: Record<string, unknown>, originalDoc?: Record<str
   return await hook({
     data,
     originalDoc,
-    req: { payload: { find: vi.fn() } },
+    req: { payload: { find: vi.fn().mockResolvedValue({ docs: [] }) } },
   } as never) as ProductData
 }
 
