@@ -61,7 +61,20 @@ function sampleProduct(overrides: Record<string, unknown> = {}) {
     basePriceCents: 49000,
     physicalSpecs: { heightMm: 180, weightGrams: 1200 },
     gallery: [
-      { role: 'cover', alt: 'Ponta frente', image: { id: 1, url: '/orig.jpg', sizes: { productCard: { url: '/pc.jpg', width: 900, height: 1200 } } } },
+      {
+        role: 'cover',
+        alt: 'Ponta frente',
+        image: {
+          id: 1,
+          url: '/orig.jpg',
+          width: 6000,
+          height: 4000,
+          sizes: {
+            productCard: { url: '/pc.jpg', width: 900, height: 1200 },
+            gallery: { url: '/gallery.jpg', width: 1800, height: 1200 },
+          },
+        },
+      },
       { role: 'detail', alt: 'Ponta verso', image: { id: 2, url: '/orig2.jpg' } },
     ],
     categories: [
@@ -83,10 +96,20 @@ describe('publicProduct — enriquecimento do card', () => {
     expect(product.pricing).toEqual({ mode: 'fixed', priceCents: 49000, installment: { count: 12, amountCents: 4083, interestFree: true } })
   })
 
-  it('prefere o crop productCard (3:4) na imagem do card', () => {
+  it('preserva a composição sem crop usando a derivação gallery no card', () => {
     const product = publicProduct(sampleProduct(), DEFAULT_TERMS)
-    expect(product.image?.url).toBe('/pc.jpg')
+    expect(product.image?.url).toBe('/gallery.jpg')
+    expect(product.image?.width).toBe(1800)
     expect(product.image?.height).toBe(1200)
+  })
+
+  it('cai para o original quando gallery não existe', () => {
+    const product = publicProduct(sampleProduct({
+      gallery: [{ role: 'cover', alt: 'Ponta frente', image: { id: 1, url: '/orig.jpg', width: 6000, height: 4000 } }],
+    }), DEFAULT_TERMS)
+    expect(product.image?.url).toBe('/orig.jpg')
+    expect(product.image?.width).toBe(6000)
+    expect(product.image?.height).toBe(4000)
   })
 
   it('dobra availability legado unique para available mantendo isUnique', () => {
