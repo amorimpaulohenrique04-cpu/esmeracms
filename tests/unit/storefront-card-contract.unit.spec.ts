@@ -61,8 +61,30 @@ function sampleProduct(overrides: Record<string, unknown> = {}) {
     basePriceCents: 49000,
     physicalSpecs: { heightMm: 180, weightGrams: 1200 },
     gallery: [
-      { role: 'cover', alt: 'Ponta frente', image: { id: 1, url: '/orig.jpg', sizes: { productCard: { url: '/pc.jpg', width: 900, height: 1200 } } } },
-      { role: 'detail', alt: 'Ponta verso', image: { id: 2, url: '/orig2.jpg' } },
+      {
+        role: 'cover',
+        alt: 'Ponta frente',
+        image: {
+          id: 1,
+          url: '/orig.jpg',
+          sizes: {
+            productCard: { url: '/pc.jpg', width: 900, height: 1200 },
+            gallery: { url: '/gallery.jpg', width: 1800, height: 1200 },
+          },
+        },
+      },
+      {
+        role: 'detail',
+        alt: 'Ponta verso',
+        image: {
+          id: 2,
+          url: '/orig2.jpg',
+          sizes: {
+            productCard: { url: '/pc2.jpg', width: 900, height: 1200 },
+            gallery: { url: '/gallery2.jpg', width: 1800, height: 1200 },
+          },
+        },
+      },
     ],
     categories: [
       { id: 7, slug: 'ponta-de-esmeralda', title: 'Ponta de Esmeralda', taxonomyAxis: 'piece_type', status: 'active', _status: 'published' },
@@ -83,10 +105,30 @@ describe('publicProduct — enriquecimento do card', () => {
     expect(product.pricing).toEqual({ mode: 'fixed', priceCents: 49000, installment: { count: 12, amountCents: 4083, interestFree: true } })
   })
 
-  it('prefere o crop productCard (3:4) na imagem do card', () => {
+  it('prefere o crop productCard (3:4) na imagem do card comum', () => {
     const product = publicProduct(sampleProduct(), DEFAULT_TERMS)
     expect(product.image?.url).toBe('/pc.jpg')
     expect(product.image?.height).toBe(1200)
+    expect(product.hoverImage?.url).toBe('/pc2.jpg')
+  })
+
+  it('preserva a proporção gallery para bandejas e bandejinhas', () => {
+    const tray = publicProduct(sampleProduct({
+      title: 'Bandeja Grande em Bege Bahia',
+      categories: [
+        { id: 12, slug: 'bandejas-para-lavabo', title: 'Bandejas para Lavabo', taxonomyAxis: 'piece_type', status: 'active', _status: 'published' },
+      ],
+    }), DEFAULT_TERMS)
+    expect(tray.image?.url).toBe('/gallery.jpg')
+    expect(tray.image?.width).toBe(1800)
+    expect(tray.image?.height).toBe(1200)
+    expect(tray.hoverImage?.url).toBe('/gallery2.jpg')
+
+    const smallTray = publicProduct(sampleProduct({
+      title: 'Bandejinha para Lavabo em Jadeíta',
+      categories: [],
+    }), DEFAULT_TERMS)
+    expect(smallTray.image?.url).toBe('/gallery.jpg')
   })
 
   it('dobra availability legado unique para available mantendo isUnique', () => {
