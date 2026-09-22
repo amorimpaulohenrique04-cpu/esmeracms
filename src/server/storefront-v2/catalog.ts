@@ -131,9 +131,10 @@ function publicMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 | nul
   }
 }
 
-// Ordem de preferência de crop para imagens de card/produto: productCard (3:4)
-// é o crop editorial oficial; card (4:5) é o legado; o original é o último recurso.
-const CARD_CROP_ORDER = ['productCard', 'card'] as const
+// Cards do catálogo preservam a composição fotográfica original. `gallery`
+// limita apenas a largura no Payload e não aplica crop; o frontend enquadra
+// todas as fotos no mesmo palco horizontal 3:2 usando object-fit: contain.
+const CARD_CROP_ORDER = ['gallery'] as const
 
 function publicCardMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 | null {
   const media = record(value)
