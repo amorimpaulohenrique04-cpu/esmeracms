@@ -217,8 +217,8 @@ describe('storefront V2 catalog builders', () => {
     const result = await buildProductDetailV2(payload, 'vaso-horizontal')
 
     expect(result.body.product.image).toMatchObject({
-      url: '/media/horizonte-900x1200.jpg',
-      width: 900,
+      url: '/media/horizonte-1800x1200.jpg',
+      width: 1800,
       height: 1200,
     })
     expect(result.body.product.gallery[0]).toMatchObject({
