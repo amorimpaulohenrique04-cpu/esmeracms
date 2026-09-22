@@ -247,7 +247,6 @@ function latestModified(values: unknown[]) {
 function categoryOrder(category: UnknownRecord) {
   return integer(category.order, 100)
 }
-
 function compareCategories(left: UnknownRecord, right: UnknownRecord) {
   const orderDifference = categoryOrder(left) - categoryOrder(right)
   if (orderDifference) return orderDifference
@@ -611,6 +610,8 @@ export function publicProduct(value: UnknownRecord, terms: PaymentTermsV2): Publ
   const pieceType = categories.find((category) => category.taxonomyAxis === 'piece_type')?.title ?? null
   const material = nullableText(value.material)
   const title = text(value.title)
+  const preserveCardComposition = [pieceType, title].some((candidate) => fold(candidate).includes('bandej'))
+  const cardMedia = preserveCardComposition ? publicGalleryMedia : publicCardMedia
   const specsRecord = record(value.physicalSpecs)
   const specs = {
     heightMm: numberValue(specsRecord?.heightMm),
@@ -633,8 +634,8 @@ export function publicProduct(value: UnknownRecord, terms: PaymentTermsV2): Publ
     availability: nullableText(value.availability),
     price,
     priceUnit: 'cent',
-    image: cover ? publicCardMedia(cover.image, cover.alt) : null,
-    hoverImage: hover ? publicCardMedia(hover.image, hover.alt) : null,
+    image: cover ? cardMedia(cover.image, cover.alt) : null,
+    hoverImage: hover ? cardMedia(hover.image, hover.alt) : null,
     categories,
     identity: { name: title, pieceType, material },
     pieceType,
