@@ -1,4 +1,5 @@
 import config from '@payload-config'
+import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
 
 import { measureServerOperation } from '../../../../../../server/performance'
@@ -16,17 +17,27 @@ type RouteContext = {
   params: Promise<{ slug: string }>
 }
 
+const loadProductDetail = unstable_cache(
+  async (slug: string) => {
+    const payload = await getPayload({ config })
+    return await buildProductDetailV2(payload, slug)
+  },
+  ['storefront-product-v2'],
+  {
+    revalidate: 45,
+    tags: ['storefront-products'],
+  },
+)
+
 export async function GET(request: Request, context: RouteContext) {
-  const payload = await getPayload({ config })
   const { slug } = await context.params
 
   try {
-    const result = await measureServerOperation('operational', 'storefront.product.v2', () =>
-      buildProductDetailV2(payload, slug))
-    payload.logger.info({
-      event: 'storefront.product.v2.served',
-      slug,
-    })
+    const result = await measureServerOperation(
+      'operational',
+      'storefront.product.v2',
+      () => loadProductDetail(slug),
+    )
     return publicJSON(request, result.body, {
       revision: result.body.revision,
       lastModified: result.lastModified,
@@ -34,7 +45,7 @@ export async function GET(request: Request, context: RouteContext) {
       staleWhileRevalidate: 180,
     })
   } catch (error) {
-    payload.logger.error({
+    console.error({
       event: 'storefront.product.v2.failed',
       slug,
       error: error instanceof Error ? error.message : 'unknown_error',
