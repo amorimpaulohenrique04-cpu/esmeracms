@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
 
 import { measureServerOperation } from '../../../../../server/performance'
+import { canonicalStorefrontQuery } from '../../../../../server/storefront-v2/cacheKey'
 import { StorefrontContractV2Error } from '../../../../../server/storefront-v2/contracts'
 import {
   buildProductsV2,
@@ -36,7 +37,7 @@ const loadProducts = unstable_cache(
 /** GET /api/storefront/products — catálogo público enriquecido e paginado. */
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const query = url.searchParams.toString()
+  const query = canonicalStorefrontQuery(url.searchParams)
 
   try {
     const result = await measureServerOperation(
