@@ -49,3 +49,107 @@
   .esmera-leads-filters__actions .esmera-button { flex: 1 1 0; }
   .esmera-leads-table__origin { display: none; }
 }
+
+.esmera-lead-favorites {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--esmera-border-subtle);
+}
+
+.esmera-lead-favorites__head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.esmera-lead-favorites__head h3 {
+  margin: 3px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.esmera-lead-favorites__count {
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--esmera-surface-selected);
+  color: var(--esmera-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.esmera-lead-favorites__list {
+  display: grid;
+  gap: 8px;
+}
+
+.esmera-lead-favorite {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 13px;
+  border: 1px solid var(--esmera-border-subtle);
+  border-radius: 8px;
+  background: var(--esmera-surface);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.esmera-lead-favorite__main,
+.esmera-lead-favorite__meta {
+  display: grid;
+  gap: 3px;
+}
+
+.esmera-lead-favorite__main {
+  min-width: 0;
+}
+
+.esmera-lead-favorite__main strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.esmera-lead-favorite__main span,
+.esmera-lead-favorite__meta span {
+  color: var(--esmera-text-muted);
+  font-size: 11px;
+}
+
+.esmera-lead-favorite__meta {
+  justify-items: end;
+  text-align: right;
+}
+
+.esmera-lead-favorite__meta strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.esmera-lead-favorite:hover {
+  border-color: var(--esmera-border);
+  background: var(--esmera-surface-hover);
+}
+
+@container esmera-workspace (max-width: 560px) {
+  .esmera-lead-favorite {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .esmera-lead-favorite__meta {
+    justify-items: start;
+    text-align: left;
+  }
+}
+
