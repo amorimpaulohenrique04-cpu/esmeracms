@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
     '/*': ['./certs/supabase-prod-ca-2021.crt'],
   },
   images: {
+    // Payload media is immutable in practice (new uploads receive new
+    // filenames). Keep optimized derivatives hot for a week so hero/product
+    // images do not repeatedly invoke the CMS function.
+    minimumCacheTTL: 604800,
+    qualities: [75],
     localPatterns: [
       {
         pathname: '/api/media/file/**',
