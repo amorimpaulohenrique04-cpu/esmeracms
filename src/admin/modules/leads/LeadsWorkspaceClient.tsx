@@ -7,7 +7,7 @@ import React, { useMemo, useState } from 'react'
 
 import { Button, DataTable, EmptyState, Inspector, Status } from '../../design-system'
 import { ContextInspector, SplitWorkspace } from '../../design-system/Primitives'
-import type { LeadFilters, LeadRecord } from './types'
+import type { InterestedProductRef, LeadFilters, LeadRecord } from './types'
 
 const sourceLabels: Record<string, string> = {
   instagram: 'Instagram',
@@ -23,6 +23,24 @@ function opportunityId(value: LeadRecord['opportunity']) {
   if (!value) return null
   if (typeof value === 'string' || typeof value === 'number') return value
   return value.id
+}
+
+function interestedProduct(value: LeadRecord['interestedProducts'] extends Array<infer T> | null | undefined ? T : never): InterestedProductRef | null {
+  if (!value || typeof value === 'string' || typeof value === 'number') return null
+  return value
+}
+
+function availabilityLabel(value?: string | null) {
+  if (value === 'unique') return 'Peça única'
+  if (value === 'made_to_order') return 'Sob encomenda'
+  if (value === 'limited') return 'Edição limitada'
+  if (value === 'archive') return 'Indisponível'
+  return 'Disponível'
+}
+
+function formatPrice(cents?: number | null) {
+  if (!cents) return null
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100)
 }
 
 function shortDate(value?: string | null) {
@@ -82,6 +100,12 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
   })
 
   const selected = useMemo(() => data.find((item) => String(item.id) === String(selectedId)) || null, [data, selectedId])
+  const selectedProducts = useMemo(
+    () => (selected?.interestedProducts || [])
+      .map(interestedProduct)
+      .filter((product): product is InterestedProductRef => Boolean(product)),
+    [selected],
+  )
 
   // Trocar a seleção desarma a exclusão: a confirmação vale só para o lead que estava aberto.
   function selectLead(id: string | number | null) {
@@ -168,6 +192,43 @@ export function LeadsWorkspaceClient({ leads, filters }: { leads: LeadRecord[]; 
               <div><dt>Origem</dt><dd>{sourceLabels[selected.source || ''] || selected.source || '—'}</dd></div>
               <div><dt>Recebido em</dt><dd>{shortDate(selected.createdAt)}</dd></div>
             </dl>
+
+            {selectedProducts.length ? (
+              <section className="esmera-lead-favorites" aria-labelledby="esmera-lead-favorites-title">
+                <div className="esmera-lead-favorites__head">
+                  <div>
+                    <span className="esmera-eyebrow">Interesse</span>
+                    <h3 id="esmera-lead-favorites-title">Peças favoritas</h3>
+                  </div>
+                  <span className="esmera-lead-favorites__count">{selectedProducts.length}</span>
+                </div>
+
+                <div className="esmera-lead-favorites__list">
+                  {selectedProducts.map((product) => {
+                    const price = formatPrice(product.basePriceCents)
+                    return (
+                      <Link
+                        key={String(product.id)}
+                        className="esmera-lead-favorite"
+                        href={`/admin/collections/products/${product.id}`}
+                      >
+                        <div className="esmera-lead-favorite__main">
+                          <strong>{product.title || 'Peça sem título'}</strong>
+                          <span>
+                            {[product.code, product.material].filter(Boolean).join(' · ') || 'Produto de interesse'}
+                          </span>
+                        </div>
+                        <div className="esmera-lead-favorite__meta">
+                          <span>{availabilityLabel(product.availability)}</span>
+                          <strong>{product.priceMode === 'inquiry' ? 'Sob consulta' : price || '—'}</strong>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </section>
+            ) : null}
+
             {selected.notes ? <p>{selected.notes}</p> : null}
             {feedback ? <p className="esmera-quick-create-feedback" role="status" aria-live="polite">{feedback}</p> : null}
           </Inspector>
