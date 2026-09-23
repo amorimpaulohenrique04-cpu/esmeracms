@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
 
 import { measureServerOperation } from '../../../../../../server/performance'
+import { canonicalStorefrontQuery } from '../../../../../../server/storefront-v2/cacheKey'
 import { StorefrontContractV2Error } from '../../../../../../server/storefront-v2/contracts'
 import {
   buildCollectionV2,
@@ -40,7 +41,7 @@ const loadCollection = unstable_cache(
 export async function GET(request: Request, context: RouteContext) {
   const { slug } = await context.params
   const url = new URL(request.url)
-  const query = url.searchParams.toString()
+  const query = canonicalStorefrontQuery(url.searchParams)
   const page = url.searchParams.get('page') || '1'
   const limit = url.searchParams.get('limit') || 'default'
   const filterCount = Array.from(url.searchParams.keys()).filter((key) => !['page', 'limit', 'sort'].includes(key)).length
