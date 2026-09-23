@@ -6,6 +6,17 @@ export type OpportunityRef = {
   stage?: string | null
 }
 
+export type InterestedProductRef = {
+  id: string | number
+  title?: string | null
+  code?: string | null
+  slug?: string | null
+  material?: string | null
+  availability?: string | null
+  basePriceCents?: number | null
+  priceMode?: string | null
+}
+
 export type LeadRecord = {
   id: string | number
   name?: string | null
@@ -14,6 +25,7 @@ export type LeadRecord = {
   source?: string | null
   notes?: string | null
   opportunity?: Relation<OpportunityRef>
+  interestedProducts?: Array<Relation<InterestedProductRef>> | null
   createdAt?: string | null
   updatedAt?: string | null
 }
