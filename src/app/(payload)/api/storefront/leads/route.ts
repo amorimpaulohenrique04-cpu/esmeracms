@@ -5,6 +5,7 @@ import { getPayload } from 'payload'
 export const dynamic = 'force-dynamic'
 
 const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/
+const PRODUCT_ACTIONS = new Set(['add', 'remove'])
 
 type UnknownRecord = Record<string, unknown>
 
@@ -15,12 +16,33 @@ function jsonError(status: number, code: string, message: string) {
   })
 }
 
+function relationshipIDs(value: unknown): Array<string | number> {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (typeof item === 'string' || typeof item === 'number') return [item]
+    if (
+      item &&
+      typeof item === 'object' &&
+      'id' in item &&
+      (typeof item.id === 'string' || typeof item.id === 'number')
+    ) {
+      return [item.id]
+    }
+    return []
+  })
+}
+
+function sameID(left: string | number, right: string | number) {
+  return String(left) === String(right)
+}
+
 /**
  * POST /api/storefront/leads
  *
- * Captura pública de lead (ex: WhatsApp do rodapé do storefront). Cria
- * diretamente em `leads` com `source: 'site'` — sem transação/idempotência
- * porque não há concorrência de estoque envolvida, ao contrário da reserva.
+ * Captura pública de leads do storefront.
+ * - Formulário do rodapé continua aceitando apenas `phone`.
+ * - Favoritos enviam `name`, `phone`, `productId` e `action`.
+ *   Nesse fluxo fazemos upsert por telefone e sincronizamos `interestedProducts`.
  */
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -37,24 +59,105 @@ export async function POST(request: Request) {
     return jsonError(400, 'invalid_request', 'Telefone inválido. Use o formato E.164, como +5511999990000.')
   }
 
+  const name = typeof body.name === 'string' ? body.name.trim().slice(0, 80) : ''
+  const productId = typeof body.productId === 'string' || typeof body.productId === 'number'
+    ? body.productId
+    : null
+  const action = typeof body.action === 'string' ? body.action : 'add'
+  const isFavoriteRequest = productId !== null
+
+  if (isFavoriteRequest && name.length < 2) {
+    return jsonError(400, 'invalid_request', 'Informe seu nome para salvar favoritos.')
+  }
+  if (isFavoriteRequest && !PRODUCT_ACTIONS.has(action)) {
+    return jsonError(400, 'invalid_request', 'Ação de favorito inválida.')
+  }
+
   try {
-    const lead = await payload.create({
+    if (!isFavoriteRequest) {
+      const lead = await payload.create({
+        collection: 'leads',
+        overrideAccess: true,
+        data: {
+          name: `Lead do rodapé — ${phone}`,
+          phone,
+          source: 'site',
+        },
+      })
+      return NextResponse.json({ lead: { id: String(lead.id) } }, {
+        status: 201,
+        headers: { 'Cache-Control': 'no-store' },
+      })
+    }
+
+    const existing = await payload.find({
       collection: 'leads',
       overrideAccess: true,
-      data: {
-        name: `Lead do rodapé — ${phone}`,
-        phone,
-        source: 'site',
+      limit: 1,
+      depth: 0,
+      where: {
+        phone: { equals: phone },
       },
     })
-    return NextResponse.json({ lead: { id: String(lead.id) } }, {
-      status: 201,
+
+    const lead = existing.docs[0]
+    if (!lead && action === 'remove') {
+      return NextResponse.json({ lead: null, favoritesUpdated: false }, {
+        status: 200,
+        headers: { 'Cache-Control': 'no-store' },
+      })
+    }
+
+    if (!lead) {
+      const created = await payload.create({
+        collection: 'leads',
+        overrideAccess: true,
+        data: {
+          name,
+          phone,
+          source: 'site',
+          interestedProducts: [productId],
+        },
+      })
+      return NextResponse.json({
+        lead: { id: String(created.id) },
+        favoritesUpdated: true,
+      }, {
+        status: 201,
+        headers: { 'Cache-Control': 'no-store' },
+      })
+    }
+
+    const currentProducts = relationshipIDs(lead.interestedProducts)
+    const nextProducts = action === 'remove'
+      ? currentProducts.filter((id) => !sameID(id, productId))
+      : currentProducts.some((id) => sameID(id, productId))
+        ? currentProducts
+        : [...currentProducts, productId]
+
+    const updated = await payload.update({
+      collection: 'leads',
+      id: lead.id,
+      overrideAccess: true,
+      data: {
+        name,
+        phone,
+        interestedProducts: nextProducts,
+      },
+    })
+
+    return NextResponse.json({
+      lead: { id: String(updated.id) },
+      favoritesUpdated: true,
+    }, {
+      status: 200,
       headers: { 'Cache-Control': 'no-store' },
     })
   } catch (error) {
     payload.logger.error({
       event: 'storefront.leads.failed',
       error: error instanceof Error ? error.message : 'unknown_error',
+      favoriteAction: isFavoriteRequest ? action : null,
     })
     return jsonError(500, 'lead_failed', 'Não foi possível registrar o contato agora.')
   }
