@@ -20,8 +20,15 @@ function normalizeETag(revision: string) {
 export function publicCacheHeaders(options: PublicHTTPOptions) {
   const maxAge = Math.max(0, options.maxAge ?? 60)
   const staleWhileRevalidate = Math.max(0, options.staleWhileRevalidate ?? 300)
+  const browserMaxAge = Math.min(maxAge, 60)
+  const sharedPolicy = `public, s-maxage=${maxAge}, stale-while-revalidate=${staleWhileRevalidate}, stale-if-error=86400`
   const headers = new Headers({
-    'Cache-Control': `public, max-age=${maxAge}, stale-while-revalidate=${staleWhileRevalidate}`,
+    // Browsers revalidate quickly while Vercel's edge keeps the expensive
+    // Payload response hot. This prevents visitors from paying for serverless
+    // + Postgres work on every navigation.
+    'Cache-Control': `public, max-age=${browserMaxAge}, must-revalidate`,
+    'CDN-Cache-Control': sharedPolicy,
+    'Vercel-CDN-Cache-Control': sharedPolicy,
     Vary: 'Accept-Encoding',
   })
   if (options.revision) headers.set('ETag', normalizeETag(options.revision))
