@@ -50,6 +50,7 @@ export async function LeadsView(props: AdminViewServerProps) {
         source: true,
         notes: true,
         opportunity: true,
+        interestedProducts: true,
         createdAt: true,
         updatedAt: true,
       },
