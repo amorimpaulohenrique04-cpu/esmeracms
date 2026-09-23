@@ -16,24 +16,21 @@ function jsonError(status: number, code: string, message: string) {
   })
 }
 
-function relationshipIDs(value: unknown): Array<string | number> {
+function relationshipIDs(value: unknown): number[] {
   if (!Array.isArray(value)) return []
   return value.flatMap((item) => {
-    if (typeof item === 'string' || typeof item === 'number') return [item]
+    if (typeof item === 'number' && Number.isInteger(item)) return [item]
     if (
       item &&
       typeof item === 'object' &&
       'id' in item &&
-      (typeof item.id === 'string' || typeof item.id === 'number')
+      typeof item.id === 'number' &&
+      Number.isInteger(item.id)
     ) {
       return [item.id]
     }
     return []
   })
-}
-
-function sameID(left: string | number, right: string | number) {
-  return String(left) === String(right)
 }
 
 /**
@@ -60,8 +57,11 @@ export async function POST(request: Request) {
   }
 
   const name = typeof body.name === 'string' ? body.name.trim().slice(0, 80) : ''
-  const productId = typeof body.productId === 'string' || typeof body.productId === 'number'
-    ? body.productId
+  const rawProductId = typeof body.productId === 'string' || typeof body.productId === 'number'
+    ? Number(body.productId)
+    : Number.NaN
+  const productId = Number.isInteger(rawProductId) && rawProductId > 0
+    ? rawProductId
     : null
   const action = typeof body.action === 'string' ? body.action : 'add'
   const isFavoriteRequest = productId !== null
@@ -130,8 +130,8 @@ export async function POST(request: Request) {
 
     const currentProducts = relationshipIDs(lead.interestedProducts)
     const nextProducts = action === 'remove'
-      ? currentProducts.filter((id) => !sameID(id, productId))
-      : currentProducts.some((id) => sameID(id, productId))
+      ? currentProducts.filter((id) => id !== productId)
+      : currentProducts.includes(productId)
         ? currentProducts
         : [...currentProducts, productId]
 
