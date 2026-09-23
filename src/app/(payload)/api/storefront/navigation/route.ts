@@ -1,4 +1,5 @@
 import config from '@payload-config'
+import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
 
 import { measureServerOperation } from '../../../../../server/performance'
@@ -8,10 +9,25 @@ import { publicError, publicJSON } from '../../../../../server/storefront-v2/htt
 
 export const dynamic = 'force-dynamic'
 
+const loadNavigation = unstable_cache(
+  async () => {
+    const payload = await getPayload({ config })
+    return await buildNavigationV2(payload)
+  },
+  ['storefront-navigation-v2'],
+  {
+    revalidate: 300,
+    tags: ['storefront-navigation'],
+  },
+)
+
 export async function GET(request: Request) {
-  const payload = await getPayload({ config })
   try {
-    const result = await measureServerOperation('navigation', 'storefront.navigation.v2', () => buildNavigationV2(payload))
+    const result = await measureServerOperation(
+      'navigation',
+      'storefront.navigation.v2',
+      loadNavigation,
+    )
     return publicJSON(request, result.body, {
       revision: result.body.revision,
       lastModified: result.lastModified,
@@ -19,7 +35,7 @@ export async function GET(request: Request) {
       staleWhileRevalidate: 900,
     })
   } catch (error) {
-    payload.logger.error({
+    console.error({
       event: 'storefront.navigation.v2.failed',
       error: error instanceof Error ? error.message : 'unknown_error',
       contractFailure: error instanceof StorefrontContractV2Error,

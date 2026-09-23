@@ -1,4 +1,5 @@
 import config from '@payload-config'
+import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
 
 import { measureServerOperation } from '../../../../../../server/performance'
@@ -21,27 +22,35 @@ type RouteContext = {
   params: Promise<{ slug: string }>
 }
 
+const loadCollection = unstable_cache(
+  async (slug: string, query: string) => {
+    const payload = await getPayload({ config })
+    const searchParams = new URLSearchParams(query)
+    const materialFilters = readCanonicalMaterialFilters(searchParams)
+    const catalogPayload = withCanonicalMaterialFilters(payload, materialFilters)
+    return await buildCollectionV2(catalogPayload, slug, searchParams)
+  },
+  ['storefront-collection-v2'],
+  {
+    revalidate: 45,
+    tags: ['storefront-collections'],
+  },
+)
+
 export async function GET(request: Request, context: RouteContext) {
-  const payload = await getPayload({ config })
   const { slug } = await context.params
   const url = new URL(request.url)
-  const materialFilters = readCanonicalMaterialFilters(url.searchParams)
-  const catalogPayload = withCanonicalMaterialFilters(payload, materialFilters)
+  const query = url.searchParams.toString()
   const page = url.searchParams.get('page') || '1'
   const limit = url.searchParams.get('limit') || 'default'
   const filterCount = Array.from(url.searchParams.keys()).filter((key) => !['page', 'limit', 'sort'].includes(key)).length
 
   try {
-    const result = await measureServerOperation('operational', 'storefront.collection.v2', () =>
-      buildCollectionV2(catalogPayload, slug, url.searchParams))
-    payload.logger.info({
-      event: 'storefront.collection.v2.served',
-      slug,
-      page,
-      limit,
-      filterCount,
-      returned: result.body.items.length,
-    })
+    const result = await measureServerOperation(
+      'operational',
+      'storefront.collection.v2',
+      () => loadCollection(slug, query),
+    )
     return publicJSON(request, result.body, {
       revision: result.body.revision,
       lastModified: result.lastModified,
@@ -49,7 +58,7 @@ export async function GET(request: Request, context: RouteContext) {
       staleWhileRevalidate: 180,
     })
   } catch (error) {
-    payload.logger.error({
+    console.error({
       event: 'storefront.collection.v2.failed',
       slug,
       page,

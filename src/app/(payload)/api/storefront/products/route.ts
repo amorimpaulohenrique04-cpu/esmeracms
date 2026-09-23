@@ -1,4 +1,5 @@
 import config from '@payload-config'
+import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
 
 import { measureServerOperation } from '../../../../../server/performance'
@@ -17,15 +18,32 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+const loadProducts = unstable_cache(
+  async (query: string) => {
+    const payload = await getPayload({ config })
+    const searchParams = new URLSearchParams(query)
+    const materialFilters = readCanonicalMaterialFilters(searchParams)
+    const catalogPayload = withCanonicalMaterialFilters(payload, materialFilters)
+    return await buildProductsV2(catalogPayload, searchParams)
+  },
+  ['storefront-products-v2'],
+  {
+    revalidate: 45,
+    tags: ['storefront-products'],
+  },
+)
+
 /** GET /api/storefront/products — catálogo público enriquecido e paginado. */
 export async function GET(request: Request) {
-  const payload = await getPayload({ config })
   const url = new URL(request.url)
-  const materialFilters = readCanonicalMaterialFilters(url.searchParams)
-  const catalogPayload = withCanonicalMaterialFilters(payload, materialFilters)
+  const query = url.searchParams.toString()
+
   try {
-    const result = await measureServerOperation('operational', 'storefront.products.v2', () =>
-      buildProductsV2(catalogPayload, url.searchParams))
+    const result = await measureServerOperation(
+      'operational',
+      'storefront.products.v2',
+      () => loadProducts(query),
+    )
     return publicJSON(request, result.body, {
       revision: result.body.revision,
       lastModified: result.lastModified,
@@ -33,7 +51,7 @@ export async function GET(request: Request) {
       staleWhileRevalidate: 180,
     })
   } catch (error) {
-    payload.logger.error({
+    console.error({
       event: 'storefront.products.v2.failed',
       error: error instanceof Error ? error.message : 'unknown_error',
       contractFailure: error instanceof StorefrontContractV2Error,
