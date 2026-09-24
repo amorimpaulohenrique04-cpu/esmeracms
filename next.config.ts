@@ -46,6 +46,7 @@ const nextConfig: NextConfig = {
     // a new filename and therefore a new cache key.
     minimumCacheTTL: 2678400,
     deviceSizes: STOREFRONT_IMAGE_WIDTHS,
+    imageSizes: [32, 48, 64, 96, 128, 256],
     qualities: [75],
     localPatterns: [
       {
