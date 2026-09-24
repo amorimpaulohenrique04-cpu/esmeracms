@@ -1,0 +1,87 @@
+name: P3 image cache validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "next.config.ts"
+      - ".github/workflows/p3-image-cache-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "next.config.ts"
+      - ".github/workflows/p3-image-cache-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  image-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: esmera_p3
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/esmera_p3
+      PAYLOAD_SECRET: p3-ci-only-payload-secret
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      CI: true
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate P3 image config contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          config="$(cat next.config.ts)"
+          for width in 384 414 512 640 750 828 1080 1200 1920 2048 3840; do
+            grep -Eq "[[:space:]]$width," <<< "$config" || {
+              echo "::error title=P3 image widths::Missing device width $width"
+              exit 1
+            }
+          done
+          grep -q "minimumCacheTTL: 2678400" <<< "$config" || {
+            echo "::error title=P3 image cache::31-day Next Image TTL missing"
+            exit 1
+          }
+          grep -q "max-age=31536000, s-maxage=31536000, immutable" <<< "$config" || {
+            echo "::error title=P3 media cache::Immutable Payload media cache missing"
+            exit 1
+          }
+          grep -q "source: '/api/media/file/:path\*'" <<< "$config" || {
+            echo "::error title=P3 media cache::Payload media route header missing"
+            exit 1
+          }
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Production build
+        run: pnpm build
