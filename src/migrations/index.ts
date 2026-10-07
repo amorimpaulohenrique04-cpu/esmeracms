@@ -90,4 +90,9 @@ export const migrations = [
     down: migration_20260909_203000_allow_duplicate_product_titles.down,
     name: '20260909_203000_allow_duplicate_product_titles',
   },
+  {
+    up: migration_20261007_220000_sale_item_personalization.up,
+    down: migration_20261007_220000_sale_item_personalization.down,
+    name: '20261007_220000_sale_item_personalization',
+  },
 ]
