@@ -12,7 +12,8 @@ import * as migration_20260810_000000_provenance_step_media from './20260810_000
 import * as migration_20260811_153500_territory_media_size from './20260811_153500_territory_media_size'
 import * as migration_20260813_020000_gallery_media_size from './20260813_020000_gallery_media_size'
 import * as migration_20260905_101500_product_editorial_order from './20260905_101500_product_editorial_order'
-import * as migration_20260909_203000_allow_duplicate_product_titles from './20260909_203000_allow_duplicate_product_titles'\nimport * as migration_20261007_220000_sale_item_personalization from './20261007_220000_sale_item_personalization'
+import * as migration_20260909_203000_allow_duplicate_product_titles from './20260909_203000_allow_duplicate_product_titles'
+import * as migration_20261007_220000_sale_item_personalization from './20261007_220000_sale_item_personalization'
 
 export const migrations = [
   {
