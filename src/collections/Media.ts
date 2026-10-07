@@ -69,8 +69,9 @@ export const Media: CollectionConfig = {
     focalPoint: true,
     imageSizes: [
       { name: 'thumb', width: 320, height: 320, position: 'centre' },
-      // productCard (3:4) é o crop preferido do card de produto do storefront.
-      // `card` (4:5) permanece para compatibilidade com conteúdos legados.
+      // Derivações legadas com crop, mantidas para outros conteúdos.
+      // O storefront de produtos não usa estes cortes: usa gallery/original
+      // para preservar a foto inteira em cards com object-fit: contain.
       { name: 'productCard', width: 900, height: 1200, position: 'centre' },
       { name: 'card', width: 900, height: 1125, position: 'centre' },
       { name: 'wide', width: 1800, height: 1200, position: 'centre' },
