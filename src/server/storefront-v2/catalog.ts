@@ -131,29 +131,24 @@ function publicMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 | nul
   }
 }
 
-// Cards do catálogo usam a rendition dedicada do Payload. Isso evita expor
-// no grid a mídia original quando ela contém composições editoriais/laterais.
-// Assets legados sem productCard continuam com fallbacks previsíveis.
-const CARD_CROP_ORDER = ['productCard', 'card', 'gallery'] as const
-
+// O card preserva a imagem inteira: "productCard" (3:4) e "card" (4:5)
+// são crops do Payload e nunca devem alimentar o palco horizontal 3:2.
+// A rendition "gallery" só redimensiona pela largura; imagens antigas com
+// proporção diferente da original voltam ao arquivo original sem crop.
 function publicCardMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 | null {
-  const media = record(value)
-  if (!media) return null
-  const sizes = record(media.sizes)
-  for (const name of CARD_CROP_ORDER) {
-    const size = record(sizes?.[name])
-    const url = text(size?.url)
-    if (url) {
-      return {
-        id: String(media.id || url),
-        url,
-        alt: text(explicitAlt) || text(media.alt) || text(media.filename),
-        width: numberValue(size?.width),
-        height: numberValue(size?.height),
-      }
+  const original = publicMedia(value, explicitAlt)
+  const gallery = publicGalleryMedia(value, explicitAlt)
+  if (!gallery) return original
+
+  if (original?.width && original.height && gallery.width && gallery.height) {
+    const originalAspect = original.width / original.height
+    const galleryAspect = gallery.width / gallery.height
+    if (Math.abs(galleryAspect / originalAspect - 1) > 0.015) {
+      return original
     }
   }
-  return publicMedia(value, explicitAlt)
+
+  return gallery
 }
 
 // A galeria do detalhe deve preservar a proporção do arquivo. `gallery` é
@@ -1170,8 +1165,8 @@ export async function buildProductDetailV2(payload: Payload, slug: string): Prom
     version: STOREFRONT_CONTRACT_V2,
     product: {
       ...card,
-      // PDP/modal preservam a mídia editorial sem crop. O contrato de listagem
-      // continua usando productCard/card exclusivamente para o grid.
+      // PDP/modal e listagem preservam a mídia editorial sem crop;
+      // o grid enquadra em 3:2 usando object-fit: contain.
       image: gallery[0] ?? card.image,
       hoverImage: gallery[1] ?? card.hoverImage,
       description: doc.description ?? null,

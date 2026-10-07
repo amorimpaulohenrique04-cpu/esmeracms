@@ -228,7 +228,7 @@ describe('storefront V2 catalog builders', () => {
     })
   })
 
-  it('uses productCard in listings while product detail keeps gallery media', async () => {
+  it('uses uncropped media in listings and details, regardless of productCard crop', async () => {
     const product = {
       id: 13,
       slug: 'gelato-regression',
@@ -261,9 +261,9 @@ describe('storefront V2 catalog builders', () => {
 
     const listing = await buildProductsV2(payload, new URLSearchParams('page=1&limit=24'))
     expect(listing.body.items[0].image).toMatchObject({
-      url: '/media/gelato-900x1200.jpg',
-      width: 900,
-      height: 1200,
+      url: '/media/gelato-1800.jpg',
+      width: 1200,
+      height: 800,
     })
 
     const detail = await buildProductDetailV2(payload, 'gelato-regression')
@@ -273,5 +273,50 @@ describe('storefront V2 catalog builders', () => {
       height: 800,
     })
     expect(detail.body.product.gallery[0].url).toBe('/media/gelato-1800.jpg')
+  })
+
+  it('uses original for both cover and hover when only cropped variants exist', async () => {
+    const product = {
+      id: 14,
+      slug: 'difusor-regression',
+      title: 'Difusor em Bege Bahia',
+      availability: 'available',
+      priceMode: 'fixed',
+      basePriceCents: 49000,
+      gallery: [
+        {
+          role: 'cover',
+          alt: 'Difusor frente',
+          image: {
+            id: 968,
+            url: '/media/difusor-original.jpg',
+            width: 1200,
+            height: 801,
+            sizes: { productCard: { url: '/media/difusor-900x1200.jpg', width: 900, height: 1200 } },
+          },
+        },
+        {
+          role: 'detail',
+          alt: 'Difusor detalhe',
+          image: {
+            id: 969,
+            url: '/media/difusor-detail-original.jpg',
+            width: 1200,
+            height: 886,
+            sizes: { card: { url: '/media/difusor-detail-900x1125.jpg', width: 900, height: 1125 } },
+          },
+        },
+      ],
+      categories: [{ ...child }],
+      updatedAt: '2026-10-07T22:00:00.000Z',
+    }
+    const { payload } = payloadStub({
+      categories: [root, child],
+      products: [product],
+    })
+
+    const listing = await buildProductsV2(payload, new URLSearchParams('page=1&limit=24'))
+    expect(listing.body.items[0].image?.url).toBe('/media/difusor-original.jpg')
+    expect(listing.body.items[0].hoverImage?.url).toBe('/media/difusor-detail-original.jpg')
   })
 })

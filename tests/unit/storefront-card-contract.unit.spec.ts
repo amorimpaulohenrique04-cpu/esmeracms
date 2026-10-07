@@ -96,15 +96,18 @@ describe('publicProduct — enriquecimento do card', () => {
     expect(product.pricing).toEqual({ mode: 'fixed', priceCents: 49000, installment: { count: 12, amountCents: 4083, interestFree: true } })
   })
 
-  it('prioriza a rendition productCard dedicada no catálogo', () => {
+  it('preserva a foto inteira, mesmo quando productCard e card estão recortados', () => {
     const product = publicProduct(sampleProduct(), DEFAULT_TERMS)
-    expect(product.image?.url).toBe('/pc.jpg')
-    expect(product.image?.width).toBe(900)
-    expect(product.image?.height).toBe(1200)
+    expect(product.image).toMatchObject({
+      url: '/gallery.jpg',
+      width: 1800,
+      height: 1200,
+    })
+    expect(product.hoverImage?.url).toBe('/orig2.jpg')
   })
 
-  it('cai para card, depois gallery e por fim original em assets legados', () => {
-    const withCard = publicProduct(sampleProduct({
+  it('usa o original quando não existe gallery proporcional', () => {
+    const withCropOnly = publicProduct(sampleProduct({
       gallery: [{
         role: 'cover',
         alt: 'Ponta frente',
@@ -115,13 +118,35 @@ describe('publicProduct — enriquecimento do card', () => {
           height: 4000,
           sizes: {
             card: { url: '/card.jpg', width: 900, height: 1125 },
-            gallery: { url: '/gallery.jpg', width: 1800, height: 1200 },
+            productCard: { url: '/pc.jpg', width: 900, height: 1200 },
           },
         },
       }],
     }), DEFAULT_TERMS)
-    expect(withCard.image?.url).toBe('/card.jpg')
+    expect(withCropOnly.image?.url).toBe('/orig.jpg')
 
+    const galleryWithCrop = publicProduct(sampleProduct({
+      gallery: [{
+        role: 'cover',
+        alt: 'Ponta frente',
+        image: {
+          id: 1,
+          url: '/orig.jpg',
+          width: 6000,
+          height: 4000,
+          sizes: {
+            gallery: { url: '/gallery-cropped.jpg', width: 900, height: 1200 },
+            productCard: { url: '/pc.jpg', width: 900, height: 1200 },
+          },
+        },
+      }],
+    }), DEFAULT_TERMS)
+    expect(galleryWithCrop.image?.url).toBe('/orig.jpg')
+    expect(galleryWithCrop.image?.width).toBe(6000)
+    expect(galleryWithCrop.image?.height).toBe(4000)
+  })
+
+  it('usa gallery proporcional quando disponível, mesmo com crop legado', () => {
     const withGallery = publicProduct(sampleProduct({
       gallery: [{
         role: 'cover',
@@ -131,7 +156,10 @@ describe('publicProduct — enriquecimento do card', () => {
           url: '/orig.jpg',
           width: 6000,
           height: 4000,
-          sizes: { gallery: { url: '/gallery.jpg', width: 1800, height: 1200 } },
+          sizes: {
+            gallery: { url: '/gallery.jpg', width: 1800, height: 1200 },
+            productCard: { url: '/pc.jpg', width: 900, height: 1200 },
+          },
         },
       }],
     }), DEFAULT_TERMS)
