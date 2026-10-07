@@ -131,10 +131,10 @@ function publicMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 | nul
   }
 }
 
-// Cards do catálogo preservam a composição fotográfica original. `gallery`
-// limita apenas a largura no Payload e não aplica crop; o frontend enquadra
-// todas as fotos no mesmo palco horizontal 3:2 usando object-fit: contain.
-const CARD_CROP_ORDER = ['gallery'] as const
+// Cards do catálogo usam a rendition dedicada do Payload. Isso evita expor
+// no grid a mídia original quando ela contém composições editoriais/laterais.
+// Assets legados sem productCard continuam com fallbacks previsíveis.
+const CARD_CROP_ORDER = ['productCard', 'card', 'gallery'] as const
 
 function publicCardMedia(value: unknown, explicitAlt?: unknown): PublicMediaV2 | null {
   const media = record(value)
@@ -1170,6 +1170,10 @@ export async function buildProductDetailV2(payload: Payload, slug: string): Prom
     version: STOREFRONT_CONTRACT_V2,
     product: {
       ...card,
+      // PDP/modal preservam a mídia editorial sem crop. O contrato de listagem
+      // continua usando productCard/card exclusivamente para o grid.
+      image: gallery[0] ?? card.image,
+      hoverImage: gallery[1] ?? card.hoverImage,
       description: doc.description ?? null,
       gallery,
       seo: publicSEO(doc.seo),
