@@ -134,6 +134,56 @@ export const Sales: CollectionConfig = {
                 { name: 'snapshotSku', type: 'text', label: 'SKU no momento da venda', admin: { readOnly: true } },
                 { name: 'snapshotSelection', type: 'text', label: 'Seleção no momento da venda', admin: { readOnly: true } },
                 {
+                  name: 'personalization',
+                  type: 'group',
+                  label: 'Personalização',
+                  admin: {
+                    description: 'Snapshot da personalização escolhida pelo cliente no storefront. Mantém frase, acabamento e tamanho vinculados à venda.',
+                  },
+                  fields: [
+                    {
+                      name: 'kind',
+                      type: 'select',
+                      label: 'Tipo',
+                      options: [{ label: 'Texto em quadrinho', value: 'frame_text' }],
+                    },
+                    {
+                      name: 'frameSize',
+                      type: 'select',
+                      label: 'Tamanho do quadrinho',
+                      options: [
+                        { label: '10 × 10 cm', value: '10x10' },
+                        { label: '15 × 15 cm', value: '15x15' },
+                        { label: '20 × 20 cm', value: '20x20' },
+                      ],
+                    },
+                    {
+                      name: 'finish',
+                      type: 'select',
+                      label: 'Acabamento da frase',
+                      options: [
+                        { label: 'Prata', value: 'silver' },
+                        { label: 'Dourada', value: 'gold' },
+                      ],
+                    },
+                    {
+                      name: 'textMode',
+                      type: 'select',
+                      label: 'Origem do texto',
+                      options: [
+                        { label: 'Frase pronta', value: 'preset' },
+                        { label: 'Frase personalizada', value: 'custom' },
+                      ],
+                    },
+                    {
+                      name: 'text',
+                      type: 'textarea',
+                      label: 'Texto escolhido',
+                      maxLength: 120,
+                    },
+                  ],
+                },
+                {
                   name: 'priceMode',
                   type: 'select',
                   label: 'Modo de preço',
