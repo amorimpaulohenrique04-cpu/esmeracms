@@ -96,20 +96,51 @@ describe('publicProduct — enriquecimento do card', () => {
     expect(product.pricing).toEqual({ mode: 'fixed', priceCents: 49000, installment: { count: 12, amountCents: 4083, interestFree: true } })
   })
 
-  it('preserva a composição sem crop usando a derivação gallery no card', () => {
+  it('prioriza a rendition productCard dedicada no catálogo', () => {
     const product = publicProduct(sampleProduct(), DEFAULT_TERMS)
-    expect(product.image?.url).toBe('/gallery.jpg')
-    expect(product.image?.width).toBe(1800)
+    expect(product.image?.url).toBe('/pc.jpg')
+    expect(product.image?.width).toBe(900)
     expect(product.image?.height).toBe(1200)
   })
 
-  it('cai para o original quando gallery não existe', () => {
-    const product = publicProduct(sampleProduct({
+  it('cai para card, depois gallery e por fim original em assets legados', () => {
+    const withCard = publicProduct(sampleProduct({
+      gallery: [{
+        role: 'cover',
+        alt: 'Ponta frente',
+        image: {
+          id: 1,
+          url: '/orig.jpg',
+          width: 6000,
+          height: 4000,
+          sizes: {
+            card: { url: '/card.jpg', width: 900, height: 1125 },
+            gallery: { url: '/gallery.jpg', width: 1800, height: 1200 },
+          },
+        },
+      }],
+    }), DEFAULT_TERMS)
+    expect(withCard.image?.url).toBe('/card.jpg')
+
+    const withGallery = publicProduct(sampleProduct({
+      gallery: [{
+        role: 'cover',
+        alt: 'Ponta frente',
+        image: {
+          id: 1,
+          url: '/orig.jpg',
+          width: 6000,
+          height: 4000,
+          sizes: { gallery: { url: '/gallery.jpg', width: 1800, height: 1200 } },
+        },
+      }],
+    }), DEFAULT_TERMS)
+    expect(withGallery.image?.url).toBe('/gallery.jpg')
+
+    const original = publicProduct(sampleProduct({
       gallery: [{ role: 'cover', alt: 'Ponta frente', image: { id: 1, url: '/orig.jpg', width: 6000, height: 4000 } }],
     }), DEFAULT_TERMS)
-    expect(product.image?.url).toBe('/orig.jpg')
-    expect(product.image?.width).toBe(6000)
-    expect(product.image?.height).toBe(4000)
+    expect(original.image?.url).toBe('/orig.jpg')
   })
 
   it('dobra availability legado unique para available mantendo isUnique', () => {

@@ -227,4 +227,51 @@ describe('storefront V2 catalog builders', () => {
       height: 1200,
     })
   })
+
+  it('uses productCard in listings while product detail keeps gallery media', async () => {
+    const product = {
+      id: 13,
+      slug: 'gelato-regression',
+      title: 'Gelato',
+      material: 'Rocha de esmeralda natural',
+      availability: 'available',
+      priceMode: 'fixed',
+      basePriceCents: 49000,
+      gallery: [{
+        role: 'cover',
+        alt: 'Gelato',
+        image: {
+          id: 54,
+          url: '/media/gelato-original.jpg',
+          width: 1200,
+          height: 800,
+          sizes: {
+            productCard: { url: '/media/gelato-900x1200.jpg', width: 900, height: 1200 },
+            gallery: { url: '/media/gelato-1800.jpg', width: 1200, height: 800 },
+          },
+        },
+      }],
+      categories: [{ ...child }],
+      updatedAt: '2026-10-07T22:00:00.000Z',
+    }
+    const { payload } = payloadStub({
+      categories: [root, child],
+      products: [product],
+    })
+
+    const listing = await buildProductsV2(payload, new URLSearchParams('page=1&limit=24'))
+    expect(listing.body.items[0].image).toMatchObject({
+      url: '/media/gelato-900x1200.jpg',
+      width: 900,
+      height: 1200,
+    })
+
+    const detail = await buildProductDetailV2(payload, 'gelato-regression')
+    expect(detail.body.product.image).toMatchObject({
+      url: '/media/gelato-1800.jpg',
+      width: 1200,
+      height: 800,
+    })
+    expect(detail.body.product.gallery[0].url).toBe('/media/gelato-1800.jpg')
+  })
 })
