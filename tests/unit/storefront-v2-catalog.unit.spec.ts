@@ -275,6 +275,43 @@ describe('storefront V2 catalog builders', () => {
     expect(detail.body.product.gallery[0].url).toBe('/media/gelato-1800.jpg')
   })
 
+  it('applies the same landscape selection on page 2, page 3 and category listings', async () => {
+    const product = {
+      id: 71,
+      slug: 'gelato-page-two',
+      title: 'Gelato',
+      availability: 'available',
+      priceMode: 'fixed',
+      basePriceCents: 49000,
+      gallery: [
+        { role: 'cover', image: { id: 1047, url: '/gelato-horizontal.jpg', width: 1200, height: 800 } },
+        { role: 'detail', image: { id: 1046, url: '/gelato-portrait.jpg', width: 1200, height: 1798 } },
+        { role: 'detail', image: { id: 1048, url: '/gelato-horizontal-detail.jpg', width: 1200, height: 800 } },
+      ],
+      categories: [{ ...child }],
+      updatedAt: '2026-10-07T22:00:00.000Z',
+    }
+    const { payload } = payloadStub({ categories: [root, child], products: [product] })
+
+    for (const page of [2, 3]) {
+      const listing = await buildProductsV2(payload, new URLSearchParams(`page=${page}&limit=24`))
+      expect(listing.body.pagination.page).toBe(page)
+      expect(listing.body.items[0].image?.url).toBe('/gelato-horizontal.jpg')
+      expect(listing.body.items[0].hoverImage?.url).toBe('/gelato-horizontal-detail.jpg')
+    }
+
+    const collection = await buildCollectionV2(payload, 'pecas', new URLSearchParams('page=2&limit=24'))
+    expect(collection.body.items[0].image?.url).toBe('/gelato-horizontal.jpg')
+    expect(collection.body.items[0].hoverImage?.url).toBe('/gelato-horizontal-detail.jpg')
+
+    const detail = await buildProductDetailV2(payload, 'gelato-page-two')
+    expect(detail.body.product.gallery.map((media) => media.url)).toEqual([
+      '/gelato-horizontal.jpg',
+      '/gelato-portrait.jpg',
+      '/gelato-horizontal-detail.jpg',
+    ])
+  })
+
   it('uses original for both cover and hover when only cropped variants exist', async () => {
     const product = {
       id: 14,
