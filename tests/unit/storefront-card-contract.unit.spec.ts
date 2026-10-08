@@ -171,6 +171,56 @@ describe('publicProduct — enriquecimento do card', () => {
     expect(original.image?.url).toBe('/orig.jpg')
   })
 
+  it('prioriza fotos horizontais distintas para capa e hover sem afetar o modal', () => {
+    const product = publicProduct(sampleProduct({
+      gallery: [
+        { role: 'cover', image: { id: 1037, url: '/cover-horizontal.jpg', width: 1200, height: 801 } },
+        { role: 'detail', image: { id: 1038, url: '/detail-portrait.jpg', width: 1200, height: 1798 } },
+        { role: 'detail', image: { id: 1039, url: '/another-portrait.jpg', width: 1200, height: 1798 } },
+        { role: 'detail', image: { id: 1040, url: '/detail-horizontal.jpg', width: 1200, height: 800 } },
+      ],
+    }), DEFAULT_TERMS)
+
+    expect(product.image?.url).toBe('/cover-horizontal.jpg')
+    expect(product.hoverImage?.url).toBe('/detail-horizontal.jpg')
+  })
+
+  it('troca apenas a capa vertical quando já existe opção horizontal inteira', () => {
+    const product = publicProduct(sampleProduct({
+      gallery: [
+        { role: 'cover', image: { id: 1001, url: '/cover-portrait.jpg', width: 1200, height: 1696 } },
+        { role: 'detail', image: { id: 1002, url: '/alternate-horizontal.jpg', width: 1200, height: 800 } },
+      ],
+    }), DEFAULT_TERMS)
+
+    expect(product.image?.url).toBe('/alternate-horizontal.jpg')
+    expect(product.hoverImage?.url).toBe('/cover-portrait.jpg')
+  })
+
+  it('mantém a foto inteira quando a galeria possui apenas imagens verticais', () => {
+    const product = publicProduct(sampleProduct({
+      gallery: [
+        { role: 'cover', image: { id: 1001, url: '/cover-portrait.jpg', width: 1200, height: 1696 } },
+        { role: 'detail', image: { id: 1002, url: '/detail-portrait.jpg', width: 1200, height: 1798 } },
+      ],
+    }), DEFAULT_TERMS)
+
+    expect(product.image?.url).toBe('/cover-portrait.jpg')
+    expect(product.hoverImage?.url).toBe('/detail-portrait.jpg')
+  })
+
+  it('não escolhe a mesma imagem repetida como foto de hover', () => {
+    const product = publicProduct(sampleProduct({
+      gallery: [
+        { role: 'cover', image: { id: 5, url: '/same.jpg', width: 1200, height: 800 } },
+        { role: 'detail', image: { id: 5, url: '/same.jpg', width: 1200, height: 800 } },
+      ],
+    }), DEFAULT_TERMS)
+
+    expect(product.image?.url).toBe('/same.jpg')
+    expect(product.hoverImage).toBeNull()
+  })
+
   it('dobra availability legado unique para available mantendo isUnique', () => {
     const product = publicProduct(sampleProduct({ availability: 'unique', edition: null }), DEFAULT_TERMS)
     expect(product.state).toBe('available')
