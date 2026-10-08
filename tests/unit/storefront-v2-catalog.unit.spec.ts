@@ -11,6 +11,7 @@ function payloadStub(options: {
   siteSettings?: RecordValue
   collectionPage?: RecordValue
   products?: RecordValue[]
+  totalPages?: number
 }) {
   const products = options.products || []
   const find = vi.fn(async (args: RecordValue) => {
@@ -18,16 +19,17 @@ function payloadStub(options: {
     if (args.collection === 'products') {
       const page = typeof args.page === 'number' ? args.page : 1
       const limit = typeof args.limit === 'number' ? args.limit : 24
+      const totalPages = options.totalPages ?? (products.length ? 1 : 0)
       return {
         docs: products,
         page,
         limit,
-        totalDocs: products.length,
-        totalPages: products.length ? 1 : 0,
-        hasNextPage: false,
-        nextPage: null,
-        hasPrevPage: false,
-        prevPage: null,
+        totalDocs: options.totalPages ? totalPages * limit : products.length,
+        totalPages,
+        hasNextPage: page < totalPages,
+        nextPage: page < totalPages ? page + 1 : null,
+        hasPrevPage: page > 1,
+        prevPage: page > 1 ? page - 1 : null,
       }
     }
     throw new Error(`collection inesperada: ${String(args.collection)}`)
@@ -291,7 +293,7 @@ describe('storefront V2 catalog builders', () => {
       categories: [{ ...child }],
       updatedAt: '2026-10-07T22:00:00.000Z',
     }
-    const { payload } = payloadStub({ categories: [root, child], products: [product] })
+    const { payload } = payloadStub({ categories: [root, child], products: [product], totalPages: 3 })
 
     for (const page of [2, 3]) {
       const listing = await buildProductsV2(payload, new URLSearchParams(`page=${page}&limit=24`))
