@@ -168,6 +168,40 @@ function publicGalleryMedia(value: unknown, explicitAlt?: unknown): PublicMediaV
   }
 }
 
+/**
+ * Card media is independent of the editorial PDP gallery order.
+ * Prefer intact landscape images for the fixed horizontal 3:2 storefront grid.
+ * Never crop a portrait file to force it into the card: if all photos are
+ * portrait, retain the original cover and let object-fit: contain do its job.
+ * Applied by publicProduct for every paginated catalog/collection response.
+ */
+function selectCatalogCardMedia(gallery: UnknownRecord[]): {
+  image: PublicMediaV2 | null
+  hoverImage: PublicMediaV2 | null
+} {
+  const candidates: Array<{ media: PublicMediaV2; role: string }> = []
+  for (const item of gallery) {
+    const media = publicCardMedia(item.image, item.alt)
+    if (media) candidates.push({ media, role: text(item.role) })
+  }
+
+  const editorialCover = candidates.find((candidate) => candidate.role === 'cover') ?? candidates[0]
+  if (!editorialCover) return { image: null, hoverImage: null }
+
+  const isLandscape = ({ media }: { media: PublicMediaV2 }) =>
+    typeof media.width === 'number' &&
+    typeof media.height === 'number' &&
+    media.width >= media.height
+
+  const cover = isLandscape(editorialCover)
+    ? editorialCover
+    : candidates.find(isLandscape) ?? editorialCover
+  const alternatives = candidates.filter((candidate) => candidate.media.id !== cover.media.id)
+  const hover = alternatives.find(isLandscape) ?? alternatives[0]
+
+  return { image: cover.media, hoverImage: hover?.media ?? null }
+}
+
 function fold(value: unknown) {
   return text(value).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('pt-BR')
 }
@@ -581,8 +615,7 @@ function availabilityState(raw: string): PublicAvailabilityStateV2 {
 
 export function publicProduct(value: UnknownRecord, terms: PaymentTermsV2): PublicProductV2 {
   const gallery = records(value.gallery)
-  const cover = gallery.find((item) => item.role === 'cover') || gallery[0]
-  const hover = gallery.find((item) => item !== cover && item.role !== 'cover') || gallery[1]
+  const cardMedia = selectCatalogCardMedia(gallery)
   const basePrice = numberValue(value.basePriceCents)
   const variantPrices = records(value.variants)
     .filter((variant) => variant.status !== 'disabled' && variant.priceMode === 'fixed')
@@ -629,8 +662,8 @@ export function publicProduct(value: UnknownRecord, terms: PaymentTermsV2): Publ
     availability: nullableText(value.availability),
     price,
     priceUnit: 'cent',
-    image: cover ? publicCardMedia(cover.image, cover.alt) : null,
-    hoverImage: hover ? publicCardMedia(hover.image, hover.alt) : null,
+    image: cardMedia.image,
+    hoverImage: cardMedia.hoverImage,
     categories,
     identity: { name: title, pieceType, material },
     pieceType,
