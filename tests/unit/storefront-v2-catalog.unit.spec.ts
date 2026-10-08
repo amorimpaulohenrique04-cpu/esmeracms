@@ -220,11 +220,17 @@ describe('storefront V2 catalog builders', () => {
 
     expect(result.body.product.image).toMatchObject({
       url: '/media/horizonte-1800x1200.jpg',
+      fullUrl: '/media/horizonte-original.jpg',
+      fullWidth: 2400,
+      fullHeight: 1600,
       width: 1800,
       height: 1200,
     })
     expect(result.body.product.gallery[0]).toMatchObject({
       url: '/media/horizonte-1800x1200.jpg',
+      fullUrl: '/media/horizonte-original.jpg',
+      fullWidth: 2400,
+      fullHeight: 1600,
       width: 1800,
       height: 1200,
     })

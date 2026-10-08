@@ -22,7 +22,7 @@ const loadProductDetail = unstable_cache(
     const payload = await getPayload({ config })
     return await buildProductDetailV2(payload, slug)
   },
-  ['storefront-product-v2'],
+  ['storefront-product-v2-original-fallback-v4'],
   {
     revalidate: 45,
     tags: ['storefront-products'],

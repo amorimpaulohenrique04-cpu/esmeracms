@@ -162,6 +162,9 @@ function publicGalleryMedia(value: unknown, explicitAlt?: unknown): PublicMediaV
   return {
     id: String(media.id || url),
     url,
+    fullUrl: text(media.url) || url,
+    fullWidth: numberValue(media.width),
+    fullHeight: numberValue(media.height),
     alt: text(explicitAlt) || text(media.alt) || text(media.filename),
     width: numberValue(gallery?.width) ?? numberValue(media.width),
     height: numberValue(gallery?.height) ?? numberValue(media.height),

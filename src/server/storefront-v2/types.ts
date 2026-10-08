@@ -3,6 +3,9 @@ export const STOREFRONT_CONTRACT_V2 = 2 as const
 export type PublicMediaV2 = {
   id: string
   url: string
+  fullWidth?: number | null
+  fullHeight?: number | null
+  fullUrl?: string
   alt: string
   width?: number | null
   height?: number | null
