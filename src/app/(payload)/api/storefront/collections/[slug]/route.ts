@@ -31,7 +31,7 @@ const loadCollection = unstable_cache(
     const catalogPayload = withCanonicalMaterialFilters(payload, materialFilters)
     return await buildCollectionV2(catalogPayload, slug, searchParams)
   },
-  ['storefront-collection-v2'],
+  ['storefront-collection-v2-landscape-v3'],
   {
     revalidate: 45,
     tags: ['storefront-collections'],

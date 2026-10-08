@@ -27,7 +27,7 @@ const loadProducts = unstable_cache(
     const catalogPayload = withCanonicalMaterialFilters(payload, materialFilters)
     return await buildProductsV2(catalogPayload, searchParams)
   },
-  ['storefront-products-v2'],
+  ['storefront-products-v2-landscape-v3'],
   {
     revalidate: 45,
     tags: ['storefront-products'],
