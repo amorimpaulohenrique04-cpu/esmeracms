@@ -151,7 +151,9 @@ async function main() {
   if (summary.invalid || summary.failed) process.exitCode = 1
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exitCode = 1
-})
+main()
+  .then(() => process.exit(process.exitCode || 0))
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
