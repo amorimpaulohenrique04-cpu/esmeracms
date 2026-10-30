@@ -42,6 +42,8 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
   const [draft, setDraft] = useState({ title: '', priceMode: 'inquiry', price: '', availability: 'available' })
   const [selectedCategories, setSelectedCategories] = useState<Array<string | number>>([])
   const [galleryCount, setGalleryCount] = useState(0)
+  const [galleryBusy, setGalleryBusy] = useState(false)
+  const [publishedUnverified, setPublishedUnverified] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<DialogError | null>(null)
   const [warnings, setWarnings] = useState<string[]>([])
@@ -121,7 +123,23 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
         setNotice(result.message || 'Revise os avisos e confirme para publicar.')
         return
       }
-      onDone()
+      if (result.status === 'published') {
+        onDone()
+        return
+      }
+      if (result.status === 'published_but_unverified') {
+        setPublishedUnverified(true)
+        setNotice(result.message || 'Produto publicado, mas a verificação da vitrine está temporariamente indisponível.')
+        return
+      }
+      if (result.status === 'published_but_incompatible' || result.status === 'publish_reverted') {
+        setError({
+          summary: result.message || 'A publicação não pôde ser concluída com segurança. Revise o produto.',
+          fieldErrors: [],
+        })
+        return
+      }
+      throw new Error('O servidor retornou um estado de publicação não reconhecido.')
     } catch (err) {
       setConfirmToken(null)
       fail(err, 'Não foi possível publicar o produto.')
@@ -160,7 +178,7 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
     )
   }
 
-  const canPublish = productId !== null && selectedCategories.length > 0 && galleryCount > 0 && !busy
+  const canPublish = productId !== null && selectedCategories.length > 0 && galleryCount > 0 && !busy && !galleryBusy && !publishedUnverified
 
   return (
     <div className="esmera-product-create-stage2">
@@ -187,7 +205,7 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
           <h3>Galeria</h3>
           <p>Envie as imagens do produto. A primeira vira a capa automaticamente.</p>
         </header>
-        {productId !== null ? <ProductGalleryUploader productId={productId} onGalleryChange={(gallery: ProductGalleryItem[]) => setGalleryCount(gallery.length)} /> : null}
+        {productId !== null ? <ProductGalleryUploader productId={productId} onGalleryChange={(gallery: ProductGalleryItem[]) => setGalleryCount(gallery.length)} onBusyChange={setGalleryBusy} /> : null}
       </section>
 
       {warnings.length ? (
@@ -201,12 +219,12 @@ function ProductCreateFlow({ categories, onDone }: { categories: ProductPickerCa
       <footer className="esmera-product-create-footer">
         <p className="esmera-product-create-footer__note">O produto já foi salvo como rascunho e aparece na listagem. Você pode fechar e continuar depois pelo editor completo.</p>
         <div className="esmera-product-create-footer__actions">
-          <Button onClick={onDone} disabled={busy}>Salvar rascunho</Button>
+          <Button onClick={onDone} disabled={busy || galleryBusy}>{publishedUnverified ? 'Voltar à lista' : 'Salvar rascunho'}</Button>
           <Button tone="primary" onClick={() => void publish()} busy={busy} disabled={!canPublish}>
             {confirmToken ? 'Confirmar publicação' : 'Publicar produto'}
           </Button>
         </div>
-        {!canPublish && !busy ? <InlineFeedback tone="info">Adicione ao menos uma categoria e uma imagem para publicar.</InlineFeedback> : null}
+        {!canPublish && !busy && !galleryBusy && !publishedUnverified ? <InlineFeedback tone="info">Adicione ao menos uma categoria e uma imagem para publicar.</InlineFeedback> : null}
       </footer>
     </div>
   )
