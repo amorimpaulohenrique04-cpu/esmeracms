@@ -6,7 +6,7 @@ import { Button, EmptyState, InlineFeedback, SavingState, Status } from '../../d
 import { expectAdminResponse, normalizeAdminError } from '../../state/asyncState'
 import { imageURL, relationId, roleLabels, type ProductGalleryItem } from './types'
 
-type UploadResponse = { id?: string | number }
+type UploadResponse = { id?: string | number; _status?: string | null }
 type GalleryResponse = { gallery?: ProductGalleryItem[] }
 
 // Uploader completo da galeria para o popup de criação. Sobe a imagem para a
@@ -16,9 +16,11 @@ type GalleryResponse = { gallery?: ProductGalleryItem[] }
 export function ProductGalleryUploader({
   productId,
   onGalleryChange,
+  onBusyChange,
 }: {
   productId: string | number
   onGalleryChange?: (gallery: ProductGalleryItem[]) => void
+  onBusyChange?: (busy: boolean) => void
 }) {
   const [gallery, setGallery] = useState<ProductGalleryItem[]>([])
   const [busy, setBusy] = useState(false)
@@ -45,6 +47,7 @@ export function ProductGalleryUploader({
     }
 
     setBusy(true)
+    onBusyChange?.(true)
     setRollback(false)
     setFeedback(null)
     try {
@@ -53,6 +56,9 @@ export function ProductGalleryUploader({
       const upload = await fetch('/api/admin-product-media', { method: 'POST', credentials: 'same-origin', body: form })
       const media = await expectAdminResponse<UploadResponse>(upload, 'Não foi possível enviar a imagem.')
       if (media.id === undefined) throw new Error('A imagem foi enviada sem identificador retornado.')
+      if (media._status !== 'published') {
+        throw new Error('A imagem foi enviada, mas não está publicada. Tente enviar novamente.')
+      }
 
       const response = await fetch('/api/admin-products', {
         method: 'POST',
@@ -70,11 +76,13 @@ export function ProductGalleryUploader({
       setFeedback(normalizeAdminError(error, 'Não foi possível enviar a imagem.').summary)
     } finally {
       setBusy(false)
+      onBusyChange?.(false)
     }
   }
 
   async function persist(next: ProductGalleryItem[], successMessage: string) {
     setBusy(true)
+    onBusyChange?.(true)
     setRollback(false)
     setFeedback(null)
     try {
@@ -103,6 +111,7 @@ export function ProductGalleryUploader({
       setFeedback(`${normalizeAdminError(error, 'Não foi possível salvar a galeria.').summary} A galeria anterior foi restaurada.`)
     } finally {
       setBusy(false)
+      onBusyChange?.(false)
     }
   }
 
