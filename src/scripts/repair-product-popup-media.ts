@@ -152,7 +152,7 @@ async function main() {
 }
 
 main()
-  .then(() => process.exit(process.exitCode || 0))
+  .then(() => process.exit(process.exitCode ? 1 : 0))
   .catch((error) => {
     console.error(error)
     process.exit(1)
