@@ -41,13 +41,21 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer())
     const media = await payload.create({
       collection: 'media',
-      data: { alt },
+      data: { alt, _status: 'published' },
+      draft: false,
       file: { data: buffer, mimetype: file.type, name: file.name || 'imagem', size: file.size },
       overrideAccess: false,
       user,
     })
+    // O upload só pode ser considerado concluído se a mídia estiver publicada.
+    // A avaliação do storefront rejeita relações cujo _status seja draft.
+    if (media._status !== 'published') {
+      throw new Error('A imagem foi enviada, mas não foi publicada na biblioteca de mídia.')
+    }
+
     return NextResponse.json({
       id: media.id,
+      _status: media._status,
       url: media.url ?? null,
       filename: media.filename ?? null,
       alt: media.alt ?? alt,
