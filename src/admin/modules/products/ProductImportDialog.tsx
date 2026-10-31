@@ -225,6 +225,7 @@ export function ProductImportDialog() {
   const fileRef = useRef<HTMLInputElement>(null)
   const idempotencyRef = useRef<string | null>(null)
   const pollAbortRef = useRef<AbortController | null>(null)
+  const localCancelRequestedRef = useRef(false)
 
   function reset() {
     pollAbortRef.current?.abort()
@@ -483,6 +484,7 @@ export function ProductImportDialog() {
     setError(null)
     setFinalStatus(null)
     setRemoteErrorCsv(null)
+    localCancelRequestedRef.current = false
     try {
       const payload = rows.map((row) => ({
         rowIndex: row.rowIndex,
@@ -490,29 +492,86 @@ export function ProductImportDialog() {
         values: row.values,
         onConflict: row.isDuplicate ? 'update' : 'skip',
       }))
-      idempotencyRef.current ||= crypto.randomUUID()
-      const data = await callImportApi<CommitResponse | QueuedResponse>({
-        action: 'commit',
-        rows: payload,
-        idempotencyKey: idempotencyRef.current,
-      })
-      if ('importId' in data) {
-        await pollImport(data)
-      } else {
-        setResult(data)
-        setFinalStatus(data.errored ? 'completed_with_errors' : 'completed')
-        setStep('result')
-        router.refresh()
+
+      // Each request is executed inside a Vercel Function (300 s limit).
+      // The importer downloads and persists every image, so a 17-product
+      // request can time out after partially committing rows. Keep requests
+      // small and aggregate their per-row results for safe selective retries.
+      const batchSize = 2
+      const summary: CommitResponse = { created: 0, updated: 0, skipped: 0, errored: 0, rows: [] }
+      let cancelled = false
+      setProgress({ importId: '', status: 'processing', processedRows: 0, totalRows: payload.length })
+
+      for (let start = 0; start < payload.length; start += batchSize) {
+        if (localCancelRequestedRef.current) {
+          cancelled = true
+          const pending = payload.slice(start)
+          summary.errored += pending.length
+          summary.rows.push(...pending.map((row) => ({
+            rowIndex: row.rowIndex,
+            sourceLine: row.sourceLine,
+            status: 'error' as const,
+            error: 'Não importado: operação cancelada.',
+          })))
+          break
+        }
+
+        const batch = payload.slice(start, start + batchSize)
+        try {
+          const data = await callImportApi<CommitResponse | QueuedResponse>({
+            action: 'commit',
+            rows: batch,
+          })
+          if ('importId' in data) {
+            throw new Error('O lote pequeno foi colocado na fila inesperadamente.')
+          }
+          summary.created += data.created
+          summary.updated += data.updated
+          summary.skipped += data.skipped
+          summary.errored += data.errored
+          summary.rows.push(...data.rows)
+          setProgress({
+            importId: '',
+            status: 'processing',
+            processedRows: Math.min(start + batch.length, payload.length),
+            totalRows: payload.length,
+          })
+        } catch (error) {
+          // Preserve successful batches, and mark everything not yet confirmed
+          // as retryable. Matching by code makes a rerun an update, not a clone.
+          const pending = payload.slice(start)
+          const reason = error instanceof Error ? error.message : 'Falha inesperada.'
+          summary.errored += pending.length
+          summary.rows.push(...pending.map((row) => ({
+            rowIndex: row.rowIndex,
+            sourceLine: row.sourceLine,
+            status: 'error' as const,
+            error: `Lote não confirmado: ${reason}`,
+          })))
+          break
+        }
       }
+
+      setResult(summary)
+      setFinalStatus(cancelled ? 'cancelled' : summary.errored ? 'completed_with_errors' : 'completed')
+      setStep('result')
+      router.refresh()
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Não foi possível concluir a importação.')
     } finally {
+      setProgress(null)
       setBusy(false)
+      localCancelRequestedRef.current = false
     }
   }
 
   async function cancelImport() {
+    if (progress && !progress.importId) {
+      localCancelRequestedRef.current = true
+      setProgress((current) => current ? { ...current, status: 'cancelled' } : null)
+      return
+    }
     if (!progress?.importId) return
     try {
       await callImportApi<{ status: 'cancelled' }>({ action: 'cancel', importId: progress.importId })
@@ -543,7 +602,7 @@ export function ProductImportDialog() {
   function changeOpen(next: boolean) {
     if (!next && (step === 'mapping' || step === 'preview') && (rows.length > 0 || rawText.trim())) {
       const message = busy
-        ? 'A importação está em andamento. Fechar esta janela não interrompe o job. Fechar mesmo assim?'
+        ? 'Fechar esta janela não interrompe o lote em andamento. Os lotes seguintes poderão ser cancelados. Fechar mesmo assim?'
         : 'Fechar e descartar as correções desta importação?'
       if (!window.confirm(message)) return
     }
