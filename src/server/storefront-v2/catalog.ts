@@ -453,11 +453,26 @@ export async function buildNavigationV2(payload: Payload): Promise<BuiltResponse
   const legacyRoots = Array.isArray(record(navigation)?.categoryLinks)
     ? (record(navigation)?.categoryLinks as unknown[]).map((category, index) => ({ category, order: (index + 1) * 100, highlightLimit: 2 }))
     : []
+  // Explicit navigation roots take priority, but do not suppress new public
+  // categories with "Exibir no menu" enabled in the CMS.
   const rootRows = configuredRoots.length ? configuredRoots : legacyRoots
+  const configuredRootIds = new Set(
+    rootRows
+      .map((row) => relationKey(row.category))
+      .filter((id): id is string => id !== null),
+  )
   const fallbackRoots = categories
-    .filter((category) => relationID(category.parent) === null && categoryVisibleInMenu(category))
+    .filter((category) => {
+      if (!categoryVisibleInMenu(category)) return false
+      const parentId = relationKey(category.parent)
+      const parent = parentId ? categoryMap.get(parentId) : null
+      // If the parent is hidden or unavailable, promote visible children
+      // instead of silently dropping them from the menu.
+      return !parent || !categoryVisibleInMenu(parent)
+    })
+    .filter((category) => !configuredRootIds.has(String(category.id)))
     .map((category) => ({ category: category.id, order: categoryOrder(category), highlightLimit: 2 }))
-  const sourceRows = rootRows.length ? rootRows : fallbackRoots
+  const sourceRows = [...rootRows, ...fallbackRoots]
 
   const uniqueRoots = new Map<string, UnknownRecord>()
   for (const row of sourceRows) {
@@ -468,6 +483,11 @@ export async function buildNavigationV2(payload: Payload): Promise<BuiltResponse
 
   const roots = Array.from(uniqueRoots.entries())
     .sort((left, right) => {
+      const leftConfigured = configuredRootIds.has(left[0])
+      const rightConfigured = configuredRootIds.has(right[0])
+      // Keep manual roots in their configured order; append automatic roots
+      // in category order without disturbing existing navigation placement.
+      if (leftConfigured !== rightConfigured) return leftConfigured ? -1 : 1
       const orderDifference = integer(left[1].order, 100) - integer(right[1].order, 100)
       return orderDifference || compareCategories(categoryMap.get(left[0]) || {}, categoryMap.get(right[0]) || {})
     })
