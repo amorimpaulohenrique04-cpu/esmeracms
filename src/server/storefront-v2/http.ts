@@ -7,6 +7,7 @@ export type PublicHTTPOptions = {
   lastModified?: string | null
   maxAge?: number
   staleWhileRevalidate?: number
+  cacheTags?: string[]
 }
 
 export function deterministicRevision(value: unknown) {
@@ -31,6 +32,7 @@ export function publicCacheHeaders(options: PublicHTTPOptions) {
     'Vercel-CDN-Cache-Control': sharedPolicy,
     Vary: 'Accept-Encoding',
   })
+  if (options.cacheTags?.length) headers.set('Vercel-Cache-Tag', options.cacheTags.join(','))
   if (options.revision) headers.set('ETag', normalizeETag(options.revision))
   if (options.lastModified) {
     const date = new Date(options.lastModified)

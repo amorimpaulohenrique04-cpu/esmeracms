@@ -15,14 +15,16 @@ import { assertExpectedDocumentRevision, createDocumentRevision } from '../../..
 import { stampPublishedDocumentMetadata } from '../../../../server/publication/stampPublicationMetadata'
 import { probeStorefrontRevision } from '../../../../server/publication/storefrontProbe'
 import { RevisionConflictError, STOREFRONT_CONTRACT_VERSION, type PublicationAssessment } from '../../../../server/publication/types'
+import { scheduleStorefrontInvalidation, SKIP_STOREFRONT_INVALIDATION } from '../../../../server/storefront-v2/invalidation'
 
 export const dynamic = 'force-dynamic'
 
-type CategoryAction = 'create' | 'save-draft' | 'save-and-publish' | 'publish' | 'unpublish' | 'reorder'
+type CategoryAction = 'create' | 'save-draft' | 'save-and-publish' | 'publish' | 'unpublish' | 'reorder' | 'add-product' | 'remove-product'
 
 type RequestBody = {
   action?: CategoryAction
   id?: string | number
+  productId?: string | number
   data?: Record<string, unknown>
   orderedIds?: Array<string | number>
   expectedRevision?: string | null
@@ -203,6 +205,60 @@ async function assessCategoryWithHierarchy(
   return assessment
 }
 
+/** Novas categorias entram no fim do seu nível, sem empatar com as existentes. */
+async function nextSiblingOrder(payload: Awaited<ReturnType<typeof getPayload>>, user: unknown, parent: unknown) {
+  const parentId = relationID(parent)
+  const where: Where = parentId === null ? { parent: { exists: false } } : { parent: { equals: parentId } }
+  const last = await payload.find({
+    collection: 'categories',
+    depth: 0,
+    draft: true,
+    limit: 1,
+    overrideAccess: false,
+    user: user as never,
+    sort: '-order',
+    where,
+    select: { order: true },
+  })
+  const current = last.docs[0]?.order
+  return (typeof current === 'number' ? current : 0) + 100
+}
+
+const PRODUCT_SEARCH_LIMIT = 20
+
+export async function GET(request: Request) {
+  const payload = await getPayload({ config })
+  const { user } = await payload.auth({ headers: request.headers })
+  if (!user) return adminCodedError('unauthenticated')
+  if (!canManageSite(user)) return adminCodedError('forbidden', { summary: 'Sem permissão para operar categorias.' })
+
+  const url = new URL(request.url)
+  const q = (url.searchParams.get('productSearch') || '').trim().slice(0, 100)
+  const categoryId = url.searchParams.get('category')
+  if (q.length < 2 || !categoryId) return NextResponse.json({ docs: [] })
+
+  try {
+    const result = await payload.find({
+      collection: 'products',
+      depth: 0,
+      draft: true,
+      limit: PRODUCT_SEARCH_LIMIT,
+      pagination: false,
+      overrideAccess: false,
+      user,
+      sort: 'title',
+      where: { or: [{ title: { like: q } }, { code: { like: q } }] },
+      select: { title: true, code: true, _status: true, categories: true },
+    })
+    const docs = result.docs
+      .filter((product) => !(product.categories || []).some((value) => String(relationID(value)) === categoryId))
+      .map((product) => ({ id: product.id, title: product.title, code: product.code, _status: product._status }))
+    return NextResponse.json({ docs })
+  } catch (error) {
+    return adminErrorResponse(error, { entity: 'category', operation: 'product-search', logger: payload.logger })
+  }
+}
+
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers: request.headers })
@@ -228,6 +284,8 @@ export async function POST(request: Request) {
           title,
           parent: data.parent ?? null,
           status: data.status || 'active',
+          order: await nextSiblingOrder(payload, user, data.parent ?? null),
+          ...(data.menu ? { menu: data.menu } : {}),
           _status: 'draft',
         } as never,
         draft: true,
@@ -388,7 +446,7 @@ export async function POST(request: Request) {
           ? 'Categoria publicada, mas a vitrine reportou incompatibilidade e não foi possível reverter automaticamente.'
           : result.status === 'published_but_unverified'
           ? 'Categoria publicada, mas a confirmação visual do site está indisponível.'
-          : 'Categoria publicada.',
+          : 'Categoria publicada. O site atualiza em até 1 minuto.',
         meta: {
           confirmationToken: result.confirmationToken,
           verification: result.verification,
@@ -472,10 +530,71 @@ export async function POST(request: Request) {
           depth: 2,
           overrideAccess: false,
           user,
+          context: { [SKIP_STOREFRONT_INVALIDATION]: true },
         })
-        await stampPublishedDocumentMetadata({ payload, entity: 'category', collection: 'categories', id, user, document: mutated })
+        await stampPublishedDocumentMetadata({
+          payload,
+          entity: 'category',
+          collection: 'categories',
+          id,
+          user,
+          document: mutated,
+          context: { [SKIP_STOREFRONT_INVALIDATION]: true },
+        })
       }
+      scheduleStorefrontInvalidation('category')
       return NextResponse.json({ updated: orderedIds.length })
+    }
+
+    if (body.action === 'add-product' || body.action === 'remove-product') {
+      if (body.id === undefined || body.id === null || body.productId === undefined || body.productId === null) {
+        return adminInputError('Informe a categoria e o produto.')
+      }
+      const latest = await payload.findByID({
+        collection: 'products',
+        id: body.productId,
+        draft: true,
+        depth: 0,
+        overrideAccess: false,
+        user,
+      })
+      const current = (latest.categories || [])
+        .map((value) => relationID(value))
+        .filter((value): value is string | number => value !== null)
+      const key = String(body.id)
+      const adding = body.action === 'add-product'
+      const already = current.some((value) => String(value) === key)
+      if (already === adding) {
+        return adminActionResponse('saved', { entityId: body.productId, message: 'O produto já estava como pedido.' })
+      }
+
+      const published = await payload.count({
+        collection: 'products',
+        overrideAccess: true,
+        where: { and: [{ id: { equals: body.productId } }, { _status: { equals: 'published' } }] },
+      })
+      const saveAsDraft = latest._status !== 'published'
+      const mutated = await payload.update({
+        collection: 'products',
+        id: body.productId,
+        data: { categories: adding ? [...current, body.id] : current.filter((value) => String(value) !== key) } as never,
+        draft: saveAsDraft,
+        depth: 2,
+        overrideAccess: false,
+        user,
+      })
+      await stampPublishedDocumentMetadata({ payload, entity: 'product', collection: 'products', id: body.productId, user, document: mutated })
+
+      // Publicado com rascunho pendente: o vínculo fica no rascunho para não
+      // sobrescrever edições em andamento de quem cuida do produto.
+      const pendingDraft = saveAsDraft && published.totalDocs > 0
+      const done = adding ? 'Produto associado.' : 'Produto removido da categoria.'
+      return adminActionResponse('saved', {
+        entityId: body.productId,
+        message: pendingDraft
+          ? `${done} O produto tem alterações em rascunho: publique-o para valer no site.`
+          : done,
+      })
     }
 
     return adminCodedError('invalid_request', { summary: 'Ação não suportada.' })

@@ -2,6 +2,7 @@ import type { GlobalConfig } from 'payload'
 
 import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
 import { callToActionFields, seoField } from '../fields/common'
+import { invalidateStorefrontAfterGlobalChange } from '../server/storefront-v2/invalidation'
 
 export const CollectionPage: GlobalConfig = {
   slug: 'collection-page',
@@ -9,6 +10,7 @@ export const CollectionPage: GlobalConfig = {
   admin: { group: 'Site', hidden: ({ user }) => !canManageSite(user) },
   access: { read: publishedGlobalOrAuthenticated, update: siteEditors, readVersions: siteEditors },
   versions: { drafts: true, max: 30 },
+  hooks: { afterChange: [invalidateStorefrontAfterGlobalChange('collection-page')] },
   fields: [
     { name: 'title', type: 'text', label: 'Título', required: true },
     { name: 'intro', type: 'richText', label: 'Introdução' },

@@ -2,7 +2,7 @@
 
 import { Combobox } from '@base-ui/react/combobox'
 import { useRouter } from 'next/navigation'
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   ActionBar,
@@ -12,21 +12,18 @@ import {
   FormShell,
   InlineFeedback,
   Status,
-  type FormTab,
 } from '../../design-system'
 import type { AdminEntityError, AdminFieldError } from '../../state/asyncState'
 import { expectAdminResponse, normalizeAdminError } from '../../state/asyncState'
-import { getCategoryDepth, indexCategoriesById, orderCategoriesHierarchically } from './hierarchy'
+import { getCategoryDepth, indexCategoriesById, moveWithinSiblings, orderCategoriesHierarchically, siblingsOf } from './hierarchy'
 import {
   categoryImageAlt,
   categoryImageURL,
-  categoryStatusLabels,
+  categoryStatePills,
   relationId,
   type CategoryDetail,
   type CategoryMedia,
   type CategoryParent,
-  type CategoryTab,
-  type CategoryWorkspaceFilters,
 } from './types'
 
 type TermItem = { id: string; value: string; creatable?: string }
@@ -62,15 +59,11 @@ type FeedbackState = {
   traceId?: string | null
 }
 
-export type CategoryEditorTab = 'content' | 'media' | 'related'
-
 type Props = {
   category: CategoryDetail
   categories: CategoryParent[]
   media: CategoryMedia[]
   termSuggestions: string[]
-  filters: CategoryWorkspaceFilters
-  initialTab?: CategoryEditorTab
   initialRevision?: string | null
   initialUpdatedAt?: string | null
   /**
@@ -80,31 +73,9 @@ type Props = {
   relatedSection?: React.ReactNode
 }
 
-// Os dois primeiros ids são os do registry editorial de categoria; `related` é
-// a consulta derivada, que não tem — nem pode ter — campo no registry.
-const editorTabs: Array<FormTab & { id: CategoryEditorTab }> = [
-  { id: 'content', label: 'Geral' },
-  { id: 'media', label: 'Mídia & SEO' },
-  { id: 'related', label: 'Produtos relacionados' },
-]
-
-// Inverso do mapeamento em CategoryDetailView.tsx (CategoryTab -> CategoryEditorTab):
-// as abas precisam de um href real (`?tab=...`) para navegação/deep-link,
-// além da troca instantânea no cliente.
-const routeTabByEditorTab: Record<CategoryEditorTab, CategoryTab> = {
-  content: 'general',
-  media: 'media',
-  related: 'products',
-}
-
-// A aba "Mídia & SEO" hospeda dois grupos do registry (`media` e `seo`) e a
-// aba "Geral" hospeda `content` e `advanced`. Nenhum id novo é inventado.
-const tabHost: Record<string, CategoryEditorTab> = {
-  content: 'content',
-  advanced: 'content',
-  media: 'media',
-  seo: 'media',
-}
+// Grupos de erro cujos campos moram em "Configurações avançadas".
+const advancedIssueTabs = new Set(['advanced', 'seo'])
+const advancedFieldPaths = /^(slug|status|nodeType|taxonomyAxis|menu\.|listingMode|listingRules|collectionPage|externalURL|hubPath|seo)/
 
 function termId(value: string) {
   return value.trim().toLocaleLowerCase('pt-BR').replace(/[^a-z0-9à-ÿ]+/gi, '-').replace(/^-+|-+$/g, '') || 'termo'
@@ -124,8 +95,6 @@ export function CategoryDetailEditor({
   categories,
   media,
   termSuggestions,
-  filters,
-  initialTab = 'content',
   initialRevision,
   initialUpdatedAt,
   relatedSection,
@@ -139,7 +108,9 @@ export function CategoryDetailEditor({
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
   const [explicitFailure, setExplicitFailure] = useState(false)
   const [confirmationToken, setConfirmationToken] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<CategoryEditorTab>(initialTab)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [positionBusy, setPositionBusy] = useState(false)
+  const [positionError, setPositionError] = useState<string | null>(null)
   const revision = useRef<string | null>(initialRevision ?? null)
   const updatedAt = useRef<string | null>(initialUpdatedAt ?? null)
   // Fila serial: publish aguarda o rascunho em voo antes de promover a revisão.
@@ -150,7 +121,6 @@ export function CategoryDetailEditor({
   const [slug, setSlug] = useState(category.slug || '')
   const [description, setDescription] = useState(category.description || '')
   const [status, setStatus] = useState(category.status || 'active')
-  const [order, setOrder] = useState(String(category.order ?? 100))
   const [parent, setParent] = useState(String(relationId(category.parent) ?? ''))
   const [image, setImage] = useState(String(relationId(category.image) ?? ''))
   const [seoTitle, setSeoTitle] = useState(category.seo?.title || '')
@@ -171,6 +141,15 @@ export function CategoryDetailEditor({
   const [collectionLayout, setCollectionLayout] = useState(category.collectionPage?.layout || 'grid')
   const [externalURL, setExternalURL] = useState(category.externalURL || '')
   const [hubPath, setHubPath] = useState(category.hubPath || '')
+
+  // Reordenar muda a revisão fora deste formulário; sem isso o próximo salvar
+  // acusaria conflito falso. Com edição em andamento, o conflito é real.
+  useEffect(() => {
+    if (dirty) return
+    if (initialRevision) revision.current = initialRevision
+    if (initialUpdatedAt) updatedAt.current = initialUpdatedAt
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `dirty` só decide se o novo baseline vale.
+  }, [initialRevision, initialUpdatedAt])
 
   const allTermItems = useMemo<TermItem[]>(() => {
     const values = [...termSuggestions, ...terms.map((item) => item.value)]
@@ -202,7 +181,6 @@ export function CategoryDetailEditor({
   }
 
   function visibleData() {
-    const parsedOrder = Number(order)
     const parsedProductsPerPage = Number(productsPerPage)
     return {
       title: title.trim(),
@@ -227,7 +205,6 @@ export function CategoryDetailEditor({
       },
       externalURL: externalURL.trim() || null,
       hubPath: hubPath.trim() || null,
-      order: Number.isInteger(parsedOrder) && parsedOrder >= 0 ? parsedOrder : 100,
       parent: parent || null,
       image: image || null,
       searchTerms: terms.map((item) => ({ term: item.value })),
@@ -358,45 +335,62 @@ export function CategoryDetailEditor({
   const fieldErrors = feedback?.fieldErrors || []
   const errorFor = (path: string) => fieldErrors.find((issue) => issue.path === path)?.message || null
 
-  // Só troca de aba quando o registry aponta para um destino que existe aqui;
-  // sem destino a issue permanece listada no resumo.
+  // A issue abre a área avançada só quando o campo apontado mora nela.
   const changeTab = (tab: string) => {
-    const host = tabHost[tab]
-    if (host) setActiveTab(host)
+    if (advancedIssueTabs.has(tab) || (tab === 'content' && fieldErrors.some((issue) => advancedFieldPaths.test(issue.path || '')))) {
+      setAdvancedOpen(true)
+    }
   }
 
-  function tabHref(tabId: CategoryEditorTab) {
-    const params = new URLSearchParams()
-    params.set('status', filters.status)
-    if (filters.q) params.set('q', filters.q)
-    params.set('category', String(category.id))
-    params.set('tab', routeTabByEditorTab[tabId])
-    return `/admin/categories?${params.toString()}`
-  }
+  const hierarchy = orderCategoriesHierarchically(categories)
+  const siblings = siblingsOf(hierarchy, category.id)
+  const position = siblings.findIndex((item) => String(item.id) === String(category.id))
+  const parentCategory = categories.find((item) => String(item.id) === parent)
 
-  const tabs = editorTabs.map((tab) => ({
-    ...tab,
-    href: tabHref(tab.id),
-    issues: fieldErrors.filter((issue) => issue.tab && tabHost[issue.tab] === tab.id).length || undefined,
-  }))
+  async function changePosition(targetIndex: number) {
+    const next = moveWithinSiblings(hierarchy, category.id, targetIndex)
+    if (!next) return
+    setPositionBusy(true)
+    setPositionError(null)
+    try {
+      const response = await fetch('/api/admin-categories', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'reorder', orderedIds: next.map((item) => item.id) }),
+      })
+      if (!response.ok) throw new Error('reorder_failed')
+      router.refresh()
+    } catch {
+      setPositionError('Não foi possível mudar a posição. Tente novamente.')
+    } finally {
+      setPositionBusy(false)
+    }
+  }
 
   const currentImage = media.find((item) => String(item.id) === image) || (typeof category.image === 'object' && category.image ? category.image : null)
   const currentImageURL = categoryImageURL(currentImage)
   const published = category._status === 'published'
+  const hasPublicVersion = category.published ?? published
+  const pills = categoryStatePills({ status, _status: category._status, published: category.published, menu: { showInMenu } })
+  const parentName = parentCategory?.title || parentCategory?.slug
+  const menuNotice = !showInMenu
+    ? 'A categoria continua no site, nos filtros e nos produtos. Só não aparece no menu.'
+    : parentCategory && parentCategory.published === false
+    ? `A categoria principal “${parentName}” está em rascunho. Enquanto isso, esta aparece direto no menu principal.`
+    : parentCategory && !parentCategory.menu?.showInMenu
+    ? `A categoria principal “${parentName}” está oculta do menu. Enquanto isso, esta aparece direto no menu principal.`
+    : null
   const saveFeedback = feedback && feedback.scope === 'save' && feedback.tone !== 'danger' ? feedback : null
   const publicationFeedback = feedback && feedback.scope === 'publication' && feedback.tone !== 'danger' ? feedback : null
 
   return (
     <FormShell
       title="Edição da categoria"
-      description="Salvar rascunho grava o estado visível. Salvar e publicar grava o mesmo estado e promove a revisão."
-      tabs={tabs}
-      activeTab={activeTab}
-      onTabChange={(tab) => setActiveTab(tab === 'media' || tab === 'related' ? tab : 'content')}
+      description="Preencha o essencial e use Salvar e publicar para enviar ao site."
       actions={
         <div className="esmera-category-editor__state">
-          <Status tone={status === 'active' ? 'success' : 'neutral'}>{categoryStatusLabels[status] || status}</Status>
-          <Status tone={published ? 'info' : 'neutral'}>{published ? 'Publicada' : 'Rascunho'}</Status>
+          {pills.map((pill) => <Status key={pill.label} tone={pill.tone}>{pill.label}</Status>)}
         </div>
       }
     >
@@ -420,39 +414,70 @@ export function CategoryDetailEditor({
         </div>
       ) : null}
 
-      {activeTab === 'content' ? (
-        <div className="esmera-category-form">
-          <FieldV2 id="category-title" path="title" label="Nome" required error={errorFor('title')}>
-            {(control) => <input {...control} className="esmera-input" value={title} onChange={(event) => changeTitle(event.target.value)} />}
-          </FieldV2>
-          <FieldV2 id="category-slug" path="slug" label="Slug" required hint="Gerado pelo nome até ser editado manualmente." error={errorFor('slug')}>
-            {(control) => <input {...control} className="esmera-input" value={slug} pattern="[a-z0-9-]+" onChange={(event) => changeSlug(event.target.value)} />}
-          </FieldV2>
-          <FieldV2 path="description" label="Descrição" optional className="esmera-category-field--wide" error={errorFor('description')}>
-            {(control) => <textarea {...control} className="esmera-input esmera-category-textarea" rows={5} value={description} onChange={(event) => { setDescription(event.target.value); edited() }} />}
-          </FieldV2>
-          <FieldV2 id="category-parent" path="parent" label="Categoria principal" hint="Ciclos em qualquer nível são rejeitados no servidor." error={errorFor('parent')}>
+      <div className="esmera-category-form">
+        <FieldV2 id="category-title" path="title" label="Nome" required error={errorFor('title')}>
+          {(control) => <input {...control} className="esmera-input" value={title} onChange={(event) => changeTitle(event.target.value)} />}
+        </FieldV2>
+        <FieldV2 id="category-parent" path="parent" label="Categoria principal" hint="Deixe em branco para aparecer direto no menu principal." error={errorFor('parent')}>
+          {(control) => (
+            <select {...control} className="esmera-input" value={parent} onChange={(event) => { setParent(event.target.value); edited() }}>
+              <option value="">Sem categoria principal</option>
+              {parentOptions.filter((item) => String(item.id) !== String(category.id)).map((item) => <option key={String(item.id)} value={String(item.id)}>{item.depth > 0 ? `${' '.repeat(item.depth)}↳ ${item.label}` : item.label}</option>)}
+            </select>
+          )}
+        </FieldV2>
+        <FieldV2 path="description" label="Descrição" optional className="esmera-category-field--wide" error={errorFor('description')}>
+          {(control) => <textarea {...control} className="esmera-input esmera-category-textarea" rows={4} value={description} onChange={(event) => { setDescription(event.target.value); edited() }} />}
+        </FieldV2>
+        <div className="esmera-category-media-preview">
+          {currentImageURL ? <img src={currentImageURL} alt={categoryImageAlt(currentImage)} /> : <div className="esmera-category-media-placeholder">Sem imagem</div>}
+        </div>
+        <FieldV2 id="category-image" path="image" label="Imagem" optional error={errorFor('image')}>
+          {(control) => (
+            <select {...control} className="esmera-input" value={image} onChange={(event) => { setImage(event.target.value); edited() }}>
+              <option value="">Sem imagem</option>
+              {media.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.filename || item.alt || `Mídia ${item.id}`}</option>)}
+            </select>
+          )}
+        </FieldV2>
+
+        <div className="esmera-category-menu-toggle esmera-category-field--wide">
+          <label className="esmera-category-checkbox">
+            <input type="checkbox" checked={showInMenu} onChange={(event) => { setShowInMenu(event.target.checked); edited() }} /> Exibir no menu
+          </label>
+          {menuNotice ? <p className="esmera-field-hint">{menuNotice}</p> : null}
+        </div>
+
+        {position >= 0 && siblings.length > 1 ? (
+          <FieldV2 id="category-position" path="order" label="Ordem de exibição" hint={dirty ? 'Salve as alterações antes de mudar a posição.' : 'Posição entre as categorias do mesmo nível.'} error={positionError}>
             {(control) => (
-              <select {...control} className="esmera-input" value={parent} onChange={(event) => { setParent(event.target.value); edited() }}>
-                <option value="">Sem categoria principal</option>
-                {parentOptions.filter((item) => String(item.id) !== String(category.id)).map((item) => <option key={String(item.id)} value={String(item.id)}>{item.depth > 0 ? `${' '.repeat(item.depth)}↳ ${item.label}` : item.label}</option>)}
+              <select {...control} className="esmera-input" value={position} disabled={dirty || busy || positionBusy} onChange={(event) => void changePosition(Number(event.target.value))}>
+                {siblings.map((item, index) => <option key={String(item.id)} value={index}>{index + 1}º {index === position ? '(posição atual)' : `no lugar de ${item.title || item.slug || item.id}`}</option>)}
               </select>
             )}
           </FieldV2>
-          <FieldV2 id="category-status" path="status" label="Status" error={errorFor('status')}>
-            {(control) => (
-              <select {...control} className="esmera-input" value={status} onChange={(event) => { setStatus(event.target.value); edited() }}>
-                <option value="active">Ativa</option>
-                <option value="archive">Arquivada</option>
-              </select>
-            )}
-          </FieldV2>
-          <details className="esmera-category-advanced esmera-category-field--wide">
-            <summary>
-              <span className="esmera-category-advanced__title">Ajustes avançados</span>
-              <span className="esmera-category-advanced__tag">Opcional</span>
-            </summary>
+        ) : null}
+
+        <div className="esmera-category-field--wide esmera-category-products">{relatedSection}</div>
+
+        <details className="esmera-category-advanced esmera-category-field--wide" open={advancedOpen} onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}>
+          <summary>
+            <span className="esmera-category-advanced__title">Configurações avançadas</span>
+            <span className="esmera-category-advanced__tag">Opcional</span>
+          </summary>
+          {advancedOpen ? (
             <div className="esmera-category-advanced__body">
+              <FieldV2 id="category-slug" path="slug" label="Endereço (slug)" hint="Criado a partir do nome. Mudar quebra links já divulgados." error={errorFor('slug')}>
+                {(control) => <input {...control} className="esmera-input" value={slug} pattern="[a-z0-9-]+" onChange={(event) => changeSlug(event.target.value)} />}
+              </FieldV2>
+              <FieldV2 id="category-status" path="status" label="Situação" error={errorFor('status')}>
+                {(control) => (
+                  <select {...control} className="esmera-input" value={status} onChange={(event) => { setStatus(event.target.value); edited() }}>
+                    <option value="active">Ativa</option>
+                    <option value="archive">Arquivada</option>
+                  </select>
+                )}
+              </FieldV2>
               <FieldV2 path="nodeType" label="Tipo do nó" error={errorFor('nodeType')}>
                 {(control) => (
                   <select {...control} className="esmera-input" value={nodeType} onChange={(event) => { setNodeType(event.target.value as typeof nodeType); edited() }}>
@@ -475,7 +500,6 @@ export function CategoryDetailEditor({
                   </select>
                 )}
               </FieldV2>
-              <label className="esmera-category-checkbox"><input type="checkbox" checked={showInMenu} onChange={(event) => { setShowInMenu(event.target.checked); edited() }} /> Exibir no menu</label>
               <FieldV2 path="menu.label" label="Rótulo no menu" optional error={errorFor('menu.label')}>
                 {(control) => <input {...control} className="esmera-input" value={menuLabel} onChange={(event) => { setMenuLabel(event.target.value); edited() }} />}
               </FieldV2>
@@ -557,96 +581,74 @@ export function CategoryDetailEditor({
                   {(control) => <input {...control} className="esmera-input" placeholder="/colecao/pecas" value={hubPath} onChange={(event) => { setHubPath(event.target.value); edited() }} />}
                 </FieldV2>
               ) : null}
-              <FieldV2 id="category-order" path="order" label="Ordem editorial" hint="Normalmente controlada pela reordenação da lista." error={errorFor('order')}>
-                {(control) => <input {...control} className="esmera-input" type="number" min="0" step="1" value={order} onChange={(event) => { setOrder(event.target.value); edited() }} />}
+              <div className="esmera-category-field--wide">
+                <label className="esmera-field-label" htmlFor={`category-terms-${category.id}`}>Taxonomia & sinônimos</label>
+                <div className="esmera-category-chips" aria-label="Sinônimos atuais">
+                  {terms.map((item) => (
+                    <span className="esmera-category-chip" key={item.id}>
+                      <span>{item.value}</span>
+                      <button className="esmera-category-chip-remove" type="button" aria-label={`Remover ${item.value}`} onClick={() => { setTerms((current) => current.filter((term) => term.id !== item.id)); edited() }}>×</button>
+                    </span>
+                  ))}
+                </div>
+                <Combobox.Root
+                  items={allTermItems}
+                  inputValue={query}
+                  onInputValueChange={setQuery}
+                  itemToStringLabel={(item: TermItem) => item.value}
+                  onValueChange={addTerm}
+                >
+                  <Combobox.InputGroup className="esmera-category-combobox">
+                    <Combobox.Input id={`category-terms-${category.id}`} className="esmera-category-combobox-input" placeholder="Adicionar sinônimo…" />
+                  </Combobox.InputGroup>
+                  <Combobox.Portal>
+                    <Combobox.Positioner className="esmera-combobox-positioner" sideOffset={6}>
+                      <Combobox.Popup className="esmera-combobox-popup">
+                        <Combobox.Empty className="esmera-select-item">Nenhuma sugestão.</Combobox.Empty>
+                        <Combobox.List>
+                          {(item: TermItem) => <Combobox.Item key={item.id} className="esmera-select-item" value={item}>{item.creatable ? `Adicionar “${item.creatable}”` : item.value}</Combobox.Item>}
+                        </Combobox.List>
+                      </Combobox.Popup>
+                    </Combobox.Positioner>
+                  </Combobox.Portal>
+                </Combobox.Root>
+                <span className="esmera-field-hint">Digite um termo e escolha “Adicionar” para criar um novo sinônimo. Os chips possuem remoção explícita por teclado.</span>
+              </div>
+
+              <div className="esmera-category-editorial-callout esmera-category-field--wide">
+                <div>
+                  <strong>Conteúdo editorial e destaques do mega menu</strong>
+                  <p>Os blocos são controlados pelo schema e permanecem nesta aba. Use o editor técnico para montar galerias, texto com imagem, manifestos, CTAs e destaques.</p>
+                </div>
+                <a className="esmera-button esmera-button--quiet" href={`/admin/collections/categories/${category.id}`}>Abrir editor técnico</a>
+              </div>
+
+              <FieldV2 id="category-seo" path="seo" label="Título SEO" optional error={errorFor('seo')}>
+                {(control) => <input {...control} className="esmera-input" maxLength={60} value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); edited() }} />}
               </FieldV2>
+              <FieldV2 path="seo.description" label="Descrição SEO" optional className="esmera-category-field--wide" error={errorFor('seo.description')}>
+                {(control) => <textarea {...control} className="esmera-input esmera-category-textarea" maxLength={160} rows={3} value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); edited() }} />}
+              </FieldV2>
+              <FieldV2 path="seo.socialImage" label="Imagem social" optional error={errorFor('seo.socialImage')}>
+                {(control) => (
+                  <select {...control} className="esmera-input" value={socialImage} onChange={(event) => { setSocialImage(event.target.value); edited() }}>
+                    <option value="">Sem imagem social</option>
+                    {media.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.filename || item.alt || `Mídia ${item.id}`}</option>)}
+                  </select>
+                )}
+              </FieldV2>
+              <label className="esmera-category-checkbox"><input type="checkbox" checked={noIndex} onChange={(event) => { setNoIndex(event.target.checked); edited() }} /> Ocultar esta categoria dos buscadores</label>
+
+              <div className="esmera-category-seo-preview esmera-category-field--wide" aria-label="Preview básico de snippet">
+                <span>Preview de busca</span>
+                <strong>{seoTitle || title || category.title || 'Título da categoria'}</strong>
+                <small>/{slug || category.slug || 'categoria'}</small>
+                <p>{seoDescription || description || category.description || 'Sem descrição SEO definida.'}</p>
+              </div>
             </div>
-          </details>
-        </div>
-      ) : null}
-
-      {activeTab === 'media' ? (
-        <div className="esmera-category-form">
-          <div className="esmera-category-media-preview">
-            {currentImageURL ? <img src={currentImageURL} alt={categoryImageAlt(currentImage)} /> : <div className="esmera-category-media-placeholder">Sem imagem</div>}
-          </div>
-          <FieldV2 id="category-image" path="image" label="Imagem da categoria" className="esmera-category-field--wide" error={errorFor('image')}>
-            {(control) => (
-              <select {...control} className="esmera-input" value={image} onChange={(event) => { setImage(event.target.value); edited() }}>
-                <option value="">Sem imagem</option>
-                {media.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.filename || item.alt || `Mídia ${item.id}`}</option>)}
-              </select>
-            )}
-          </FieldV2>
-
-          <div className="esmera-category-field--wide">
-            <label className="esmera-field-label" htmlFor={`category-terms-${category.id}`}>Taxonomia & sinônimos</label>
-            <div className="esmera-category-chips" aria-label="Sinônimos atuais">
-              {terms.map((item) => (
-                <span className="esmera-category-chip" key={item.id}>
-                  <span>{item.value}</span>
-                  <button className="esmera-category-chip-remove" type="button" aria-label={`Remover ${item.value}`} onClick={() => { setTerms((current) => current.filter((term) => term.id !== item.id)); edited() }}>×</button>
-                </span>
-              ))}
-            </div>
-            <Combobox.Root
-              items={allTermItems}
-              inputValue={query}
-              onInputValueChange={setQuery}
-              itemToStringLabel={(item: TermItem) => item.value}
-              onValueChange={addTerm}
-            >
-              <Combobox.InputGroup className="esmera-category-combobox">
-                <Combobox.Input id={`category-terms-${category.id}`} className="esmera-category-combobox-input" placeholder="Adicionar sinônimo…" />
-              </Combobox.InputGroup>
-              <Combobox.Portal>
-                <Combobox.Positioner className="esmera-combobox-positioner" sideOffset={6}>
-                  <Combobox.Popup className="esmera-combobox-popup">
-                    <Combobox.Empty className="esmera-select-item">Nenhuma sugestão.</Combobox.Empty>
-                    <Combobox.List>
-                      {(item: TermItem) => <Combobox.Item key={item.id} className="esmera-select-item" value={item}>{item.creatable ? `Adicionar “${item.creatable}”` : item.value}</Combobox.Item>}
-                    </Combobox.List>
-                  </Combobox.Popup>
-                </Combobox.Positioner>
-              </Combobox.Portal>
-            </Combobox.Root>
-            <span className="esmera-field-hint">Digite um termo e escolha “Adicionar” para criar um novo sinônimo. Os chips possuem remoção explícita por teclado.</span>
-          </div>
-
-          <div className="esmera-category-editorial-callout esmera-category-field--wide">
-            <div>
-              <strong>Conteúdo editorial e destaques do mega menu</strong>
-              <p>Os blocos são controlados pelo schema e permanecem nesta aba. Use o editor técnico para montar galerias, texto com imagem, manifestos, CTAs e destaques.</p>
-            </div>
-            <a className="esmera-button esmera-button--quiet" href={`/admin/collections/categories/${category.id}`}>Editar blocos</a>
-          </div>
-
-          <FieldV2 id="category-seo" path="seo" label="Título SEO" optional error={errorFor('seo')}>
-            {(control) => <input {...control} className="esmera-input" maxLength={60} value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); edited() }} />}
-          </FieldV2>
-          <FieldV2 path="seo.description" label="Descrição SEO" optional className="esmera-category-field--wide" error={errorFor('seo.description')}>
-            {(control) => <textarea {...control} className="esmera-input esmera-category-textarea" maxLength={160} rows={3} value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); edited() }} />}
-          </FieldV2>
-          <FieldV2 path="seo.socialImage" label="Imagem social" optional error={errorFor('seo.socialImage')}>
-            {(control) => (
-              <select {...control} className="esmera-input" value={socialImage} onChange={(event) => { setSocialImage(event.target.value); edited() }}>
-                <option value="">Sem imagem social</option>
-                {media.map((item) => <option key={String(item.id)} value={String(item.id)}>{item.filename || item.alt || `Mídia ${item.id}`}</option>)}
-              </select>
-            )}
-          </FieldV2>
-          <label className="esmera-category-checkbox"><input type="checkbox" checked={noIndex} onChange={(event) => { setNoIndex(event.target.checked); edited() }} /> Ocultar esta categoria dos buscadores</label>
-
-          <div className="esmera-category-seo-preview esmera-category-field--wide" aria-label="Preview básico de snippet">
-            <span>Preview de busca</span>
-            <strong>{seoTitle || title || category.title || 'Título da categoria'}</strong>
-            <small>/{slug || category.slug || 'categoria'}</small>
-            <p>{seoDescription || description || category.description || 'Sem descrição SEO definida.'}</p>
-          </div>
-        </div>
-      ) : null}
-
-      {activeTab === 'related' ? relatedSection : null}
+          ) : null}
+        </details>
+      </div>
 
       <div className="esmera-category-editor__save-feedback">
         {saveFeedback ? <InlineFeedback tone={saveFeedback.tone}>{saveFeedback.message}</InlineFeedback> : null}
@@ -673,12 +675,12 @@ export function CategoryDetailEditor({
       <ActionBar
         dirty={dirty}
         saving={busy}
-        published={published}
+        publicationBlocked={published && !dirty}
+        savedLabel={published ? 'Tudo publicado' : 'Rascunho salvo'}
         publishLabel={confirmationToken ? 'Confirmar publicação' : 'Salvar e publicar'}
         onSave={() => void saveDraft()}
         onPublish={() => void publish(confirmationToken)}
-        onUnpublish={() => void enqueue(() => runRequest('unpublish'))}
-        secondary={<a className="esmera-button esmera-button--quiet" href={`/admin/collections/categories/${category.id}`}>Admin técnico</a>}
+        secondary={hasPublicVersion ? <Button disabled={busy} onClick={() => void enqueue(() => runRequest('unpublish'))}>Despublicar</Button> : null}
       />
     </FormShell>
   )

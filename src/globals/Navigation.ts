@@ -1,6 +1,7 @@
 import type { Field, GlobalConfig, Where } from 'payload'
 
 import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
+import { invalidateStorefrontAfterGlobalChange } from '../server/storefront-v2/invalidation'
 
 const navigationLinkFields = (): Field[] => [
   { name: 'label', type: 'text' as const, label: 'Nome', required: true, maxLength: 40 },
@@ -29,6 +30,7 @@ export const Navigation: GlobalConfig = {
   admin: { group: 'Site', hidden: ({ user }) => !canManageSite(user) },
   access: { read: publishedGlobalOrAuthenticated, update: siteEditors, readVersions: siteEditors },
   versions: { drafts: true, max: 30 },
+  hooks: { afterChange: [invalidateStorefrontAfterGlobalChange('navigation')] },
   fields: [
     {
       name: 'roots',

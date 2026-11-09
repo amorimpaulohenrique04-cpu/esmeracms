@@ -38,7 +38,7 @@ describe('guard estático dos caminhos de publicação pública', () => {
   it('Home usa afterChange com bypass de recursão', async () => {
     const home = await source('src/globals/Home.ts')
     const helper = await source('src/server/publication/stampPublicationMetadata.ts')
-    expect(home).toContain('afterChange: [stampPublishedHomeMetadata]')
+    expect(home).toContain("afterChange: [stampPublishedHomeMetadata, invalidateStorefrontAfterGlobalChange('home')]")
     expect(helper).toContain('skipPublicRevisionStamp')
     expect(helper).toContain('findGlobal')
     expect(helper).toContain('draft: false')

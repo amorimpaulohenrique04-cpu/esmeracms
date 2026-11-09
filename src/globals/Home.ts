@@ -4,6 +4,7 @@ import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../a
 import { callToActionFields, imageWithAltFields, seoField } from '../fields/common'
 import { publicationMetadataFields } from '../server/publication/publicationMetadataFields'
 import { stampPublishedHomeMetadata } from '../server/publication/stampPublicationMetadata'
+import { invalidateStorefrontAfterGlobalChange } from '../server/storefront-v2/invalidation'
 
 export const HOME_DISABLED_SECTIONS = [
   'hero',
@@ -47,7 +48,7 @@ export const Home: GlobalConfig = {
   },
   versions: { drafts: true, max: 50 },
   hooks: {
-    afterChange: [stampPublishedHomeMetadata],
+    afterChange: [stampPublishedHomeMetadata, invalidateStorefrontAfterGlobalChange('home')],
   },
   fields: [
     {

@@ -8,8 +8,10 @@ import {
 
 import { activeCategoriesOrAuthenticated, siteEditors } from '../access/roles'
 import { getCategoryHierarchyIssues } from '../businessRules/categories/hierarchy'
-import { seoField, slugify } from '../fields/common'
+import { uniqueCategorySlug } from '../businessRules/categories/slug'
+import { seoField } from '../fields/common'
 import { publicationMetadataFields } from '../server/publication/publicationMetadataFields'
+import { invalidateStorefrontAfterChange, invalidateStorefrontAfterDelete } from '../server/storefront-v2/invalidation'
 
 const NODE_TYPES = ['collection', 'editorial', 'external', 'group'] as const
 const TAXONOMY_AXES = ['navigation', 'piece_type', 'collection', 'environment', 'campaign', 'service'] as const
@@ -254,10 +256,16 @@ export const Categories: CollectionConfig = {
     maxPerDoc: 30,
   },
   hooks: {
+    afterChange: [invalidateStorefrontAfterChange('category')],
+    afterDelete: [invalidateStorefrontAfterDelete('category')],
     beforeValidate: [
       async ({ data, originalDoc, req }) => {
         if (!data) return data
-        if (data.title && !data.slug) data.slug = slugify(String(data.title))
+        // O slug nasce do nome uma única vez: renomear não quebra links publicados.
+        if (!text(data.slug)) {
+          if (originalDoc?.slug) data.slug = originalDoc.slug
+          else if (data.title) data.slug = await uniqueCategorySlug(req, String(data.title))
+        }
 
         const id = originalDoc?.id as string | number | undefined
         const parent = data.parent !== undefined ? data.parent : originalDoc?.parent

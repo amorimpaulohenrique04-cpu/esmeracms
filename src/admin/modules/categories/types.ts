@@ -22,6 +22,9 @@ export type CategoryParent = {
   taxonomyAxis?: CategoryTaxonomyAxis | null
   order?: number | null
   parent?: RelationshipLike<CategoryParent>
+  menu?: CategoryMenu | null
+  /** Existe versão pública, mesmo com rascunho mais novo por cima. */
+  published?: boolean
 }
 
 export type CategorySearchTerm = {
@@ -77,6 +80,9 @@ export type CategoryListItem = {
   searchTerms?: CategorySearchTerm[] | null
   _status?: string | null
   updatedAt?: string | null
+  menu?: CategoryMenu | null
+  published?: boolean
+  parentTitle?: string | null
   productCount: number
   depth: number
   /** Tem ao menos um filho visível na lista atual — só para tipografia pai/folha. */
@@ -86,7 +92,6 @@ export type CategoryListItem = {
 export type CategoryDetail = CategoryListItem & {
   revision?: string | null
   description?: string | null
-  menu?: CategoryMenu | null
   listingMode?: CategoryListingMode | null
   listingRules?: CategoryListingRules | null
   collectionPage?: CategoryCollectionPage | null
@@ -108,14 +113,42 @@ export type RelatedProduct = {
 
 export type CategoryTab = 'general' | 'media' | 'products'
 
+export type CategoryView = 'all' | 'published' | 'draft' | 'hidden'
+
 export type CategoryWorkspaceFilters = {
   q: string
   status: 'active' | 'archive'
+  view?: CategoryView
 }
 
-export const categoryStatusLabels: Record<string, string> = {
-  active: 'Ativa',
-  archive: 'Arquivada',
+type CategoryStateInput = {
+  status?: string | null
+  _status?: string | null
+  published?: boolean
+  menu?: CategoryMenu | null
+}
+
+export type CategoryStatePill = { label: string; tone: 'success' | 'info' | 'warning' | 'neutral' }
+
+/** Estados em linguagem da cliente; lista e editor usam a mesma regra. */
+export function categoryStatePills(category: CategoryStateInput): CategoryStatePill[] {
+  if (category.status === 'archive') return [{ label: 'Arquivada', tone: 'neutral' }]
+  const hasPublicVersion = category.published ?? category._status === 'published'
+  const publication: CategoryStatePill = !hasPublicVersion
+    ? { label: 'Rascunho', tone: 'neutral' }
+    : category._status === 'published'
+    ? { label: 'Publicado no site', tone: 'success' }
+    : { label: 'Publicado, com alterações não publicadas', tone: 'warning' }
+  return category.menu?.showInMenu
+    ? [publication]
+    : [publication, { label: 'Oculto do menu', tone: 'info' }]
+}
+
+export function matchesCategoryView(category: CategoryStateInput, view: CategoryView = 'all') {
+  if (view === 'all') return true
+  if (view === 'hidden') return !category.menu?.showInMenu
+  const hasPublicVersion = category.published ?? category._status === 'published'
+  return view === 'published' ? hasPublicVersion : !hasPublicVersion
 }
 
 export function relationId(value: RelationshipLike<{ id?: string | number | null }>) {
