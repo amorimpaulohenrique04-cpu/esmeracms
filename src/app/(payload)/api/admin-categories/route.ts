@@ -19,7 +19,7 @@ import { scheduleStorefrontInvalidation, SKIP_STOREFRONT_INVALIDATION } from '..
 
 export const dynamic = 'force-dynamic'
 
-type CategoryAction = 'create' | 'save-draft' | 'save-and-publish' | 'publish' | 'unpublish' | 'reorder' | 'add-product' | 'remove-product'
+type CategoryAction = 'create' | 'save-draft' | 'save-and-publish' | 'publish' | 'unpublish' | 'reorder' | 'add-product' | 'remove-product' | 'trash'
 
 type RequestBody = {
   action?: CategoryAction
@@ -39,6 +39,14 @@ function relationID(value: unknown): string | number | null {
     if (typeof id === 'string' || typeof id === 'number') return id
   }
   return null
+}
+
+/** Procura a categoria nas relações do conteúdo editorial (Home e menu). */
+function referencesCategory(value: unknown, key: string): boolean {
+  if (Array.isArray(value)) return value.some((item) => referencesCategory(item, key))
+  if (!value || typeof value !== 'object') return false
+  return Object.entries(value).some(([field, entry]) =>
+    (['category', 'destination'].includes(field) && String(relationID(entry)) === key) || referencesCategory(entry, key))
 }
 
 const CATEGORY_NODE_TYPES = new Set(['collection', 'editorial', 'external', 'group'])
@@ -544,6 +552,38 @@ export async function POST(request: Request) {
       }
       scheduleStorefrontInvalidation('category')
       return NextResponse.json({ updated: orderedIds.length })
+    }
+
+    if (body.action === 'trash') {
+      if (body.id === undefined || body.id === null) return adminInputError('Categoria não informada.')
+      const [children, products, home, navigation] = await Promise.all([
+        payload.find({ collection: 'categories', draft: true, depth: 0, limit: 1, overrideAccess: false, user, where: { parent: { equals: body.id } }, select: {} }),
+        payload.find({ collection: 'products', draft: true, depth: 0, limit: 1, overrideAccess: false, user, where: { categories: { contains: body.id } }, select: {} }),
+        payload.findGlobal({ slug: 'home', draft: true, depth: 0, overrideAccess: true }),
+        payload.findGlobal({ slug: 'navigation', draft: true, depth: 0, overrideAccess: true }),
+      ])
+      const key = String(body.id)
+      const editorial = referencesCategory(home, key) || referencesCategory(navigation, key)
+      if (children.totalDocs || products.totalDocs || editorial) {
+        const reasons = [
+          children.totalDocs ? `tem ${children.totalDocs} subcategoria(s)` : '',
+          products.totalDocs ? `tem ${products.totalDocs} produto(s)` : '',
+          editorial ? 'aparece na Home ou no menu' : '',
+        ].filter(Boolean)
+        return adminCodedError('publication_blocked', {
+          summary: `Esta categoria não pode ser excluída porque ${reasons.join(' e ')}.`,
+          meta: { children: children.totalDocs, products: products.totalDocs, editorial },
+        })
+      }
+      await payload.update({
+        collection: 'categories',
+        id: body.id,
+        data: { deletedAt: new Date().toISOString() } as never,
+        depth: 0,
+        overrideAccess: false,
+        user,
+      })
+      return adminActionResponse('saved', { entityId: body.id, message: 'Categoria movida para a lixeira.' })
     }
 
     if (body.action === 'add-product' || body.action === 'remove-product') {
