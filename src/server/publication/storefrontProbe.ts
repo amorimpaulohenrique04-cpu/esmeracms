@@ -6,6 +6,8 @@ export type StorefrontProbeInput = {
   slug?: string
   expectedRevision: string
   contractVersion: string
+  /** Limite desta consulta; nunca amplia o configurado no ambiente. */
+  timeoutMs?: number
 }
 
 type ProbeResponse = {
@@ -64,9 +66,10 @@ export async function probeStorefrontRevision(
   }
 
   const configuredTimeout = Number(process.env.STOREFRONT_PROBE_TIMEOUT_MS || DEFAULT_TIMEOUT_MS)
-  const timeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+  const environmentTimeout = Number.isFinite(configuredTimeout) && configuredTimeout > 0
     ? configuredTimeout
     : DEFAULT_TIMEOUT_MS
+  const timeoutMs = Math.min(environmentTimeout, input.timeoutMs ?? environmentTimeout)
 
   try {
     const response = await fetch(endpoint, {

@@ -26,6 +26,8 @@ import { assertExpectedDocumentRevision, createDocumentRevision } from '../../..
 import { stampPublishedDocumentMetadata } from '../../../../server/publication/stampPublicationMetadata'
 import { probeStorefrontRevision } from '../../../../server/publication/storefrontProbe'
 import { RevisionConflictError, STOREFRONT_CONTRACT_VERSION } from '../../../../server/publication/types'
+import { draftData, STUDIO_DRAFT_VERSION, StudioInputError } from '../../../../server/studio/productDraft'
+import { publishFromStudio } from '../../../../server/studio/publishProduct'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,6 +43,10 @@ type ProductAction =
   | 'set-categories'
   | 'set-availability'
   | 'save-draft'
+  | 'studio-capabilities'
+  | 'studio-publish'
+  | 'trash'
+  | 'untrash'
   | 'reorder-gallery'
   | 'reorder'
   | 'add-gallery-image'
@@ -57,6 +63,7 @@ type RequestBody = {
   gallery?: Array<Record<string, unknown>>
   orderedIds?: Array<string | number>
   mediaId?: string | number
+  expectedCode?: string
   expectedRevision?: string | null
   expectedUpdatedAt?: string | null
   confirmationToken?: string | null
@@ -77,30 +84,6 @@ function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   if (error && typeof error === 'object' && 'message' in error) return String((error as { message?: unknown }).message || 'Erro de validação.')
   return 'Não foi possível atualizar o produto.'
-}
-
-function draftData(input: Record<string, unknown> | undefined) {
-  const source = input || {}
-  const data: Record<string, unknown> = {}
-  const textFields = ['title', 'subtitle', 'material', 'edition'] as const
-  for (const field of textFields) {
-    if (typeof source[field] === 'string' || source[field] === null) data[field] = source[field]
-  }
-  if (typeof source.availability === 'string') data.availability = source.availability
-  if (typeof source.priceMode === 'string') data.priceMode = source.priceMode
-  if (typeof source.basePriceCents === 'number' || source.basePriceCents === null) data.basePriceCents = source.basePriceCents
-  const specs = source.physicalSpecs
-  if (specs && typeof specs === 'object' && !Array.isArray(specs)) {
-    const specsRecord = specs as Record<string, unknown>
-    const physicalSpecs: Record<string, number | null> = {}
-    for (const field of ['heightMm', 'widthMm', 'depthMm', 'weightGrams'] as const) {
-      const value = specsRecord[field]
-      if (typeof value === 'number' || value === null) physicalSpecs[field] = value
-    }
-    data.physicalSpecs = physicalSpecs
-  }
-  data._status = 'draft'
-  return data
 }
 
 function updatedAt(document: unknown): string | null {
@@ -124,6 +107,56 @@ export async function POST(request: Request) {
 
   const action = body.action
   if (!action) return adminCodedError('invalid_request', { summary: 'Ação não informada.' })
+
+  if (action === 'studio-capabilities') {
+    return NextResponse.json({ studioDraftVersion: STUDIO_DRAFT_VERSION })
+  }
+
+  if (action === 'studio-publish') {
+    try {
+      const outcome = await publishFromStudio(payload, user, body)
+      return adminActionResponse('bulk_completed', {
+        entityId: outcome.document.id,
+        revision: outcome.item.revision ?? null,
+        message: outcome.item.message,
+        meta: outcome,
+      })
+    } catch (error) {
+      if (error instanceof StudioInputError) return adminInputError(error.message)
+      return adminErrorResponse(error, {
+        entity: 'product',
+        operation: 'studio-publish',
+        logger: payload.logger,
+        meta: { entityId: body.id },
+      })
+    }
+  }
+
+  // Lixeira: sai do site sem apagar vendas e histórico que apontam para o produto.
+  // Restaurar volta como rascunho; voltar ao site exige uma nova publicação.
+  if (action === 'trash' || action === 'untrash') {
+    const trashIds = Array.from(new Set((body.ids || []).filter((id): id is string | number => typeof id === 'string' || typeof id === 'number'))).slice(0, 100)
+    if (!trashIds.length) return adminCodedError('invalid_request', { summary: 'Selecione ao menos um produto.' })
+    let moved = 0
+    const failures: Array<{ id: string | number; message: string }> = []
+    for (const id of trashIds) {
+      try {
+        await payload.update({
+          collection: 'products',
+          id,
+          data: (action === 'trash' ? { deletedAt: new Date().toISOString() } : { deletedAt: null, _status: 'draft' }) as never,
+          trash: true,
+          depth: 0,
+          overrideAccess: false,
+          user,
+        })
+        moved += 1
+      } catch (error) {
+        failures.push({ id, message: errorMessage(error) })
+      }
+    }
+    return NextResponse.json({ updated: moved, errors: failures }, { status: moved || !failures.length ? 200 : httpStatusByCode.validation_error })
+  }
 
   if (action === 'create') {
     const title = String((body.data?.title as string) || '').trim()

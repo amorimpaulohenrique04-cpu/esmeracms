@@ -124,10 +124,20 @@ export function mapCoordinatorOutcome(
   }
 }
 
-async function publishSingleProduct(
+export type PublishSingleOptions = {
+  /** Dados gravados no rascunho antes da avaliação. O padrão não altera campos. */
+  data?: Record<string, unknown>
+  assertCurrent?: (document: unknown) => void
+  beforeSave?: (current: unknown, data: Record<string, unknown>) => Promise<void>
+  /** Uma única consulta com este limite: sem retentativas segurando a resposta. */
+  verifyTimeoutMs?: number
+}
+
+export async function publishSingleProduct(
   payload: Payload,
   user: PayloadRequest['user'],
   item: BulkPublicationItemInput,
+  options: PublishSingleOptions = {},
 ): Promise<BulkPublicationItemResult> {
   let lastCurrent: unknown = null
   let lastDraft: unknown = null
@@ -146,23 +156,27 @@ async function publishSingleProduct(
     const result = await coordinatePublication({
       entity: 'product',
       entityId: item.id,
-      data: { _status: 'draft' },
+      data: options.data ?? { _status: 'draft' },
       expectedRevision: item.expectedRevision,
       expectedUpdatedAt: item.expectedUpdatedAt,
       confirmationToken: item.confirmationToken,
       readCurrent: async () => {
         lastCurrent = await read()
+        options.assertCurrent?.(lastCurrent)
         return lastCurrent
       },
-      saveDraft: (data) => payload.update({
-        collection: 'products',
-        id: item.id,
-        data: data as never,
-        draft: true,
-        depth: 2,
-        overrideAccess: false,
-        user,
-      }),
+      saveDraft: async (data) => {
+        await options.beforeSave?.(lastCurrent, data)
+        return payload.update({
+          collection: 'products',
+          id: item.id,
+          data: data as never,
+          draft: true,
+          depth: 2,
+          overrideAccess: false,
+          user,
+        })
+      },
       readDraft: async () => {
         lastDraft = await read()
         return lastDraft
@@ -188,12 +202,18 @@ async function publishSingleProduct(
           user,
         })
       },
-      verify: (published, revision) => probeStorefrontRevision({
-        entity: 'product',
-        entityId: item.id,
-        expectedRevision: revision,
-        contractVersion: STOREFRONT_CONTRACT_VERSION,
-      }),
+      verify: async (published, revision) => {
+        const verification = await probeStorefrontRevision({
+          entity: 'product',
+          entityId: item.id,
+          expectedRevision: revision,
+          contractVersion: STOREFRONT_CONTRACT_VERSION,
+          timeoutMs: options.verifyTimeoutMs,
+        })
+        return options.verifyTimeoutMs !== undefined && verification.status === 'revision_mismatch'
+          ? { ...verification, status: 'unavailable' as const }
+          : verification
+      },
       revertPublish: () => payload.update({
         collection: 'products',
         id: item.id,
