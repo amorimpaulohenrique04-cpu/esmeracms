@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { detectDelimiter, parseDelimited, parseTabularText } from '../../src/server/domain/products/csv'
 
 describe('product import csv parser', () => {
+  it('detecta TSV com células multilinha sem perder o cabeçalho', () => {
+    expect(detectDelimiter('nome\tcodigo\n\n"Vaso\nde cerâmica"\t001\nBandeja\t002')).toBe('\t')
+  })
+
   it('C1: detecta CSV do Excel pt-BR separado por ponto e vírgula', () => {
     const text = 'nome;codigo;preco\r\nVaso;OBJ-1;1.490,00\r\nBandeja;OBJ-2;890,00'
     expect(detectDelimiter(text)).toBe(';')

@@ -682,6 +682,18 @@ export interface ProductImport {
     | number
     | boolean
     | null;
+  resumable?: boolean | null;
+  mediaCache?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  leaseToken?: string | null;
+  leaseUntil?: string | null;
   error?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -1826,6 +1838,10 @@ export interface ProductImportsSelect<T extends boolean = true> {
   errored?: T;
   payloadSnapshot?: T;
   results?: T;
+  resumable?: T;
+  mediaCache?: T;
+  leaseToken?: T;
+  leaseUntil?: T;
   error?: T;
   updatedAt?: T;
   createdAt?: T;

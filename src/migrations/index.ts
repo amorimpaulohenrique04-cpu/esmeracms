@@ -15,6 +15,8 @@ import * as migration_20260905_101500_product_editorial_order from './20260905_1
 import * as migration_20260909_203000_allow_duplicate_product_titles from './20260909_203000_allow_duplicate_product_titles'
 import * as migration_20261007_220000_sale_item_personalization from './20261007_220000_sale_item_personalization'
 
+import * as migration_20261108_170000_resumable_product_imports from './20261108_170000_resumable_product_imports';
+
 export const migrations = [
   {
     up: migration_20260801_000000_initial_schema.up,
@@ -95,5 +97,10 @@ export const migrations = [
     up: migration_20261007_220000_sale_item_personalization.up,
     down: migration_20261007_220000_sale_item_personalization.down,
     name: '20261007_220000_sale_item_personalization',
+  },
+  {
+    up: migration_20261108_170000_resumable_product_imports.up,
+    down: migration_20261108_170000_resumable_product_imports.down,
+    name: '20261108_170000_resumable_product_imports',
   },
 ]

@@ -181,6 +181,9 @@ export function validateRowShape(
   }
 
   const imageUrls = isClearCell(values.imageUrls) ? [] : splitMulti(values.imageUrls)
+  if (imageUrls.length > 12) {
+    issues.push({ column: 'imageUrls', code: 'image_count', message: 'Informe até 12 imagens por produto.', severity: 'error' })
+  }
   const invalidUrl = imageUrls.find((url) => !isHttpUrl(url))
   if (invalidUrl) {
     issues.push({ column: 'imageUrls', code: 'image_url', message: `URL inválida: ${invalidUrl}`, severity: 'error' })

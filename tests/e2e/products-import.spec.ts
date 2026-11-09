@@ -1,6 +1,8 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
+import { emptyImportValues } from '../../src/businessRules/products/importValidation'
+
 const adminEmail = process.env.E2E_ADMIN_EMAIL || process.env.PAYLOAD_ADMIN_EMAIL
 const adminPassword = process.env.E2E_ADMIN_PASSWORD || process.env.PAYLOAD_ADMIN_PASSWORD
 
@@ -57,6 +59,55 @@ async function openImporter(page: Page) {
 }
 
 test.describe('importação de produtos', () => {
+  test('lê o modelo de Excel pelo worker e preserva a linha original', async ({ page }) => {
+    await openImporter(page)
+    const response = await page.request.get('/api/admin-products-import?template=xlsx')
+    expect(response.ok()).toBe(true)
+    const input = page.getByRole('dialog').locator('input[type=file]')
+    await expect(input).toBeEnabled()
+    const worker = page.waitForEvent('worker', (candidate) => /importWorker|_next/.test(candidate.url()))
+    await input.setInputFiles({
+      name: 'produtos.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: await response.body(),
+    })
+    await worker
+    await expect(page.getByRole('textbox', { name: 'nome, linha 2' })).toHaveValue('Vaso Terracota')
+  })
+
+  test('retoma uma importação salva ao reabrir a tela', async ({ page }) => {
+    await login(page)
+    const code = 'E2E-RESUME-' + Date.now()
+    const response = await page.request.post('/api/admin-products-import', {
+      data: {
+        action: 'start',
+        idempotencyKey: code,
+        rows: [{
+          rowIndex: 0,
+          sourceLine: 5,
+          values: { ...emptyImportValues(), title: code, code, catalogStatus: 'archived' },
+          onConflict: 'skip',
+        }],
+      },
+    })
+    expect(response.status()).toBe(202)
+    const { importId } = await response.json()
+    try {
+      await page.goto('/admin/products')
+      await page.getByRole('button', { name: 'Importar produtos' }).click()
+      await expect(page.getByRole('button', { name: 'Retomar importação' })).toBeVisible()
+      await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).click()
+      await page.reload()
+      await page.getByRole('button', { name: 'Importar produtos' }).click()
+      await page.getByRole('button', { name: 'Retomar importação' }).click()
+      await expect(page.getByText('Importação concluída.')).toBeVisible({ timeout: 30_000 })
+      const result = await page.request.get('/api/admin-products-import?importId=' + importId)
+      expect(await result.json()).toMatchObject({ created: 1, processedRows: 1, results: [{ sourceLine: 5 }] })
+    } finally {
+      await page.request.post('/api/admin-products-import', { data: { action: 'cancel', importId } })
+    }
+  })
+
   test('500 linhas mantêm o DOM do preview limitado', async ({ page }) => {
     await openImporter(page)
 

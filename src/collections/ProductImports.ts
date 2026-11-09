@@ -53,6 +53,10 @@ export const ProductImports: CollectionConfig = {
     { name: 'errored', type: 'number', required: true, defaultValue: 0, min: 0 },
     { name: 'payloadSnapshot', type: 'json', required: true },
     { name: 'results', type: 'json' },
+    { name: 'resumable', type: 'checkbox', admin: { hidden: true } },
+    { name: 'mediaCache', type: 'json', admin: { hidden: true } },
+    { name: 'leaseToken', type: 'text', admin: { hidden: true } },
+    { name: 'leaseUntil', type: 'date', admin: { hidden: true } },
     { name: 'error', type: 'textarea', maxLength: 4000 },
   ],
 }

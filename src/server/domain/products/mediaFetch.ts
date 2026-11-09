@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import type { LookupAddress } from 'node:dns'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 
@@ -50,7 +51,7 @@ function allowedHost(hostname: string) {
     : host === entry)
 }
 
-async function validateTarget(url: URL) {
+async function validateTarget(url: URL, signal: AbortSignal) {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('A imagem precisa usar HTTP ou HTTPS.')
   if (url.username || url.password) throw new Error('URL de imagem não pode conter credenciais.')
   const defaultPort = !url.port || (url.protocol === 'https:' && url.port === '443') || (url.protocol === 'http:' && url.port === '80')
@@ -62,7 +63,14 @@ async function validateTarget(url: URL) {
     return
   }
 
-  const addresses = await lookup(url.hostname, { all: true, verbatim: true })
+  const addresses = await new Promise<LookupAddress[]>((resolve, reject) => {
+    const abort = () => reject(signal.reason)
+    signal.throwIfAborted()
+    signal.addEventListener('abort', abort, { once: true })
+    void lookup(url.hostname, { all: true, verbatim: true }).then(resolve, reject).finally(() => {
+      signal.removeEventListener('abort', abort)
+    })
+  })
   if (!addresses.length || addresses.some(({ address }) => isBlockedRemoteAddress(address))) {
     throw new Error('URL de imagem resolve para uma rede privada ou reservada.')
   }
@@ -97,7 +105,10 @@ async function readLimited(response: Response) {
       if (done) break
       if (!value) continue
       size += value.byteLength
-      if (size > MAX_BYTES) throw new Error('Imagem maior que 10MB.')
+      if (size > MAX_BYTES) {
+        void reader.cancel().catch(() => undefined)
+        throw new Error('Imagem maior que 10MB.')
+      }
       chunks.push(Buffer.from(value))
     }
   } finally {
@@ -106,17 +117,18 @@ async function readLimited(response: Response) {
   return Buffer.concat(chunks, size)
 }
 
-async function fetchWithSafeRedirects(initial: URL): Promise<{ response: Response; finalURL: URL }> {
+async function fetchWithSafeRedirects(initial: URL, signal: AbortSignal): Promise<{ response: Response; finalURL: URL }> {
   let current = initial
   for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
-    await validateTarget(current)
+    await validateTarget(current, signal)
     const response = await fetch(current, {
       redirect: 'manual',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal,
       headers: { Accept: 'image/avif,image/webp,image/png,image/jpeg' },
     })
 
     if (response.status >= 300 && response.status < 400) {
+      void response.body?.cancel().catch(() => undefined)
       if (redirectCount === MAX_REDIRECTS) throw new Error('A imagem excedeu o limite de redirecionamentos.')
       const location = response.headers.get('location')
       if (!location) throw new Error('Redirecionamento de imagem sem destino.')
@@ -132,11 +144,27 @@ export async function fetchRemoteImage(rawURL: string): Promise<RemoteImage> {
   let url: URL
   try { url = new URL(rawURL) } catch { throw new Error('URL de imagem inválida.') }
 
-  const { response, finalURL } = await fetchWithSafeRedirects(url)
-  if (!response.ok) throw new Error(`Não foi possível baixar a imagem (${response.status}).`)
+  const signal = AbortSignal.timeout(TIMEOUT_MS)
+  try {
+    return await downloadImage(url, signal)
+  } catch (error) {
+    if (signal.aborted) throw new Error('A imagem demorou mais de 15 segundos para baixar.')
+    throw error
+  }
+}
+
+async function downloadImage(url: URL, signal: AbortSignal): Promise<RemoteImage> {
+  const { response, finalURL } = await fetchWithSafeRedirects(url, signal)
+  if (!response.ok) {
+    void response.body?.cancel().catch(() => undefined)
+    throw new Error(`Não foi possível baixar a imagem (${response.status}).`)
+  }
 
   const length = Number(response.headers.get('content-length') || 0)
-  if (Number.isFinite(length) && length > MAX_BYTES) throw new Error('Imagem maior que 10MB.')
+  if (Number.isFinite(length) && length > MAX_BYTES) {
+    void response.body?.cancel().catch(() => undefined)
+    throw new Error('Imagem maior que 10MB.')
+  }
 
   const buffer = await readLimited(response)
   const mime = sniffMime(buffer)
