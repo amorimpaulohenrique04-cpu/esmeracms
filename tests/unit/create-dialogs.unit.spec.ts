@@ -31,7 +31,7 @@ describe('Popups de criação e responsividade', () => {
     const productsView = source('src/admin/modules/products/ProductsView.tsx')
     const productsWorkspace = source('src/admin/modules/products/ProductsWorkspaceClient.tsx')
     expect(salesView).toContain('<SaleCreateDialog products={productsResult.docs} />')
-    expect(categoriesView).toContain('<CategoryCreateDialog categories={allResult.docs} />')
+    expect(categoriesView).toContain("<CategoryCreateDialog key={categoryId || 'none'} categories={orderedAll} />")
     expect(categoriesView).not.toContain('/admin/collections/categories/create')
     expect(productsView).toContain('<ProductCreateDialog categories={eligibleCategoryResult.docs} />')
     expect(productsView).not.toContain('/admin/collections/products/create')

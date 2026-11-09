@@ -3,15 +3,16 @@ import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
 
 import { measureServerOperation } from '../../../../../server/performance'
-import { buildNavigationV2 } from '../../../../../server/storefront-v2/catalog'
+import { buildCatalogCategoriesV2, buildNavigationV2 } from '../../../../../server/storefront-v2/catalog'
 import { deterministicRevision, publicError, publicJSON } from '../../../../../server/storefront-v2/http'
+import { STOREFRONT_CACHE_TAGS } from '../../../../../server/storefront-v2/invalidation'
 
 export const dynamic = 'force-dynamic'
 
 const loadBootstrap = unstable_cache(
   async () => {
     const payload = await getPayload({ config })
-    const [home, siteSettings, navigation] = await Promise.all([
+    const [home, siteSettings, navigation, catalogCategories] = await Promise.all([
       payload.findGlobal({
         slug: 'home',
         depth: 2,
@@ -25,6 +26,7 @@ const loadBootstrap = unstable_cache(
         overrideAccess: true,
       }),
       buildNavigationV2(payload),
+      buildCatalogCategoriesV2(payload),
     ])
 
     const revision = deterministicRevision({
@@ -34,6 +36,7 @@ const loadBootstrap = unstable_cache(
           ? siteSettings.updatedAt
           : null,
       navigationRevision: navigation.body.revision,
+      catalogCategories,
     })
 
     const timestamps = [
@@ -54,15 +57,16 @@ const loadBootstrap = unstable_cache(
         home,
         siteSettings,
         navigation: navigation.body,
+        catalogCategories,
         revision,
       },
       lastModified: timestamps[0]?.toISOString() || null,
     }
   },
-  ['storefront-bootstrap-v3'],
+  ['storefront-bootstrap-v4'],
   {
     revalidate: 300,
-    tags: ['storefront-bootstrap'],
+    tags: [STOREFRONT_CACHE_TAGS.bootstrap],
   },
 )
 
@@ -85,8 +89,9 @@ export async function GET(request: Request) {
     return publicJSON(request, result.body, {
       revision: result.body.revision,
       lastModified: result.lastModified,
-      maxAge: 300,
-      staleWhileRevalidate: 3600,
+      maxAge: 60,
+      staleWhileRevalidate: 300,
+      cacheTags: [STOREFRONT_CACHE_TAGS.bootstrap],
     })
   } catch (error) {
     console.error({

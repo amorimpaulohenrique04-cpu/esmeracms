@@ -20,7 +20,7 @@ export function CategoryCreateDialog({ categories }: { categories: CategoryParen
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
-  const [draft, setDraft] = useState({ title: '', parent: '', status: 'active' })
+  const [draft, setDraft] = useState({ title: '', parent: '', showInMenu: true })
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -37,7 +37,7 @@ export function CategoryCreateDialog({ categories }: { categories: CategoryParen
           data: {
             title: draft.title,
             parent: draft.parent || null,
-            status: draft.status,
+            menu: { showInMenu: draft.showInMenu },
           },
         }),
       })
@@ -56,7 +56,7 @@ export function CategoryCreateDialog({ categories }: { categories: CategoryParen
     trigger="Nova categoria"
     triggerClassName="esmera-button--primary"
     title="Nova categoria"
-    description="Crie a estrutura mínima e complete descrição, mídia, SEO e sinônimos no detalhe."
+    description="Dê um nome. A descrição, a imagem e os produtos vêm na próxima tela."
   >
     <form className="esmera-category-dialog-form" onSubmit={submit}>
       <Field label="Nome">
@@ -68,12 +68,9 @@ export function CategoryCreateDialog({ categories }: { categories: CategoryParen
           {categories.map((category) => <option key={String(category.id)} value={String(category.id)}>{category.title || category.slug || category.id}</option>)}
         </select>
       </Field>
-      <Field label="Status">
-        <select className="esmera-input" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })}>
-          <option value="active">Ativa</option>
-          <option value="archive">Arquivada</option>
-        </select>
-      </Field>
+      <label className="esmera-category-checkbox">
+        <input type="checkbox" checked={draft.showInMenu} onChange={(event) => setDraft({ ...draft, showInMenu: event.target.checked })} /> Exibir no menu
+      </label>
       {feedback ? <InlineFeedback tone="danger">{feedback}</InlineFeedback> : null}
       <div className="esmera-category-dialog-actions">
         <Button type="submit" tone="primary" disabled={busy}>{busy ? 'Criando…' : 'Criar categoria'}</Button>

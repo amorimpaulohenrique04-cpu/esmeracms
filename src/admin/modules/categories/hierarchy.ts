@@ -114,6 +114,37 @@ export function orderCategoriesHierarchically<T extends HierarchyNode>(categorie
   return ordered
 }
 
+/** Categorias do mesmo nível que `id`, na ordem recebida (ela inclusa). */
+export function siblingsOf<T extends HierarchyNode>(ordered: T[], id: string | number): T[] {
+  const present = new Set(ordered.map((node) => String(node.id)))
+  const levelOf = (node: T) => {
+    const parentId = relationId(node.parent)
+    return parentId !== null && present.has(String(parentId)) ? String(parentId) : null
+  }
+  const target = ordered.find((node) => String(node.id) === String(id))
+  if (!target) return []
+  const level = levelOf(target)
+  return ordered.filter((node) => levelOf(node) === level)
+}
+
+/**
+ * Move a categoria para `targetIndex` entre as irmãs e devolve a pré-ordem
+ * completa: as filhas acompanham a mãe. `null` quando não há o que mover.
+ */
+export function moveWithinSiblings<T extends HierarchyNode>(ordered: T[], id: string | number, targetIndex: number): T[] | null {
+  const siblings = siblingsOf(ordered, id)
+  const from = siblings.findIndex((node) => String(node.id) === String(id))
+  if (from < 0 || from === targetIndex || targetIndex < 0 || targetIndex >= siblings.length) return null
+
+  const moved = [...siblings]
+  const [node] = moved.splice(from, 1)
+  moved.splice(targetIndex, 0, node)
+
+  const siblingIds = new Set(siblings.map((item) => String(item.id)))
+  let cursor = 0
+  return orderCategoriesHierarchically(ordered.map((item) => siblingIds.has(String(item.id)) ? moved[cursor++] : item))
+}
+
 /**
  * Conjunto de ids das categorias que têm ao menos um filho **presente no
  * conjunto informado** — usado só para diferenciação tipográfica pai/folha na

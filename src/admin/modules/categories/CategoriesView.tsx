@@ -23,18 +23,20 @@ import {
   indexCategoriesById,
   orderCategoriesHierarchically,
 } from './hierarchy'
+import { relationId } from './types'
 import {
+  matchesCategoryView,
   type CategoryDetail,
   type CategoryListItem,
   type CategoryMedia,
   type CategoryParent,
-  type CategoryTab,
+  type CategoryView,
   type CategoryWorkspaceFilters,
 } from './types'
 import './categories.scss'
 import './category-create-dialog.scss'
 
-const categoryTabs: CategoryTab[] = ['general', 'media', 'products']
+const categoryViews: CategoryView[] = ['all', 'published', 'draft', 'hidden']
 
 function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -45,9 +47,11 @@ async function paramsOf(props: AdminViewServerProps) {
 }
 
 function filtersFrom(params: Record<string, string | string[] | undefined>): CategoryWorkspaceFilters {
+  const view = first(params.view) as CategoryView | undefined
   return {
     q: (first(params.q) || '').trim().slice(0, 100),
     status: first(params.status) === 'archive' ? 'archive' : 'active',
+    view: view && categoryViews.includes(view) ? view : 'all',
   }
 }
 
@@ -88,14 +92,12 @@ export async function CategoriesView(props: AdminViewServerProps) {
   const params = await paramsOf(props)
   const filters = filtersFrom(params)
   const categoryId = first(params.category)
-  const requestedTab = first(params.tab) as CategoryTab | undefined
-  const tab = requestedTab && categoryTabs.includes(requestedTab) ? requestedTab : 'general'
   const req = props.initPageResult.req
 
   try {
-    const [visibleResult, allResult] = await Promise.all([
+    const [visibleResult, allResult, publishedResult] = await Promise.all([
       findDocs<Omit<CategoryListItem, 'productCount' | 'depth'>>(req, 'categories', {
-        sort: 'order',
+        sort: ['order', 'title', 'id'],
         limit: 500,
         depth: 1,
         draft: true,
@@ -111,37 +113,54 @@ export async function CategoriesView(props: AdminViewServerProps) {
           parent: true,
           image: true,
           searchTerms: true,
+          menu: true,
           _status: true,
           updatedAt: true,
         },
       }),
       findDocs<CategoryParent & { searchTerms?: Array<{ term?: string | null }> | null }>(req, 'categories', {
-        sort: 'order',
+        sort: ['order', 'title', 'id'],
         limit: 500,
         depth: 0,
         draft: true,
-        select: { id: true, title: true, slug: true, status: true, order: true, parent: true, searchTerms: true },
+        select: { id: true, title: true, slug: true, status: true, order: true, parent: true, searchTerms: true, menu: true, _status: true },
+      }),
+      // O site lê a versão publicada; `draft: true` mostraria só a mais recente.
+      findDocs<{ id: string | number }>(req, 'categories', {
+        limit: 500,
+        depth: 0,
+        draft: false,
+        where: { _status: { equals: 'published' } } as Where,
+        select: { id: true },
       }),
     ])
 
-    const hierarchyMap = indexCategoriesById(allResult.docs)
+    const publishedIds = new Set(publishedResult.docs.map((category) => String(category.id)))
+    const allCategories = allResult.docs.map((category) => ({ ...category, published: publishedIds.has(String(category.id)) }))
+
+    const hierarchyMap = indexCategoriesById(allCategories)
     // Pré-ordem sobre TODA a taxonomia (fonte única de sequência). A lista
     // visível e o `allOrderIds` do reorder derivam desta mesma sequência para
     // que a relação de posição entre item visível e conjunto completo continue
     // consistente — condição de correção do `mergedFullOrder` no cliente.
-    const orderedAll = orderCategoriesHierarchically(allResult.docs)
+    const orderedAll = orderCategoriesHierarchically(allCategories)
     const positionInFull = new Map(orderedAll.map((category, index) => [String(category.id), index]))
-    const allOrderIds = orderedAll.map((category) => category.id)
 
     const counts = await Promise.all(visibleResult.docs.map((category) => countDocs(req, 'products', { categories: { contains: category.id } } as Where)))
     const visibleParentIds = collectParentIds(visibleResult.docs)
     const categories: CategoryListItem[] = visibleResult.docs
-      .map((category, index) => ({
-        ...category,
-        productCount: counts[index],
-        depth: getCategoryDepth(category as CategoryParent, hierarchyMap),
-        hasChildren: visibleParentIds.has(String(category.id)),
-      }))
+      .map((category, index) => {
+        const parentId = relationId(category.parent)
+        return {
+          ...category,
+          published: publishedIds.has(String(category.id)),
+          parentTitle: parentId === null ? null : hierarchyMap.get(String(parentId))?.title ?? null,
+          productCount: counts[index],
+          depth: getCategoryDepth(category as CategoryParent, hierarchyMap),
+          hasChildren: visibleParentIds.has(String(category.id)),
+        }
+      })
+      .filter((category) => matchesCategoryView(category, filters.view))
       .sort((left, right) => (positionInFull.get(String(left.id)) ?? 0) - (positionInFull.get(String(right.id)) ?? 0))
 
     let detail: CategoryDetail | null = null
@@ -162,7 +181,8 @@ export async function CategoriesView(props: AdminViewServerProps) {
       media = mediaResult.docs
       relatedTotal = productsCount
       detail.productCount = relatedTotal
-      detail.depth = getCategoryDepth(detail, hierarchyMap)
+      detail.published = publishedIds.has(String(detail.id))
+      detail.depth = getCategoryDepth<CategoryParent>(detail, hierarchyMap)
     }
 
     const termSuggestions = allResult.docs
@@ -172,28 +192,27 @@ export async function CategoriesView(props: AdminViewServerProps) {
       .filter((term, index, terms) => terms.findIndex((candidate) => candidate.toLocaleLowerCase('pt-BR') === term.toLocaleLowerCase('pt-BR')) === index)
       .sort((left, right) => left.localeCompare(right, 'pt-BR'))
 
-    const relatedSection = categoryId && tab === 'products' ? (
-      <Suspense key={`${categoryId}-${tab}`} fallback={<LoadingState compact label="Carregando produtos relacionados…" />}>
+    const relatedSection = categoryId ? (
+      <Suspense key={categoryId} fallback={<LoadingState compact label="Carregando produtos relacionados…" />}>
         <CategoryRelatedProductsPanel req={req} categoryId={categoryId} />
       </Suspense>
-    ) : <LoadingState compact label="Carregando produtos relacionados…" />
+    ) : null
 
     return (
       <ViewFrame props={props}>
         <PageHeader
           eyebrow="Catálogo"
           title="Categorias"
-          subtitle="Taxonomia operacional em master-detail. Relações com produtos são derivadas; ordem e hierarquia permanecem governadas pelo Payload."
-          actions={<CategoryCreateDialog categories={allResult.docs} />}
+          subtitle="Organize as categorias do site, o menu e os produtos de cada uma."
+          actions={<CategoryCreateDialog key={categoryId || 'none'} categories={orderedAll} />}
         />
         <div className={`esmera-categories-workspace${detail ? ' has-detail' : ''}`}>
-          <CategoriesMasterList categories={categories} allOrderIds={allOrderIds} filters={filters} selectedId={categoryId} />
+          <CategoriesMasterList categories={categories} hierarchy={orderedAll} filters={filters} selectedId={categoryId} />
           {detail ? (
             <CategoryDetailView
               category={detail}
-              tab={tab}
               filters={filters}
-              categories={allResult.docs}
+              categories={allCategories}
               media={media}
               termSuggestions={termSuggestions}
               relatedSection={relatedSection}
@@ -203,7 +222,7 @@ export async function CategoriesView(props: AdminViewServerProps) {
             <section className="esmera-category-detail esmera-category-detail--empty">
               <span className="esmera-eyebrow">Detalhe</span>
               <h2>Selecione uma categoria</h2>
-              <p>Abra uma linha para editar taxonomia, SEO, mídia e conferir os produtos relacionados sem sair do workspace.</p>
+              <p>Escolha uma categoria na lista para editar o nome, o menu e os produtos.</p>
             </section>
           )}
         </div>

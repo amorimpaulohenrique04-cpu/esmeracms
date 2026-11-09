@@ -250,6 +250,7 @@ export function ActionBar({
   onUnpublish,
   secondary,
   publishLabel = 'Publicar',
+  savedLabel = 'Rascunho sincronizado',
 }: {
   dirty?: boolean
   saving?: boolean
@@ -260,11 +261,12 @@ export function ActionBar({
   onUnpublish?: () => void
   secondary?: React.ReactNode
   publishLabel?: string
+  savedLabel?: string
 }) {
   return (
     <div className="esmera-action-bar" role="region" aria-label="Ações do documento">
       <div className="esmera-action-bar__state" aria-live="polite">
-        {saving ? 'Salvando…' : dirty ? 'Alterações não salvas' : 'Rascunho sincronizado'}
+        {saving ? 'Salvando…' : dirty ? 'Alterações não salvas' : savedLabel}
       </div>
       <div className="esmera-action-bar__actions">
         {secondary}

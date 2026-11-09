@@ -97,7 +97,6 @@ function renderEditor(relatedSection?: React.ReactNode) {
     categories: [],
     media: [],
     termSuggestions: [],
-    filters: { q: '', status: 'active' },
     initialRevision: 'rev-3',
     initialUpdatedAt: '2026-02-01T09:00:00.000Z',
     relatedSection: relatedSection ?? React.createElement('p', null, '4 produtos relacionados'),
@@ -110,10 +109,6 @@ function actionBar() {
 
 function summary() {
   return document.querySelector('.esmera-error-summary')
-}
-
-function tabNav() {
-  return screen.getByRole('navigation', { name: 'Seções de Edição da categoria' })
 }
 
 beforeEach(() => {
@@ -139,19 +134,81 @@ describe('CategoryDetailEditor — FormSystem', () => {
     expect(screen.getByRole('heading', { name: 'Edição da categoria' })).toBeTruthy()
   })
 
-  it('mantém exatamente as três abas', () => {
+  it('mostra só o essencial no fluxo principal', () => {
     renderEditor()
-    // As abas viraram links reais (href para /admin/categories?...&tab=...) em
-    // vez de botões client-only, para deep-link e navegação de verdade.
-    expect(within(tabNav()).getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Geral', 'Mídia & SEO', 'Produtos relacionados',
-    ])
+    expect(screen.queryByRole('navigation', { name: 'Seções de Edição da categoria' })).toBeNull()
+    for (const label of ['Nome', 'Categoria principal', 'Descrição', 'Imagem', 'Exibir no menu']) {
+      expect(screen.getByLabelText(new RegExp(label))).toBeTruthy()
+    }
+    expect(screen.getByText('4 produtos relacionados')).toBeTruthy()
+    for (const label of ['Endereço (slug)', 'Tipo do nó', 'Eixo taxonômico', 'Modo de listagem', 'Título SEO']) {
+      expect(screen.queryByLabelText(label)).toBeNull()
+    }
+  })
+
+  it('mantém os ajustes especializados na área avançada', () => {
+    renderEditor()
+    const details = screen.getByText('Configurações avançadas').closest('details') as HTMLDetailsElement
+    details.open = true
+    fireEvent(details, new Event('toggle'))
+    for (const label of ['Endereço (slug)', 'Tipo do nó', 'Eixo taxonômico', 'Modo de listagem', 'Título SEO']) {
+      expect(screen.getByLabelText(label)).toBeTruthy()
+    }
+  })
+
+  it('mostra a categoria publicada e permite publicar uma alteração direto', async () => {
+    render(React.createElement(CategoryDetailEditor, {
+      category: { ...category, _status: 'published', published: true, menu: { showInMenu: true } },
+      categories: [],
+      media: [],
+      termSuggestions: [],
+      initialRevision: 'rev-3',
+      initialUpdatedAt: '2026-02-01T09:00:00.000Z',
+    }))
+    expect(screen.getByText('Publicado no site')).toBeTruthy()
+    const bar = actionBar()
+    const publish = within(bar).getByRole('button', { name: 'Salvar e publicar' })
+    expect(publish.hasAttribute('disabled')).toBe(true)
+    expect(within(bar).getByRole('button', { name: 'Despublicar' })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Nome'), { target: { value: 'Anéis autorais' } })
+    expect(publish.hasAttribute('disabled')).toBe(false)
+  })
+
+  it('avisa quando a categoria está oculta do menu e quando a principal não está no site', () => {
+    const parent = { id: 9, title: 'Coleções', published: false, menu: { showInMenu: true } }
+    render(React.createElement(CategoryDetailEditor, {
+      category: { ...category, parent: 9, menu: { showInMenu: true } },
+      categories: [parent, { id: 3, title: 'Anéis', parent: 9 }],
+      media: [],
+      termSuggestions: [],
+    }))
+    expect(screen.getByText(/“Coleções” está em rascunho/)).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Exibir no menu'))
+    expect(screen.getByText(/Só não aparece no menu/)).toBeTruthy()
+    expect(screen.getByText('Oculto do menu')).toBeTruthy()
+  })
+
+  it('muda a posição usando a reordenação completa', async () => {
+    const siblings = [
+      { id: 3, title: 'Anéis', order: 100 },
+      { id: 4, title: 'Brincos', order: 200 },
+    ]
+    render(React.createElement(CategoryDetailEditor, {
+      category,
+      categories: siblings,
+      media: [],
+      termSuggestions: [],
+    }))
+    fireEvent.change(screen.getByLabelText('Ordem de exibição'), { target: { value: '1' } })
+    await waitFor(() => expect(bodies).toHaveLength(1))
+    expect(bodies[0]).toMatchObject({ action: 'reorder', orderedIds: [4, 3] })
   })
 
   it('a ActionBar reflete o dirty state real', () => {
     renderEditor()
     const bar = actionBar()
-    expect(within(bar).getByText('Rascunho sincronizado')).toBeTruthy()
+    expect(within(bar).getByText('Rascunho salvo')).toBeTruthy()
     expect(within(bar).getByRole('button', { name: 'Salvar rascunho' }).hasAttribute('disabled')).toBe(true)
 
     fireEvent.change(screen.getByLabelText('Nome'), { target: { value: 'Anéis autorais' } })
@@ -301,32 +358,29 @@ describe('CategoryDetailEditor — FormSystem', () => {
   it('produtos relacionados permanecem derivados e fora da mutation', async () => {
     const { rerender } = renderEditor()
 
-    fireEvent.click(within(tabNav()).getByRole('link', { name: 'Produtos relacionados' }))
     expect(screen.getByText('4 produtos relacionados')).toBeTruthy()
     // A consulta derivada não marca o formulário como sujo.
-    expect(within(actionBar()).getByText('Rascunho sincronizado')).toBeTruthy()
+    expect(within(actionBar()).getByText('Rascunho salvo')).toBeTruthy()
 
     rerender(React.createElement(CategoryDetailEditor, {
       category,
       categories: [],
       media: [],
       termSuggestions: [],
-      filters: { q: '', status: 'active' },
       initialRevision: 'rev-3',
       initialUpdatedAt: '2026-02-01T09:00:00.000Z',
       relatedSection: React.createElement('p', null, '5 produtos relacionados'),
     }))
     expect(screen.getByText('5 produtos relacionados')).toBeTruthy()
-    expect(within(actionBar()).getByText('Rascunho sincronizado')).toBeTruthy()
+    expect(within(actionBar()).getByText('Rascunho salvo')).toBeTruthy()
 
-    fireEvent.click(within(tabNav()).getByRole('link', { name: 'Geral' }))
     fireEvent.change(screen.getByLabelText('Nome'), { target: { value: 'Anéis autorais' } })
     fireEvent.click(within(actionBar()).getByRole('button', { name: 'Salvar rascunho' }))
     await waitFor(() => expect(bodies).toHaveLength(1))
 
     expect(Object.keys(bodies[0].data ?? {}).sort()).toEqual([
       'collectionPage', 'description', 'externalURL', 'hubPath', 'image', 'listingMode', 'listingRules',
-      'menu', 'nodeType', 'order', 'parent', 'searchTerms', 'seo', 'slug', 'status', 'taxonomyAxis', 'title',
+      'menu', 'nodeType', 'parent', 'searchTerms', 'seo', 'slug', 'status', 'taxonomyAxis', 'title',
     ])
     expect(bodies[0].data).not.toHaveProperty('products')
     expect(bodies[0].data).not.toHaveProperty('productCount')

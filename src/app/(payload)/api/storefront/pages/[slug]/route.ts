@@ -10,6 +10,7 @@ import {
   StorefrontNotFoundError,
 } from '../../../../../../server/storefront-v2/catalog'
 import { publicError, publicJSON } from '../../../../../../server/storefront-v2/http'
+import { STOREFRONT_CACHE_TAGS } from '../../../../../../server/storefront-v2/invalidation'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,7 @@ export async function GET(request: Request, context: RouteContext) {
       lastModified: result.lastModified,
       maxAge: 300,
       staleWhileRevalidate: 900,
+      cacheTags: [STOREFRONT_CACHE_TAGS.pages],
     })
   } catch (error) {
     payload.logger.error({

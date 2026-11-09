@@ -10,6 +10,7 @@ import {
 import { productCode } from '../businessRules/products/code'
 import { seoField, slugify } from '../fields/common'
 import { publicationMetadataFields } from '../server/publication/publicationMetadataFields'
+import { invalidateStorefrontAfterChange, invalidateStorefrontAfterDelete } from '../server/storefront-v2/invalidation'
 
 type GalleryItem = {
   alt?: string | null
@@ -82,6 +83,8 @@ export const Products: CollectionConfig = {
     maxPerDoc: 50,
   },
   hooks: {
+    afterChange: [invalidateStorefrontAfterChange('product')],
+    afterDelete: [invalidateStorefrontAfterDelete('product')],
     beforeValidate: [
       async ({ data, originalDoc, req }) => {
         if (!data) return data

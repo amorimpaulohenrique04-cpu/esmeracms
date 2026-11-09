@@ -24,6 +24,7 @@ export async function stampPublishedDocumentMetadata(input: {
   id: string | number
   user: PayloadRequest['user']
   document?: unknown
+  context?: Record<string, unknown>
 }): Promise<unknown> {
   let published = record(input.document)
   if (!published) {
@@ -73,7 +74,7 @@ export async function stampPublishedDocumentMetadata(input: {
     depth: 2,
     overrideAccess: true,
     user: input.user,
-    context: { skipPublicRevisionStamp: true },
+    context: { ...input.context, skipPublicRevisionStamp: true },
   })
 }
 

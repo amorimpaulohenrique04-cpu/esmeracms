@@ -440,6 +440,28 @@ function channelURL(item: UnknownRecord) {
   return null
 }
 
+export type CatalogCategoryV2 = {
+  id: string
+  title: string
+  slug: string
+  parentId: string | null
+  order: number
+}
+
+/** Categorias disponíveis para filtrar o catálogo, independentemente do menu. */
+export async function buildCatalogCategoriesV2(payload: Payload): Promise<CatalogCategoryV2[]> {
+  const categories = await loadPublicCategories(payload, 0)
+  return categories
+    .filter((category) => (text(category.nodeType) || 'collection') === 'collection' && text(category.slug))
+    .map((category) => ({
+      id: String(category.id),
+      title: text(category.title),
+      slug: text(category.slug),
+      parentId: relationKey(category.parent),
+      order: categoryOrder(category),
+    }))
+}
+
 export async function buildNavigationV2(payload: Payload): Promise<BuiltResponse<StorefrontNavigationV2>> {
   const [categories, navigation, siteSettings] = await Promise.all([
     loadPublicCategories(payload, 1),

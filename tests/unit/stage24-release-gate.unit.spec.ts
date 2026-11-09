@@ -29,11 +29,12 @@ describe('Etapa 24 — release gate de Categorias e Pós-venda', () => {
     expect(view).not.toContain('categories.release.scss')
     expect(view).toContain('esmera-categories-workspace')
     expect(master).toContain('DragDropProvider')
-    expect(master).toContain('Mover ${title} para posição')
+    expect(master).toContain('Subir ${title}')
+    expect(master).toContain('Descer ${title}')
     expect(master).not.toContain('categoryStatusLabels')
-    expect(master).toContain('<span>Categoria</span><span>Produtos</span><span>Posição</span>')
+    expect(master).toContain('<span>Categoria</span><span>Produtos</span><span>Ordem</span>')
     expect(styles).toContain('grid-template-columns: 30px minmax(0, 1fr) 64px 72px')
-    expect(styles).toContain('.esmera-category-position .esmera-input')
+    expect(styles).toContain('.esmera-category-step__button')
   })
 
   it('mantém o Pós-venda orientado por Tasks e com inspector contido', async () => {

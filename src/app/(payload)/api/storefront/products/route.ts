@@ -12,6 +12,7 @@ import {
   StorefrontNotFoundError,
 } from '../../../../../server/storefront-v2/catalog'
 import { publicError, publicJSON } from '../../../../../server/storefront-v2/http'
+import { STOREFRONT_CACHE_TAGS } from '../../../../../server/storefront-v2/invalidation'
 import {
   readCanonicalMaterialFilters,
   withCanonicalMaterialFilters,
@@ -30,7 +31,7 @@ const loadProducts = unstable_cache(
   ['storefront-products-v2-original-fallback-v4'],
   {
     revalidate: 45,
-    tags: ['storefront-products'],
+    tags: [STOREFRONT_CACHE_TAGS.products],
   },
 )
 
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
       lastModified: result.lastModified,
       maxAge: 45,
       staleWhileRevalidate: 180,
+      cacheTags: [STOREFRONT_CACHE_TAGS.products],
     })
   } catch (error) {
     console.error({

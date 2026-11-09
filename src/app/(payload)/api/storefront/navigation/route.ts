@@ -6,6 +6,7 @@ import { measureServerOperation } from '../../../../../server/performance'
 import { StorefrontContractV2Error } from '../../../../../server/storefront-v2/contracts'
 import { buildNavigationV2, StorefrontConfigurationError } from '../../../../../server/storefront-v2/catalog'
 import { publicError, publicJSON } from '../../../../../server/storefront-v2/http'
+import { STOREFRONT_CACHE_TAGS } from '../../../../../server/storefront-v2/invalidation'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ const loadNavigation = unstable_cache(
   ['storefront-navigation-v2'],
   {
     revalidate: 300,
-    tags: ['storefront-navigation'],
+    tags: [STOREFRONT_CACHE_TAGS.navigation],
   },
 )
 
@@ -31,8 +32,9 @@ export async function GET(request: Request) {
     return publicJSON(request, result.body, {
       revision: result.body.revision,
       lastModified: result.lastModified,
-      maxAge: 300,
-      staleWhileRevalidate: 900,
+      maxAge: 60,
+      staleWhileRevalidate: 300,
+      cacheTags: [STOREFRONT_CACHE_TAGS.navigation],
     })
   } catch (error) {
     console.error({

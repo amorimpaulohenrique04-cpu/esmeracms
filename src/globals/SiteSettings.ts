@@ -1,6 +1,7 @@
 import type { GlobalConfig } from 'payload'
 
 import { canManageSite, publishedGlobalOrAuthenticated, siteEditors } from '../access/roles'
+import { invalidateStorefrontAfterGlobalChange } from '../server/storefront-v2/invalidation'
 
 export const SiteSettings: GlobalConfig = {
   slug: 'site-settings',
@@ -8,6 +9,7 @@ export const SiteSettings: GlobalConfig = {
   admin: { group: 'Site', hidden: ({ user }) => !canManageSite(user) },
   access: { read: publishedGlobalOrAuthenticated, update: siteEditors, readVersions: siteEditors },
   versions: { drafts: true, max: 30 },
+  hooks: { afterChange: [invalidateStorefrontAfterGlobalChange('site-settings')] },
   fields: [
     { name: 'siteName', type: 'text', label: 'Nome do site', defaultValue: 'Esméra' },
     { name: 'defaultSeoTitle', type: 'text', label: 'Título SEO padrão', maxLength: 60 },

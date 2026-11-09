@@ -874,6 +874,16 @@ export interface Sale {
     snapshotSlug: string;
     snapshotSku?: string | null;
     snapshotSelection?: string | null;
+    /**
+     * Snapshot da personalização escolhida pelo cliente no storefront. Mantém frase, acabamento e tamanho vinculados à venda.
+     */
+    personalization?: {
+      kind?: 'frame_text' | null;
+      frameSize?: ('10x10' | '15x15' | '20x20') | null;
+      finish?: ('silver' | 'gold') | null;
+      textMode?: ('preset' | 'custom') | null;
+      text?: string | null;
+    };
     priceMode: 'fixed' | 'inquiry';
     /**
      * Automático para preço fixo. Em itens sob consulta, informe apenas após o valor ser negociado.
@@ -2015,6 +2025,15 @@ export interface SalesSelect<T extends boolean = true> {
         snapshotSlug?: T;
         snapshotSku?: T;
         snapshotSelection?: T;
+        personalization?:
+          | T
+          | {
+              kind?: T;
+              frameSize?: T;
+              finish?: T;
+              textMode?: T;
+              text?: T;
+            };
         priceMode?: T;
         unitPriceCents?: T;
         quantity?: T;
