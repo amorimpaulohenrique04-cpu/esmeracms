@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import config from '@payload-config'
 import { createHash, randomUUID } from 'node:crypto'
 import { getPayload, type Payload } from 'payload'
