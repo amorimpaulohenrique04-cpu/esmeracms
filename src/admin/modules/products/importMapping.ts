@@ -6,7 +6,7 @@ import {
   type ImportColumn,
 } from '../../../businessRules/products/importSchema'
 import { foldKey } from '../../../businessRules/products/importValidation'
-import { detectDelimiter, parseTabularText, type Delimiter } from '../../../server/domain/products/csv'
+import { detectDelimiter, parseDelimited, type Delimiter } from '../../../server/domain/products/csv'
 
 export type ImportHeaderInspection = {
   delimiter: Delimiter
@@ -38,6 +38,7 @@ function levenshtein(left: string, right: string) {
 }
 
 function fuzzyColumn(header: string, used: Set<ImportColumn>) {
+  if (header.length > 64) return null
   let best: ImportColumn | null = null
   let score = Number.POSITIVE_INFINITY
   for (const column of importColumns) {
@@ -53,13 +54,14 @@ function fuzzyColumn(header: string, used: Set<ImportColumn>) {
 
 export function inspectImportHeaders(text: string): ImportHeaderInspection {
   const delimiter = detectDelimiter(text)
-  const first = parseTabularText(text, delimiter)[0]
+  const first = parseDelimited(text, delimiter, 1)[0]
   if (!first) return { delimiter, headers: [], mapping: [], needsMapping: false, missingRequired: [] }
 
   const used = new Set<ImportColumn>()
   const mapping = first.cells.map((header) => {
     const exact = resolveHeaderColumn(header)
-    if (exact && !used.has(exact)) {
+    if (exact) {
+      if (used.has(exact)) return null
       used.add(exact)
       return exact
     }
@@ -69,19 +71,21 @@ export function inspectImportHeaders(text: string): ImportHeaderInspection {
   })
 
   const missingRequired = importColumns.filter((column) => importColumnRequired[column] && !mapping.includes(column))
-  const hasUnknown = first.cells.some((header, index) => header.trim() && mapping[index] === null)
+  const needsConfirmation = first.cells.some((header, index) => header.trim() &&
+    (!mapping[index] || resolveHeaderColumn(header) !== mapping[index]))
   return {
     delimiter,
     headers: first.cells,
     mapping,
     missingRequired,
-    needsMapping: hasUnknown || missingRequired.length > 0,
+    needsMapping: needsConfirmation || missingRequired.length > 0,
   }
 }
 
-function firstRowEnd(text: string) {
+function firstRowEnd(text: string, line: number) {
   let inQuotes = false
-  const start = text.charCodeAt(0) === 0xfeff ? 1 : 0
+  let start = text.charCodeAt(0) === 0xfeff ? 1 : 0
+  for (let current = 1; current < line; current += 1) start = text.indexOf('\n', start) + 1
   for (let index = start; index < text.length; index += 1) {
     const char = text[index]
     const next = text[index + 1]
@@ -110,9 +114,10 @@ export function applyImportMapping(
   }
 
   const header = mapping.map((column) => column ? importColumnLabels[column] : '').join(delimiter)
-  const boundary = firstRowEnd(text)
+  const boundary = firstRowEnd(text, parseDelimited(text, delimiter, 1)[0]?.sourceLine ?? 1)
   const bodyStart = boundary.end + boundary.newlineLength
   if (bodyStart >= text.length) return header
   const newline = boundary.newlineLength === 2 ? '\r\n' : '\n'
-  return `${header}${newline}${text.slice(bodyStart)}`
+  const oldHeaderLines = text.slice(boundary.start, boundary.end).split('\n').length
+  return `${text.slice(0, boundary.start)}${header}${newline.repeat(oldHeaderLines)}${text.slice(bodyStart)}`
 }

@@ -4,6 +4,7 @@ const ZIP_LOCAL_SIGNATURE = 0x04034b50
 const MAX_ENTRY_BYTES = 16 * 1024 * 1024
 const MAX_WORKBOOK_BYTES = 32 * 1024 * 1024
 const MAX_SHEET_ROWS = 2_100
+const MAX_SHEET_COLUMNS = 16_384
 
 type ZipEntry = {
   name: string
@@ -16,6 +17,7 @@ type ZipEntry = {
 export type ParsedXlsxSheet = {
   name: string
   text: string
+  sourceLines: number[]
 }
 
 export type ParsedXlsxWorkbook = {
@@ -85,7 +87,30 @@ async function inflateRaw(compressed: Uint8Array) {
   }
   const copy = compressed.slice().buffer as ArrayBuffer
   const stream = new Blob([copy]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
-  return new Uint8Array(await new Response(stream).arrayBuffer())
+  const reader = stream.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > MAX_ENTRY_BYTES) {
+        void reader.cancel().catch(() => undefined)
+        throw new Error('Arquivo .xlsx excede o limite de segurança por entrada.')
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  const output = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    output.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return output
 }
 
 async function readZipEntry(buffer: ArrayBuffer, entry: ZipEntry) {
@@ -206,18 +231,25 @@ function sheetAsText(xml: string, strings: string[]) {
     for (const cellMatch of rowBody.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const reference = attribute(cellMatch[1], 'r') || ''
       const index = columnIndex(reference)
+      if (index >= MAX_SHEET_COLUMNS) throw new Error('Coluna fora dos limites do Excel.')
       cells[index] = cellValue(cellMatch[1], cellMatch[2] || '', strings)
     }
     rows.set(declaredRow, cells)
   }
 
   const lines: string[] = []
+  const sourceLines: number[] = []
+  let textLength = 0
   for (let row = 1; row <= highestRow; row += 1) {
     const cells = rows.get(row) || []
+    if (cells.some((value) => value?.trim())) sourceLines.push(row)
     const last = cells.reduce((max, value, index) => value !== undefined && value !== '' ? index : max, -1)
-    lines.push(last < 0 ? '' : cells.slice(0, last + 1).map((value) => quoteTsv(value || '')).join('\t'))
+    const line = last < 0 ? '' : cells.slice(0, last + 1).map((value) => quoteTsv(value || '')).join('\t')
+    textLength += line.length + 1
+    if (textLength > 4 * 1024 * 1024) throw new Error('A aba contém mais de 4 MB de dados. Divida a importação em lotes menores.')
+    lines.push(line)
   }
-  return lines.join('\n')
+  return { text: lines.join('\n'), sourceLines: sourceLines.slice(1) }
 }
 
 async function readXml(buffer: ArrayBuffer, entries: Map<string, ZipEntry>, path: string, required = true) {
@@ -229,19 +261,29 @@ async function readXml(buffer: ArrayBuffer, entries: Map<string, ZipEntry>, path
   return decodeUtf8(await readZipEntry(buffer, entry))
 }
 
-export async function parseXlsxWorkbook(buffer: ArrayBuffer): Promise<ParsedXlsxWorkbook> {
+export async function openXlsxWorkbook(buffer: ArrayBuffer) {
   const entries = readZipEntries(buffer)
   const workbookXml = await readXml(buffer, entries, 'xl/workbook.xml')
   const relsXml = await readXml(buffer, entries, 'xl/_rels/workbook.xml.rels')
-  const sharedXml = await readXml(buffer, entries, 'xl/sharedStrings.xml', false)
-  const strings = sharedStrings(sharedXml)
   const definitions = workbookSheets(workbookXml || '', relsXml || '')
   if (!definitions.length) throw new Error('Arquivo .xlsx sem abas de planilha legíveis.')
 
-  const sheets: ParsedXlsxSheet[] = []
-  for (const definition of definitions) {
-    const xml = await readXml(buffer, entries, definition.path)
-    sheets.push({ name: definition.name, text: sheetAsText(xml || '', strings) })
+  let strings: string[] | undefined
+  return {
+    sheetNames: definitions.map((sheet) => sheet.name),
+    async readSheet(index: number): Promise<ParsedXlsxSheet> {
+      const sheet = definitions[index]
+      if (!sheet) throw new Error('Aba do Excel não encontrada.')
+      strings ??= sharedStrings(await readXml(buffer, entries, 'xl/sharedStrings.xml', false))
+      const xml = await readXml(buffer, entries, sheet.path)
+      return { name: sheet.name, ...sheetAsText(xml || '', strings) }
+    },
   }
+}
+
+export async function parseXlsxWorkbook(buffer: ArrayBuffer): Promise<ParsedXlsxWorkbook> {
+  const workbook = await openXlsxWorkbook(buffer)
+  const sheets = []
+  for (const index of workbook.sheetNames.keys()) sheets.push(await workbook.readSheet(index))
   return { sheets }
 }

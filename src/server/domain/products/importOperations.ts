@@ -16,7 +16,7 @@ import {
   type ImportRowIssue,
   type ImportRowValues,
 } from '../../../businessRules/products/importValidation'
-import { detectDelimiter, parseTabularText } from './csv'
+import { detectDelimiter, parseDelimited } from './csv'
 import { fetchRemoteImage, type RemoteImage } from './mediaFetch'
 import { textToRichText } from './textToRichText'
 
@@ -49,6 +49,8 @@ type ExistingMedia = { id: string | number; sourceSha256?: string | null }
 
 export type { ImportRowIssue, ImportRowValues }
 
+export type ImportSourceRow = { rowIndex: number; sourceLine?: number; values: ImportRowValues }
+
 export type ImportRowPreview = {
   rowIndex: number
   sourceLine: number
@@ -66,13 +68,13 @@ export type ImportPreviewResult = {
   delimiter: ReturnType<typeof detectDelimiter>
 }
 
-export function parseImportSheet(rawText: string): {
+export function parseImportSheet(rawText: string, maxDataRows = Infinity): {
   rows: Array<{ values: ImportRowValues; sourceLine: number }>
   unknownHeaders: string[]
   delimiter: ReturnType<typeof detectDelimiter>
 } {
   const delimiter = detectDelimiter(rawText)
-  const table = parseTabularText(rawText, delimiter)
+  const table = parseDelimited(rawText, delimiter, maxDataRows + 1)
   if (!table.length) return { rows: [], unknownHeaders: [], delimiter }
 
   const [header, ...dataRows] = table
@@ -120,10 +122,11 @@ async function findImportProducts(
   codes: string[],
   slugs: string[],
   req?: PayloadRequest,
+  suggestSlugs = false,
 ) {
   const normalizedCodes = uniqueNonEmpty(codes.map(foldKey))
   const legacyCodes = codeVariants(codes)
-  const slugCandidates = slugLookupCandidates(slugs)
+  const slugCandidates = suggestSlugs ? slugLookupCandidates(slugs) : uniqueNonEmpty(slugs)
   const or: Array<Record<string, unknown>> = []
   if (normalizedCodes.length) or.push({ codeNormalized: { in: normalizedCodes } })
   if (legacyCodes.length) or.push({ code: { in: legacyCodes } })
@@ -144,16 +147,13 @@ async function findImportProducts(
       code: true,
       codeNormalized: true,
       slug: true,
-      title: true,
-      catalogStatus: true,
-      availability: true,
-      categories: true,
-      material: true,
-      description: true,
-      priceMode: true,
-      basePriceCents: true,
-      gallery: true,
-      deletedAt: true,
+      ...(!suggestSlugs ? {
+        title: true,
+        catalogStatus: true,
+        categories: true,
+        gallery: true,
+        deletedAt: true,
+      } : {}),
     },
   } as never)
   return result.docs as unknown as ExistingProduct[]
@@ -209,12 +209,21 @@ export async function previewImport(
   req?: PayloadRequest,
 ): Promise<ImportPreviewResult> {
   const { rows, unknownHeaders, delimiter } = parseImportSheet(rawText)
+  return { ...await previewImportRows(payload, user, rows.map((row, rowIndex) => ({ ...row, rowIndex })), req), unknownHeaders, delimiter }
+}
+
+export async function previewImportRows(
+  payload: Payload,
+  user: WorkflowUser,
+  rows: ImportSourceRow[],
+  req?: PayloadRequest,
+) {
   const codes = rows.map((row) => row.values.code)
   const slugs = rows.map((row) => proposedSlug(row.values)).filter(Boolean)
   const categoryNames = rows.flatMap((row) => isClearCell(row.values.categories) ? [] : splitMulti(row.values.categories))
 
   const [existing, categoryByTitle] = await Promise.all([
-    findImportProducts(payload, user, codes, slugs, req),
+    findImportProducts(payload, user, codes, slugs, req, true),
     loadCategoryMap(payload, user, categoryNames, req),
   ])
   const existingByCode = new Map(existing.filter((doc) => doc.code).map((doc) => [
@@ -226,7 +235,7 @@ export async function previewImport(
   const seenCodes = new Set<string>()
   const seenSlugs = new Set<string>()
 
-  const preview: ImportRowPreview[] = rows.map(({ values, sourceLine }, rowIndex) => {
+  const preview: ImportRowPreview[] = rows.map(({ values, sourceLine, rowIndex }) => {
     const code = foldKey(values.code)
     const existingDoc = code ? existingByCode.get(code) || null : null
     const existingId = existingDoc?.id ?? null
@@ -247,21 +256,22 @@ export async function previewImport(
       }
     }
 
-    const nextSlug = proposedSlug(values)
+    const nextSlug = existingDoc ? values.slug.trim() : proposedSlug(values)
     if (nextSlug) {
       const owner = existingBySlug.get(nextSlug)
       const clashesWithExisting = owner !== undefined && String(owner) !== String(existingId ?? '')
       const clashesInBatch = seenSlugs.has(nextSlug)
       if (clashesWithExisting || clashesInBatch) {
-        const suggestion = slugSuggestion(nextSlug, new Set([...occupiedSlugs, ...seenSlugs]))
+        const suggestion = slugSuggestion(nextSlug, occupiedSlugs)
         issues.push({ column: 'slug', code: 'slug_conflict', message: `Slug já existe. Sugestão: ${suggestion}.`, severity: 'error' })
       }
       seenSlugs.add(nextSlug)
+      occupiedSlugs.add(nextSlug)
     }
 
     return {
       rowIndex,
-      sourceLine,
+      sourceLine: sourceLine ?? rowIndex + 2,
       values,
       issues,
       isDuplicate: existingId !== null,
@@ -272,8 +282,6 @@ export async function previewImport(
 
   return {
     rows: preview,
-    unknownHeaders,
-    delimiter,
     blockingCount: preview.reduce((sum, row) => sum + blockingIssueCount(row.issues), 0),
   }
 }
@@ -319,7 +327,7 @@ function chunkRows<T>(rows: T[], size: number) {
 }
 
 async function prefetchChunkImages(rows: ImportCommitInput[], cache: MediaCache) {
-  const urls = [...new Set(rows.flatMap((row) => isClearCell(row.values.imageUrls) ? [] : splitMulti(row.values.imageUrls)).filter((url) => !cache.byURL.has(url)))]
+  const urls = [...new Set(rows.flatMap((row) => importImageUrls(row.values)).filter((url) => !cache.byURL.has(url)))]
   const result = new Map<string, PrefetchedImage>()
   const remaining = Math.max(0, 200 - cache.downloads)
   const allowed = urls.slice(0, remaining)
@@ -463,6 +471,35 @@ export type ImportCommitOptions = {
   chunkSize?: number
   onProgress?: (progress: ImportCommitProgress, report: ImportCommitReport) => void | Promise<void>
   shouldCancel?: () => boolean | Promise<boolean>
+  shouldYield?: () => boolean
+  imageCache?: Map<string, MediaDocument>
+  checkpoint?: {
+    save: (input: ImportCommitInput, write: (req: PayloadRequest) => Promise<ImportRowResult>, images: Map<string, MediaDocument>) => Promise<ImportRowResult | null>
+    error: (input: ImportCommitInput, result: ImportRowResult) => Promise<boolean>
+  }
+}
+
+export class ImportCheckpointError extends Error {}
+
+export function importImageUrls(values: ImportRowValues) {
+  return isClearCell(values.imageUrls) ? [] : splitMulti(values.imageUrls)
+}
+
+export async function withImportTransaction<T>(
+  payload: Payload,
+  req: PayloadRequest | undefined,
+  operation: (req: PayloadRequest) => Promise<T>,
+): Promise<T> {
+  const transactionID = await payload.db.beginTransaction()
+  if (transactionID === null) throw new Error('Não foi possível iniciar a transação da importação.')
+  try {
+    const result = await operation({ ...req, payload, transactionID } as PayloadRequest)
+    await payload.db.commitTransaction(transactionID)
+    return result
+  } catch (error) {
+    await payload.db.rollbackTransaction(transactionID)
+    throw error
+  }
 }
 
 function setCell(
@@ -521,7 +558,7 @@ export async function commitImport(
 ): Promise<ImportCommitReport> {
   const startedAt = Date.now()
   const report: ImportCommitReport = { created: 0, updated: 0, skipped: 0, errored: 0, rows: [] }
-  const cache: MediaCache = { byURL: new Map(), byHash: new Map(), downloads: 0 }
+  const cache: MediaCache = { byURL: options.imageCache ?? new Map(), byHash: new Map(), downloads: 0 }
   const codes = inputRows.map((row) => row.values.code)
   const slugs = inputRows.map((row) => proposedSlug(row.values)).filter(Boolean)
   const categoryNames = inputRows.flatMap((row) => isClearCell(row.values.categories) ? [] : splitMulti(row.values.categories))
@@ -543,10 +580,12 @@ export async function commitImport(
       break
     }
 
-    const prefetched = await prefetchChunkImages(chunk, cache)
+    const needsImages = chunk.filter((row) => row.onConflict === 'update' || !existingByCode.has(foldKey(row.values.code)))
+    const prefetched = await prefetchChunkImages(needsImages, cache)
     await seedExistingMedia(payload, user, prefetched, cache, options.req)
 
     for (const input of chunk) {
+      if (options.shouldYield?.()) return report
       const { values } = input
       const sourceLine = input.sourceLine ?? input.rowIndex + 2
       const createdThisRow: Array<string | number> = []
@@ -565,8 +604,13 @@ export async function commitImport(
         if (issues.length) throw new Error(issues.map((issue) => issue.message).join(' '))
 
         if (existingId !== null && input.onConflict === 'skip') {
+          const skipped: ImportRowResult = { rowIndex: input.rowIndex, sourceLine, status: 'skipped', productId: existingId }
+          if (options.checkpoint && !await options.checkpoint.save(input, async () => skipped, cache.byURL)) {
+            report.cancelled = true
+            break
+          }
           report.skipped += 1
-          report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'skipped', productId: existingId })
+          report.rows.push(skipped)
           continue
         }
 
@@ -594,8 +638,12 @@ export async function commitImport(
         }
 
         if (values.imageUrls.trim()) {
-          const imageUrls = isClearCell(values.imageUrls) ? [] : splitMulti(values.imageUrls)
+          const imageUrls = importImageUrls(values)
           const gallery: Array<{ image: string | number; mediaKey: string; role: string; alt: string }> = []
+          for (const url of imageUrls) {
+            const fetched = prefetched.get(url)
+            if (!cache.byURL.has(url) && fetched && !fetched.ok) throw new Error(fetched.error)
+          }
           for (const [index, url] of imageUrls.entries()) {
             const media = await imageAsMedia(
               payload,
@@ -657,10 +705,7 @@ export async function commitImport(
           throw new Error('Produto ativo precisa ter ao menos uma imagem no estado final.')
         }
 
-        const transactionID = await payload.db.beginTransaction()
-        if (transactionID === null) throw new Error('Não foi possível iniciar a transação desta linha.')
-        const rowReq = { ...(options.req || {}), payload, user: user as never, transactionID } as PayloadRequest
-        try {
+        const write = async (rowReq: PayloadRequest): Promise<ImportRowResult> => {
           if (existingId !== null) {
             const updateData = existing?.deletedAt ? { ...data, deletedAt: null } : data
             await payload.update({
@@ -672,51 +717,49 @@ export async function commitImport(
               req: rowReq,
               data: updateData as never,
             } as never)
-            await payload.db.commitTransaction(transactionID)
-            report.updated += 1
-            report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'updated', productId: existingId })
-            existingByCode.set(codeKey, {
-              ...existing,
-              ...data,
-              id: existingId,
-              codeNormalized: codeKey,
-              deletedAt: null,
-            } as ExistingProduct)
-          } else {
-            const created = await payload.create({
-              collection: 'products',
-              overrideAccess: false,
-              user: user as never,
-              req: rowReq,
-              data: data as never,
-            } as never)
-            await payload.db.commitTransaction(transactionID)
-            report.created += 1
-            report.rows.push({ rowIndex: input.rowIndex, sourceLine, status: 'created', productId: created.id })
-            existingByCode.set(codeKey, {
-              ...(data as ExistingProduct),
-              id: created.id,
-              codeNormalized: codeKey,
-            })
+            return { rowIndex: input.rowIndex, sourceLine, status: 'updated', productId: existingId }
           }
-          if (nextSlug) existingBySlug.set(nextSlug, existingId ?? report.rows.at(-1)?.productId ?? '')
-        } catch (error) {
-          await payload.db.rollbackTransaction(transactionID)
-          throw error
+          const created = await payload.create({
+            collection: 'products',
+            overrideAccess: false,
+            user: user as never,
+            req: rowReq,
+            data: data as never,
+          } as never)
+          return { rowIndex: input.rowIndex, sourceLine, status: 'created', productId: created.id }
         }
+        const saved = options.checkpoint
+          ? await options.checkpoint.save(input, write, cache.byURL)
+          : await withImportTransaction(payload, { ...options.req, user } as PayloadRequest, write)
+        if (!saved) {
+          await compensateMedia(payload, user, createdThisRow, cache, options.req)
+          report.cancelled = true
+          break
+        }
+        report[saved.status === 'updated' ? 'updated' : 'created'] += 1
+        report.rows.push(saved)
+        existingByCode.set(codeKey, { ...existing, ...data, id: saved.productId, codeNormalized: codeKey, deletedAt: null } as ExistingProduct)
+        if (nextSlug && saved.productId !== undefined) existingBySlug.set(nextSlug, saved.productId)
       } catch (error) {
+        if (error instanceof ImportCheckpointError) throw error
         await compensateMedia(payload, user, createdThisRow, cache, options.req)
-        report.errored += 1
-        report.rows.push({
+        const failed: ImportRowResult = {
           rowIndex: input.rowIndex,
           sourceLine,
           status: 'error',
-          error: importErrorMessage(error),
-        })
+          error: importErrorMessage(error).slice(0, 600),
+        }
+        if (options.checkpoint && !await options.checkpoint.error(input, failed)) {
+          report.cancelled = true
+          break
+        }
+        report.errored += 1
+        report.rows.push(failed)
       }
     }
 
     await options.onProgress?.(progressOf(report, inputRows.length), report)
+    if (report.cancelled) break
   }
 
   payload.logger.info({

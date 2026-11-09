@@ -3,7 +3,7 @@
 import { Dialog } from '@base-ui/react/dialog'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   importColumnLabels,
@@ -22,7 +22,7 @@ import {
   inspectImportHeaders,
   type ImportHeaderInspection,
 } from './importMapping'
-import { parseXlsxWorkbook, type ParsedXlsxSheet } from './xlsx'
+import type { WorkbookCommand, WorkbookReply } from './importWorker'
 
 const PREVIEW_WINDOW = 40
 const DB_ISSUE_CODES = new Set(['category_missing', 'slug_conflict', 'duplicate_batch'])
@@ -64,14 +64,6 @@ type CommitResponse = {
   rows: CommitRowResult[]
 }
 
-type QueuedResponse = {
-  importId: string
-  status: string
-  totalRows: number
-  processedRows: number
-  pollUrl: string
-}
-
 type ImportStatusResponse = {
   importId: string
   status: 'queued' | 'processing' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled'
@@ -84,76 +76,83 @@ type ImportStatusResponse = {
   results: CommitRowResult[]
   error?: string | null
   errorCsvUrl?: string | null
+  working: boolean
 }
 
 type RowFilter = 'all' | 'pending' | 'new' | 'existing'
 
-type ProgressState = {
-  importId: string
-  status: ImportStatusResponse['status']
-  processedRows: number
-  totalRows: number
+type SourceRow = Pick<PreviewRow, 'rowIndex' | 'sourceLine' | 'values'>
+
+const endpoint = '/api/admin-products-import'
+
+class ImportApiError extends Error {
+  constructor(message: string, readonly status: number, readonly rows?: PreviewRow[]) {
+    super(message)
+  }
 }
 
-type WorkerResponse = {
-  id: string
-  ok: boolean
-  result?: PreviewResponse
-  error?: string
-}
-
-async function callImportApi<T>(body: Record<string, unknown>): Promise<T> {
-  const response = await fetch('/api/admin-products-import', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const result = await response.json() as T & { error?: string }
-  if (!response.ok) throw new Error((result as { error?: string }).error || 'Falha na importação.')
-  return result
-}
-
-async function fetchImportStatus(url: string, signal: AbortSignal): Promise<ImportStatusResponse> {
-  const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', signal })
-  const data = await response.json() as ImportStatusResponse & { error?: string }
-  if (!response.ok) throw new Error(data.error || 'Não foi possível consultar o andamento da importação.')
+async function importResponse<T>(response: Response): Promise<T> {
+  const data = await response.json().catch(() => null) as (T & { error?: string; rows?: PreviewRow[] }) | null
+  if (!response.ok || !data) {
+    throw new ImportApiError(
+      data?.error || (response.status === 413 ? 'Dados maiores que 4 MB. Divida a planilha em lotes menores.' : 'Não foi possível comunicar com a importação.'),
+      response.status,
+      data?.rows,
+    )
+  }
   return data
 }
 
-function parseLocally(text: string): Promise<PreviewResponse | null> {
-  if (typeof Worker === 'undefined') return Promise.resolve(null)
-  return new Promise((resolve) => {
-    const worker = new Worker(new URL('./importWorker.ts', import.meta.url), { type: 'module' })
-    const id = crypto.randomUUID()
-    const timeout = window.setTimeout(() => {
-      worker.terminate()
-      resolve(null)
-    }, 12_000)
+async function callImportApi<T>(body: Record<string, unknown>, signal: AbortSignal): Promise<T> {
+  const json = JSON.stringify(body)
+  if (new Blob([json]).size > 4 * 1024 * 1024) {
+    throw new ImportApiError('Dados maiores que 4 MB. Divida a planilha em lotes menores.', 413)
+  }
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: json,
+    signal: AbortSignal.any([signal, AbortSignal.timeout(body.action === 'advance' ? 125_000 : 30_000)]),
+  })
+  return importResponse<T>(response)
+}
 
-    worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      if (event.data.id !== id) return
-      window.clearTimeout(timeout)
+async function getImport<T>(params: Record<string, string>, signal: AbortSignal) {
+  const response = await fetch(endpoint + '?' + new URLSearchParams(params), {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    signal: AbortSignal.any([signal, AbortSignal.timeout(20_000)]),
+  })
+  return response.status === 204 ? null : importResponse<T>(response)
+}
+
+function readWorkbook(worker: Worker, command: WorkbookCommand, signal: AbortSignal, transfer: Transferable[] = []) {
+  return new Promise<WorkbookReply>((resolve, reject) => {
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(30_000)])
+    requestSignal.throwIfAborted()
+    function clear() {
+      requestSignal.removeEventListener('abort', abort)
+      worker.onmessage = null
+      worker.onerror = null
+    }
+    function abort() {
+      clear()
       worker.terminate()
-      resolve(event.data.ok ? event.data.result || null : null)
+      reject(requestSignal.reason)
+    }
+    requestSignal.addEventListener('abort', abort, { once: true })
+    worker.onmessage = ({ data }: MessageEvent<WorkbookReply>) => {
+      clear()
+      if (data.error) reject(new Error(data.error))
+      else resolve(data)
     }
     worker.onerror = () => {
-      window.clearTimeout(timeout)
-      worker.terminate()
-      resolve(null)
+      clear()
+      reject(new Error('Não foi possível ler o arquivo Excel.'))
     }
-    worker.postMessage({ id, text })
+    worker.postMessage(command, transfer)
   })
-}
-
-function csvCell(value: string) {
-  return /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value
-}
-
-function sheetFromRows(rows: PreviewRow[]) {
-  const header = importColumns.map((column) => importColumnLabels[column])
-  const lines = [header, ...rows.map((row) => importColumns.map((column) => row.values[column] || ''))]
-  return lines.map((line) => line.map(csvCell).join(',')).join('\n')
 }
 
 function decodeSheet(buffer: ArrayBuffer): { text: string; encoding: string } {
@@ -173,20 +172,6 @@ function delimiterLabel(delimiter: PreviewResponse['delimiter'] | null) {
   return delimiter || 'auto'
 }
 
-function downloadErrorCsv(result: CommitResponse) {
-  const rows = result.rows.filter((item) => item.status === 'error')
-  const csv = [
-    ['linha', 'erro'],
-    ...rows.map((item) => [String(item.sourceLine), item.error || 'Falha desconhecida']),
-  ].map((row) => row.map(csvCell).join(',')).join('\r\n')
-  const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = 'erros-importacao-produtos.csv'
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
-
 function terminalStatus(status: ImportStatusResponse['status']) {
   return status === 'completed' ||
     status === 'completed_with_errors' ||
@@ -201,12 +186,12 @@ function affectsDatabaseResolution(column: ImportColumn) {
 export function ProductImportDialog() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [step, setStep] = useState<'input' | 'mapping' | 'preview' | 'result'>('input')
+  const [step, setStep] = useState<'input' | 'mapping' | 'preview' | 'progress' | 'result'>('input')
   const [rawText, setRawText] = useState('')
   const [rows, setRows] = useState<PreviewRow[]>([])
   const [unknownHeaders, setUnknownHeaders] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
-  const [resolving, setResolving] = useState(false)
+  const [activity, setActivity] = useState<string | null>(null)
   const [needsDbRevalidation, setNeedsDbRevalidation] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<CommitResponse | null>(null)
@@ -215,21 +200,31 @@ export function ProductImportDialog() {
   const [filter, setFilter] = useState<RowFilter>('all')
   const [page, setPage] = useState(0)
   const [activePendingRow, setActivePendingRow] = useState<number | null>(null)
-  const [progress, setProgress] = useState<ProgressState | null>(null)
+  const [progress, setProgress] = useState<ImportStatusResponse | null>(null)
+  const [latest, setLatest] = useState<ImportStatusResponse | null>(null)
+  const [finishedId, setFinishedId] = useState<string | null>(null)
   const [remoteErrorCsv, setRemoteErrorCsv] = useState<string | null>(null)
   const [finalStatus, setFinalStatus] = useState<ImportStatusResponse['status'] | null>(null)
-  const [xlsxSheets, setXlsxSheets] = useState<ParsedXlsxSheet[]>([])
+  const [xlsxSheets, setXlsxSheets] = useState<string[]>([])
   const [selectedSheet, setSelectedSheet] = useState(0)
   const [mappingInspection, setMappingInspection] = useState<ImportHeaderInspection | null>(null)
   const [mappingValues, setMappingValues] = useState<Array<ImportColumn | null>>([])
-  const fileRef = useRef<HTMLInputElement>(null)
   const idempotencyRef = useRef<string | null>(null)
-  const pollAbortRef = useRef<AbortController | null>(null)
-  const localCancelRequestedRef = useRef(false)
+  const taskRef = useRef<AbortController | null>(null)
+  const workbookRef = useRef<Worker | null>(null)
+  const sourceLinesRef = useRef<number[] | null>(null)
+
+  useEffect(() => () => {
+    taskRef.current?.abort()
+    workbookRef.current?.terminate()
+  }, [])
 
   function reset() {
-    pollAbortRef.current?.abort()
-    pollAbortRef.current = null
+    taskRef.current?.abort()
+    taskRef.current = null
+    workbookRef.current?.terminate()
+    workbookRef.current = null
+    sourceLinesRef.current = null
     idempotencyRef.current = null
     setStep('input')
     setRawText('')
@@ -243,15 +238,36 @@ export function ProductImportDialog() {
     setPage(0)
     setActivePendingRow(null)
     setProgress(null)
+    setLatest(null)
+    setFinishedId(null)
     setRemoteErrorCsv(null)
     setFinalStatus(null)
     setXlsxSheets([])
     setSelectedSheet(0)
-    setResolving(false)
+    setBusy(false)
+    setActivity(null)
     setNeedsDbRevalidation(false)
     setMappingInspection(null)
     setMappingValues([])
-    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  async function runTask(operation: (signal: AbortSignal) => Promise<void>, fallback: string) {
+    if (taskRef.current) return
+    const task = new AbortController()
+    taskRef.current = task
+    setBusy(true)
+    setError(null)
+    try {
+      await operation(task.signal)
+    } catch (error) {
+      if (!task.signal.aborted) setError(error instanceof Error ? error.message : fallback)
+    } finally {
+      if (taskRef.current === task) {
+        taskRef.current = null
+        setBusy(false)
+        setActivity(null)
+      }
+    }
   }
 
   function applyPreview(data: PreviewResponse) {
@@ -266,106 +282,97 @@ export function ProductImportDialog() {
     setStep('preview')
   }
 
-  async function runPreview(text: string) {
-    setBusy(true)
-    setResolving(true)
-    setError(null)
+  async function runPreview(text: string, signal: AbortSignal) {
+    setActivity('Conferindo produtos e categorias…')
+    const data = await callImportApi<PreviewResponse>({ action: 'preview', text }, signal)
+    signal.throwIfAborted()
+    const sourceLines = sourceLinesRef.current
+    applyPreview({
+      ...data,
+      rows: data.rows.map((row, index) => ({ ...row, sourceLine: sourceLines?.[index] ?? row.sourceLine })),
+    })
     setNeedsDbRevalidation(false)
     idempotencyRef.current = null
-
-    const serverPromise = callImportApi<PreviewResponse>({ action: 'preview', text })
-    try {
-      const local = await parseLocally(text)
-      if (local) applyPreview(local)
-
-      const data = await serverPromise
-      applyPreview(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível pré-visualizar.')
-    } finally {
-      setResolving(false)
-      setBusy(false)
-    }
   }
 
-  async function beginPreview(text: string) {
-    setError(null)
+  async function inspectAndPreview(text: string, signal: AbortSignal) {
     const inspection = inspectImportHeaders(text)
     if (inspection.needsMapping) {
-      setRawText(text)
       setMappingInspection(inspection)
       setMappingValues(inspection.mapping)
       setStep('mapping')
-      setBusy(false)
       return
     }
-    await runPreview(text)
+    await runPreview(text, signal)
   }
 
-  async function confirmMapping() {
+  function beginPreview(text: string) {
+    return runTask((signal) => inspectAndPreview(text, signal), 'Não foi possível pré-visualizar a planilha.')
+  }
+
+  function confirmMapping() {
     if (!mappingInspection) return
-    setBusy(true)
-    setError(null)
-    try {
-      const mapped = applyImportMapping(rawText, mappingInspection.delimiter, mappingValues)
-      setRawText(mapped)
-      await runPreview(mapped)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível aplicar o mapeamento.')
-    } finally {
-      setBusy(false)
-    }
+    return runTask((signal) => runPreview(
+      applyImportMapping(rawText, mappingInspection.delimiter, mappingValues), signal,
+    ), 'Não foi possível aplicar o mapeamento.')
   }
 
-  async function consumeFile(file: File) {
-    setError(null)
-    if (file.size > 4 * 1024 * 1024) {
-      setError('Arquivo maior que 4 MB. Divida a importação em lotes menores.')
-      return
-    }
+  async function loadSheet(worker: Worker, index: number, signal: AbortSignal) {
+    setActivity('Lendo a aba selecionada…')
+    setStep('input')
+    setRows([])
+    setRawText('')
+    setSelectedSheet(index)
+    const { sheet } = await readWorkbook(worker, { action: 'sheet', index }, signal)
+    signal.throwIfAborted()
+    if (!sheet) throw new Error('A aba selecionada não pôde ser lida.')
+    sourceLinesRef.current = sheet.sourceLines
+    setRawText(sheet.text)
+    await inspectAndPreview(sheet.text, signal)
+  }
 
-    setBusy(true)
-    try {
-      const buffer = await file.arrayBuffer()
-      if (/\.xlsx$/i.test(file.name)) {
-        const workbook = await parseXlsxWorkbook(buffer)
-        const first = workbook.sheets[0]
-        if (!first) throw new Error('O arquivo .xlsx não possui uma aba legível.')
-        setXlsxSheets(workbook.sheets)
-        setSelectedSheet(0)
-        setEncoding('XLSX')
-        setRawText(first.text)
-        await beginPreview(first.text)
-        return
-      }
-
+  function consumeFile(file: File) {
+    return runTask(async (signal) => {
+      if (file.size > 4 * 1024 * 1024) throw new Error('Arquivo maior que 4 MB. Divida a importação em lotes menores.')
+      setActivity('Lendo arquivo…')
+      workbookRef.current?.terminate()
+      workbookRef.current = null
+      sourceLinesRef.current = null
       setXlsxSheets([])
       setSelectedSheet(0)
+      setRawText('')
+      const buffer = await file.arrayBuffer()
+      signal.throwIfAborted()
+      if (/\.xlsx$/i.test(file.name)) {
+        const worker = new Worker(new URL('./importWorker.ts', import.meta.url), { type: 'module' })
+        workbookRef.current = worker
+        const { sheetNames } = await readWorkbook(worker, { action: 'open', buffer }, signal, [buffer])
+        signal.throwIfAborted()
+        setXlsxSheets(sheetNames ?? [])
+        setEncoding('XLSX')
+        await loadSheet(worker, 0, signal)
+        return
+      }
       const decoded = decodeSheet(buffer)
       setEncoding(decoded.encoding)
       setRawText(decoded.text)
-      await beginPreview(decoded.text)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível ler o arquivo.')
-    } finally {
-      setBusy(false)
-    }
+      await inspectAndPreview(decoded.text, signal)
+    }, 'Não foi possível ler o arquivo.')
   }
 
   function onFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (file) void consumeFile(file)
   }
 
-  async function changeXlsxSheet(index: number) {
-    const sheet = xlsxSheets[index]
-    if (!sheet) return
-    setSelectedSheet(index)
-    setRawText(sheet.text)
-    await beginPreview(sheet.text)
+  function changeXlsxSheet(index: number) {
+    const worker = workbookRef.current
+    if (worker) void runTask((signal) => loadSheet(worker, index, signal), 'Não foi possível ler a aba.')
   }
 
   function updateCell(rowIndex: number, column: ImportColumn, value: string) {
+    idempotencyRef.current = null
     setRows((current) => current.map((row) => {
       if (row.rowIndex !== rowIndex) return row
       const values = { ...row.values, [column]: value }
@@ -387,12 +394,23 @@ export function ProductImportDialog() {
   }
 
   function removeRow(rowIndex: number) {
+    idempotencyRef.current = null
     setRows((current) => current.filter((row) => row.rowIndex !== rowIndex))
     idempotencyRef.current = null
   }
 
-  async function revalidate() {
-    await runPreview(sheetFromRows(rows))
+  async function previewRows(input: SourceRow[], signal: AbortSignal) {
+    setActivity('Conferindo produtos e categorias…')
+    const data = await callImportApi<Pick<PreviewResponse, 'rows'>>({ action: 'preview', rows: input }, signal)
+    signal.throwIfAborted()
+    applyPreview({ ...data, unknownHeaders, delimiter: delimiter ?? ',' })
+    setNeedsDbRevalidation(false)
+    idempotencyRef.current = null
+  }
+
+  function revalidate() {
+    const input = rows.map(({ rowIndex, sourceLine, values }) => ({ rowIndex, sourceLine, values }))
+    return runTask((signal) => previewRows(input, signal), 'Não foi possível revalidar a planilha.')
   }
 
   const blockingCount = rows.reduce((sum, row) => sum + blockingIssueCount(row.issues), 0)
@@ -435,185 +453,141 @@ export function ProductImportDialog() {
     }, 0)
   }
 
-  async function pollImport(initial: QueuedResponse) {
-    const controller = new AbortController()
-    pollAbortRef.current?.abort()
-    pollAbortRef.current = controller
-    let pollUrl = initial.pollUrl
-    setProgress({
-      importId: initial.importId,
-      status: initial.status as ImportStatusResponse['status'],
-      processedRows: initial.processedRows,
-      totalRows: initial.totalRows,
-    })
-
-    while (!controller.signal.aborted) {
-      const status = await fetchImportStatus(pollUrl, controller.signal)
-      setProgress({
-        importId: status.importId,
-        status: status.status,
-        processedRows: status.processedRows,
-        totalRows: status.totalRows,
-      })
-      if (terminalStatus(status.status)) {
-        setFinalStatus(status.status)
-        setRemoteErrorCsv(status.errorCsvUrl || null)
-        setResult({
-          created: status.created,
-          updated: status.updated,
-          skipped: status.skipped,
-          errored: status.errored,
-          rows: status.results || [],
-        })
-        if (status.status === 'failed') {
-          setError(status.error || 'A importação falhou durante o processamento.')
-        }
-        setStep('result')
-        setProgress(null)
-        router.refresh()
-        pollAbortRef.current = null
-        return
-      }
-      await new Promise((resolve) => window.setTimeout(resolve, 1000))
-      pollUrl = `/api/admin-products-import?importId=${encodeURIComponent(status.importId)}`
-    }
+  async function showResult(id: string, signal: AbortSignal, refresh = false) {
+    const status = await getImport<ImportStatusResponse>({ importId: id }, signal)
+    signal.throwIfAborted()
+    if (!status) throw new Error('Não foi possível carregar o resultado.')
+    setFinishedId(id)
+    setFinalStatus(status.status)
+    setRemoteErrorCsv(status.errorCsvUrl || null)
+    setResult({ ...status, rows: status.results })
+    if (status.error) setError(status.error)
+    setStep('result')
+    setProgress(null)
+    if (refresh) router.refresh()
   }
 
-  async function confirmImport() {
-    setBusy(true)
-    setError(null)
-    setFinalStatus(null)
-    setRemoteErrorCsv(null)
-    localCancelRequestedRef.current = false
-    try {
-      const payload = rows.map((row) => ({
-        rowIndex: row.rowIndex,
-        sourceLine: row.sourceLine,
-        values: row.values,
-        onConflict: row.isDuplicate ? 'update' : 'skip',
-      }))
-
-      // Each request is executed inside a Vercel Function (300 s limit).
-      // The importer downloads and persists every image, so a 17-product
-      // request can time out after partially committing rows. Keep requests
-      // small and aggregate their per-row results for safe selective retries.
-      const batchSize = 2
-      const summary: CommitResponse = { created: 0, updated: 0, skipped: 0, errored: 0, rows: [] }
-      let cancelled = false
-      setProgress({ importId: '', status: 'processing', processedRows: 0, totalRows: payload.length })
-
-      for (let start = 0; start < payload.length; start += batchSize) {
-        if (localCancelRequestedRef.current) {
-          cancelled = true
-          const pending = payload.slice(start)
-          summary.errored += pending.length
-          summary.rows.push(...pending.map((row) => ({
-            rowIndex: row.rowIndex,
-            sourceLine: row.sourceLine,
-            status: 'error' as const,
-            error: 'Não importado: operação cancelada.',
-          })))
-          break
-        }
-
-        const batch = payload.slice(start, start + batchSize)
+  async function driveImport(initial: ImportStatusResponse, signal: AbortSignal) {
+    let current = initial
+    setStep('progress')
+    setProgress(current)
+    while (!terminalStatus(current.status)) {
+      signal.throwIfAborted()
+      const id = current.importId
+      const cursor = current.processedRows
+      if (current.working) {
+        setActivity('Aguardando a etapa em andamento…')
+        await new Promise((resolve) => window.setTimeout(resolve, 1500))
+        current = await getImport<ImportStatusResponse>({ importId: id }, signal) ?? current
+      } else {
+        setActivity('Processando produtos e imagens…')
         try {
-          const data = await callImportApi<CommitResponse | QueuedResponse>({
-            action: 'commit',
-            rows: batch,
-          })
-          if ('importId' in data) {
-            throw new Error('O lote pequeno foi colocado na fila inesperadamente.')
-          }
-          summary.created += data.created
-          summary.updated += data.updated
-          summary.skipped += data.skipped
-          summary.errored += data.errored
-          summary.rows.push(...data.rows)
-          setProgress({
-            importId: '',
-            status: 'processing',
-            processedRows: Math.min(start + batch.length, payload.length),
-            totalRows: payload.length,
-          })
+          current = await callImportApi<ImportStatusResponse>({ action: 'advance', importId: id, cursor }, signal)
         } catch (error) {
-          // Preserve successful batches, and mark everything not yet confirmed
-          // as retryable. Matching by code makes a rerun an update, not a clone.
-          const pending = payload.slice(start)
-          const reason = error instanceof Error ? error.message : 'Falha inesperada.'
-          summary.errored += pending.length
-          summary.rows.push(...pending.map((row) => ({
-            rowIndex: row.rowIndex,
-            sourceLine: row.sourceLine,
-            status: 'error' as const,
-            error: `Lote não confirmado: ${reason}`,
-          })))
-          break
+          signal.throwIfAborted()
+          current = await getImport<ImportStatusResponse>({ importId: id }, signal) ?? current
+          if (!current.working && !terminalStatus(current.status) && current.processedRows === cursor) throw error
+        }
+        if (!current.working && !terminalStatus(current.status) && current.processedRows === cursor) {
+          throw new Error('A importação está pausada. Retome para continuar da última linha salva.')
         }
       }
-
-      setResult(summary)
-      setFinalStatus(cancelled ? 'cancelled' : summary.errored ? 'completed_with_errors' : 'completed')
-      setStep('result')
-      router.refresh()
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
-      setError(err instanceof Error ? err.message : 'Não foi possível concluir a importação.')
-    } finally {
-      setProgress(null)
-      setBusy(false)
-      localCancelRequestedRef.current = false
+      signal.throwIfAborted()
+      setProgress(current)
     }
+    await showResult(current.importId, signal, true)
   }
 
-  async function cancelImport() {
-    if (progress && !progress.importId) {
-      localCancelRequestedRef.current = true
-      setProgress((current) => current ? { ...current, status: 'cancelled' } : null)
-      return
-    }
-    if (!progress?.importId) return
-    try {
-      await callImportApi<{ status: 'cancelled' }>({ action: 'cancel', importId: progress.importId })
-      setProgress((current) => current ? { ...current, status: 'cancelled' } : current)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível cancelar a importação.')
-    }
+  function confirmImport() {
+    return runTask(async (signal) => {
+      setActivity('Preparando importação…')
+      const input = rows.map(({ rowIndex, sourceLine, values, isDuplicate }) => ({
+        rowIndex, sourceLine, values, onConflict: isDuplicate ? 'update' : 'skip',
+      }))
+      idempotencyRef.current ??= crypto.randomUUID()
+      let status: ImportStatusResponse
+      try {
+        status = await callImportApi<ImportStatusResponse>({ action: 'start', rows: input, idempotencyKey: idempotencyRef.current }, signal)
+      } catch (error) {
+        if (error instanceof ImportApiError && error.status === 422 && error.rows) {
+          applyPreview({ rows: error.rows, unknownHeaders, delimiter: delimiter ?? ',' })
+        }
+        if (error instanceof ImportApiError && error.status === 409) {
+          const pending = await getImport<ImportStatusResponse>({ latest: '1' }, signal)
+          signal.throwIfAborted()
+          if (pending && !terminalStatus(pending.status)) {
+            setProgress(pending)
+            setStep('progress')
+          }
+        }
+        throw error
+      }
+      signal.throwIfAborted()
+      await driveImport(status, signal)
+    }, 'Não foi possível concluir a importação. Retome a partir da última linha salva.')
+  }
+
+  function resumeImport() {
+    if (!progress) return
+    return runTask(async (signal) => {
+      const current = await getImport<ImportStatusResponse>({ importId: progress.importId }, signal)
+      signal.throwIfAborted()
+      if (current) await driveImport(current, signal)
+    }, 'Não foi possível retomar a importação.')
+  }
+
+  function cancelImport() {
+    if (!progress) return
+    taskRef.current?.abort()
+    taskRef.current = null
+    return runTask(async (signal) => {
+      setActivity('Cancelando importação…')
+      try {
+        await callImportApi({ action: 'cancel', importId: progress.importId }, signal)
+      } catch (error) {
+        if (!(error instanceof ImportApiError && error.status === 409)) throw error
+      }
+      await showResult(progress.importId, signal, true)
+    }, 'Não foi possível cancelar a importação.')
   }
 
   function reimportErrors() {
-    if (!result) return
-    const failedIndexes = new Set(
-      result.rows.filter((item) => item.status === 'error').map((item) => item.rowIndex),
-    )
-    const failedRows = rows.filter((row) => failedIndexes.has(row.rowIndex))
-    if (!failedRows.length) return
-    setRows(failedRows)
-    setResult(null)
-    setRemoteErrorCsv(null)
-    setFinalStatus(null)
-    setFilter('all')
-    setPage(0)
-    setNeedsDbRevalidation(false)
-    idempotencyRef.current = null
-    setStep('preview')
+    if (!finishedId) return
+    return runTask(async (signal) => {
+      const data = await getImport<{ rows: SourceRow[] }>({ importId: finishedId, format: 'retry' }, signal)
+      signal.throwIfAborted()
+      if (!data?.rows.length) throw new Error('Nenhuma linha com erro para reimportar.')
+      setXlsxSheets([])
+      setRawText('')
+      await previewRows(data.rows, signal)
+    }, 'Não foi possível recuperar as linhas com erro.')
   }
 
   function changeOpen(next: boolean) {
-    if (!next && (step === 'mapping' || step === 'preview') && (rows.length > 0 || rawText.trim())) {
-      const message = busy
-        ? 'Fechar esta janela não interrompe o lote em andamento. Os lotes seguintes poderão ser cancelados. Fechar mesmo assim?'
-        : 'Fechar e descartar as correções desta importação?'
-      if (!window.confirm(message)) return
+    if (!next && (step === 'mapping' || step === 'preview') && !busy && (rows.length || rawText.trim())) {
+      if (!window.confirm('Fechar e descartar as correções desta importação?')) return
     }
     setOpen(next)
-    if (!next) reset()
+    if (!next) {
+      reset()
+      return
+    }
+    void runTask(async (signal) => {
+      const last = await getImport<ImportStatusResponse>({ latest: '1' }, signal)
+      signal.throwIfAborted()
+      if (!last) return
+      if (terminalStatus(last.status)) setLatest(last)
+      else {
+        setProgress(last)
+        setStep('progress')
+      }
+    }, 'Não foi possível consultar a última importação.')
   }
 
   const progressPercent = progress?.totalRows
     ? Math.round((progress.processedRows / progress.totalRows) * 100)
     : 0
-  const confirmBlocked = busy || resolving || !rows.length || blockingCount > 0 || needsDbRevalidation
+  const confirmBlocked = busy || !rows.length || blockingCount > 0 || needsDbRevalidation
 
   return <Dialog.Root open={open} onOpenChange={changeOpen}>
     <Dialog.Trigger className="esmera-button">Importar produtos</Dialog.Trigger>
@@ -625,7 +599,7 @@ export function ProductImportDialog() {
             <div>
               <Dialog.Title>Importar produtos</Dialog.Title>
               <Dialog.Description>
-                Envie Excel, CSV ou TSV. Célula vazia preserva o valor em atualizações; use -- para limpar um campo opcional.
+                {step === 'input' ? '1 de 3 · Enviar planilha' : step === 'mapping' || step === 'preview' ? '2 de 3 · Revisar' : '3 de 3 · Importar'}
               </Dialog.Description>
             </div>
             <Dialog.Close className="esmera-icon-button" aria-label="Fechar">×</Dialog.Close>
@@ -634,7 +608,19 @@ export function ProductImportDialog() {
           <div className="esmera-overlay-body esmera-products-import">
             {error ? <p className="esmera-quick-create-feedback" role="alert" aria-live="assertive">{error}</p> : null}
 
+            {activity && step !== 'progress' ? <p className="esmera-products-import__resolving" role="status">{activity}</p> : null}
+            {xlsxSheets.length > 1 && (step === 'input' || step === 'mapping' || step === 'preview') ? <label className="esmera-products-import__sheet">
+              <span>Aba do Excel</span>
+              <select className="esmera-input" value={selectedSheet} disabled={busy} onChange={(event) => changeXlsxSheet(Number(event.target.value))}>
+                {xlsxSheets.map((name, index) => <option value={index} key={index}>{name}</option>)}
+              </select>
+            </label> : null}
+
             {step === 'input' ? <div className="esmera-products-import__input">
+              {latest ? <button type="button" className="esmera-button esmera-button--quiet" disabled={busy}
+                onClick={() => void runTask((signal) => showResult(latest.importId, signal), 'Não foi possível carregar o resultado.')}>
+                Ver última importação
+              </button> : null}
               <div className="esmera-products-import__templates">
                 <Link className="esmera-button esmera-button--quiet" href="/api/admin-products-import?template=xlsx" download>
                   Baixar modelo (.xlsx)
@@ -655,10 +641,10 @@ export function ProductImportDialog() {
                 <strong>Solte Excel, CSV ou TSV aqui</strong>
                 <span>.xlsx direto ou arquivos exportados pelo Excel/Google Sheets</span>
                 <input
-                  ref={fileRef}
                   type="file"
                   accept=".xlsx,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/tab-separated-values"
                   onChange={onFile}
+                  disabled={busy}
                 />
               </label>
               <label className="esmera-products-import__field">
@@ -667,8 +653,12 @@ export function ProductImportDialog() {
                   className="esmera-input"
                   rows={10}
                   value={rawText}
+                  disabled={busy}
                   onChange={(event) => {
                     setRawText(event.target.value)
+                    workbookRef.current?.terminate()
+                    workbookRef.current = null
+                    sourceLinesRef.current = null
                     setEncoding('texto colado')
                     setXlsxSheets([])
                   }}
@@ -687,17 +677,7 @@ export function ProductImportDialog() {
                 <strong>Mapear colunas</strong>
                 <p>Associe cada coluna recebida a um campo do produto. Colunas sem uso podem ficar como “Ignorar”.</p>
               </div>
-              {xlsxSheets.length > 1 ? <label className="esmera-products-import__sheet">
-                <span>Aba</span>
-                <select
-                  className="esmera-input"
-                  value={selectedSheet}
-                  disabled={busy}
-                  onChange={(event) => void changeXlsxSheet(Number(event.target.value))}
-                >
-                  {xlsxSheets.map((sheet, index) => <option value={index} key={`${sheet.name}-${index}`}>{sheet.name}</option>)}
-                </select>
-              </label> : null}
+
               <div className="esmera-products-import__mapping-list">
                 {mappingInspection.headers.map((header, index) => {
                   const current = mappingValues[index]
@@ -735,43 +715,15 @@ export function ProductImportDialog() {
               <div className="esmera-products-import__meta" aria-live="polite">
                 <span>Formato: <strong>{encoding || 'texto'}</strong></span>
                 <span>Delimitador: <strong>{delimiterLabel(delimiter)}</strong></span>
-                {xlsxSheets.length > 1 ? <label className="esmera-products-import__sheet">
-                  <span>Aba</span>
-                  <select
-                    className="esmera-input"
-                    value={selectedSheet}
-                    disabled={busy}
-                    onChange={(event) => void changeXlsxSheet(Number(event.target.value))}
-                  >
-                    {xlsxSheets.map((sheet, index) => <option value={index} key={`${sheet.name}-${index}`}>{sheet.name}</option>)}
-                  </select>
-                </label> : null}
+
               </div>
 
-              {resolving ? <p className="esmera-products-import__resolving" aria-live="polite">
-                Preview local pronto. Conferindo produtos existentes, categorias e slugs no catálogo…
-              </p> : null}
               {unknownHeaders.length ? <p className="esmera-products-import__warning">
                 Colunas não reconhecidas (ignoradas): {unknownHeaders.join(', ')}
               </p> : null}
               {needsDbRevalidation ? <p className="esmera-products-import__warning">
                 Você alterou código, categoria, nome ou slug. Revalide as referências do catálogo antes de confirmar.
               </p> : null}
-
-              {progress ? <div className="esmera-products-import__progress" aria-live="polite">
-                <div>
-                  <strong>{progress.status === 'queued' ? 'Na fila' : progress.status === 'processing' ? 'Importando produtos' : 'Finalizando'}</strong>
-                  <span>{progress.processedRows} de {progress.totalRows} linhas · {progressPercent}%</span>
-                </div>
-                <progress
-                  max={progress.totalRows || 1}
-                  value={progress.processedRows}
-                  aria-label={`Importação ${progressPercent}% concluída`}
-                />
-                {progress.status !== 'cancelled'
-                  ? <button type="button" className="esmera-button esmera-button--quiet" onClick={() => void cancelImport()}>Cancelar importação</button>
-                  : <span>Cancelamento solicitado.</span>}
-              </div> : null}
 
               <div className="esmera-products-import__filters" aria-label="Filtrar linhas da importação">
                 <button type="button" className={filter === 'all' ? 'is-active' : ''} onClick={() => selectFilter('all')}>Todas ({rows.length})</button>
@@ -893,8 +845,11 @@ export function ProductImportDialog() {
                 </details>)}
               </div>
 
+              <p>Células vazias preservam os valores atuais. Use -- para limpar um campo opcional.</p>
               <div className="esmera-products-import__summary" aria-live="polite">
                 <span>{rows.length} linha{rows.length === 1 ? '' : 's'}</span>
+                <span>{rows.filter((row) => !row.isDuplicate).length} a criar</span>
+                <span>{rows.filter((row) => row.isDuplicate).length} a atualizar</span>
                 <span className={blockingCount || needsDbRevalidation ? 'is-danger' : 'is-success'}>
                   {needsDbRevalidation
                     ? 'Revalidação do catálogo necessária'
@@ -914,12 +869,27 @@ export function ProductImportDialog() {
                   onClick={() => void confirmImport()}
                   disabled={confirmBlocked}
                 >
-                  {busy ? (progress ? `Importando ${progressPercent}%` : 'Preparando…') : `Confirmar importação (${rows.length})`}
+                  {busy ? 'Preparando…' : `Importar ${rows.length} ${rows.length === 1 ? 'produto' : 'produtos'}`}
                 </Button>
               </div>
               {confirmBlocked ? <span id="import-blocking-reason" className="esmera-products-import__sr-note">
                 Corrija as pendências e revalide referências alteradas antes de confirmar.
               </span> : null}
+            </div> : null}
+
+            {step === 'progress' && progress ? <div className="esmera-products-import__progress">
+              <div role="status">
+                <strong>{activity || 'Importação pausada'}</strong>
+                <span>{progress.processedRows} de {progress.totalRows} linhas processadas · {progressPercent}%</span>
+              </div>
+              <progress max={progress.totalRows || 1} value={progress.processedRows} aria-label="Linhas processadas" />
+              <p>{progress.created + progress.updated} produtos salvos. Você pode fechar e retomar depois.</p>
+              <div className="esmera-actions">
+                {!busy ? <Button type="button" onClick={() => void resumeImport()}>Retomar importação</Button> : null}
+                <button type="button" className="esmera-button esmera-button--quiet"
+                  disabled={activity === 'Cancelando importação…' || terminalStatus(progress.status)}
+                  onClick={() => void cancelImport()}>Cancelar importação</button>
+              </div>
             </div> : null}
 
             {step === 'result' && result ? <div className="esmera-products-import__result">
@@ -950,13 +920,9 @@ export function ProductImportDialog() {
                   </table>
                 </div>
                 <div className="esmera-actions">
-                  {remoteErrorCsv
-                    ? <a href={remoteErrorCsv} className="esmera-button esmera-button--quiet">Baixar relatório de erros (.csv)</a>
-                    : <button type="button" className="esmera-button esmera-button--quiet" onClick={() => downloadErrorCsv(result)}>
-                      Baixar relatório de erros (.csv)
-                    </button>}
-                  <button type="button" className="esmera-button esmera-button--quiet" onClick={reimportErrors}>
-                    Reimportar apenas linhas com erro
+                  {remoteErrorCsv ? <a href={remoteErrorCsv} className="esmera-button esmera-button--quiet">Baixar relatório de erros (.csv)</a> : null}
+                  <button type="button" className="esmera-button esmera-button--quiet" disabled={busy} onClick={() => void reimportErrors()}>
+                    Corrigir e reimportar linhas com erro
                   </button>
                 </div>
               </> : null}

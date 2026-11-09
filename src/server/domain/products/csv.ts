@@ -22,7 +22,20 @@ function countOutsideQuotes(line: string, delimiter: Delimiter) {
 }
 
 export function detectDelimiter(text: string): Delimiter {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim()).slice(0, 5)
+  const lines: string[] = []
+  let start = text.charCodeAt(0) === 0xfeff ? 1 : 0
+  let inQuotes = false
+  for (let index = start; index < text.length && lines.length < 5; index += 1) {
+    const char = text[index]
+    if (char === '"' && inQuotes && text[index + 1] === '"') { index += 1; continue }
+    if (char === '"') inQuotes = !inQuotes
+    if (char === '\n' && !inQuotes) {
+      const line = text.slice(start, index)
+      if (line.trim()) lines.push(line)
+      start = index + 1
+    }
+  }
+  if (lines.length < 5 && text.slice(start).trim()) lines.push(text.slice(start))
   let best: Delimiter = ','
   let bestScore = -1
 
@@ -40,7 +53,7 @@ export function detectDelimiter(text: string): Delimiter {
   return best
 }
 
-export function parseDelimited(text: string, delimiter: Delimiter): ParsedDelimitedRow[] {
+export function parseDelimited(text: string, delimiter: Delimiter, maxRows = Infinity): ParsedDelimitedRow[] {
   const rows: ParsedDelimitedRow[] = []
   let row: string[] = []
   let field = ''
@@ -74,6 +87,7 @@ export function parseDelimited(text: string, delimiter: Delimiter): ParsedDelimi
     else if (char === delimiter) { row.push(field); field = '' }
     else if (char === '\n') {
       pushRow()
+      if (rows.length >= maxRows) return rows
       physicalLine += 1
       rowStartLine = physicalLine
     } else if (char === '\r') { /* \n cuida da quebra */ }

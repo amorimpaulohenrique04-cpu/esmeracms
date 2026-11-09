@@ -1,58 +1,22 @@
 /// <reference lib="webworker" />
 
-import { resolveHeaderColumn } from '../../../businessRules/products/importSchema'
-import {
-  emptyImportValues,
-  validateRowShape,
-  type ImportRowValues,
-} from '../../../businessRules/products/importValidation'
-import { detectDelimiter, parseTabularText } from '../../../server/domain/products/csv'
+import { openXlsxWorkbook, type ParsedXlsxSheet } from './xlsx'
 
-type ParseRequest = { id: string; text: string }
+export type WorkbookCommand = { action: 'open'; buffer: ArrayBuffer } | { action: 'sheet'; index: number }
+export type WorkbookReply = { sheetNames?: string[]; sheet?: ParsedXlsxSheet; error?: string }
 
-type LocalPreviewRow = {
-  rowIndex: number
-  sourceLine: number
-  values: ImportRowValues
-  issues: ReturnType<typeof validateRowShape>
-  isDuplicate: false
-  action: 'create'
-}
+let workbook: Awaited<ReturnType<typeof openXlsxWorkbook>> | undefined
 
-self.onmessage = (event: MessageEvent<ParseRequest>) => {
-  const { id, text } = event.data
+self.onmessage = async ({ data }: MessageEvent<WorkbookCommand>) => {
   try {
-    const delimiter = detectDelimiter(text)
-    const table = parseTabularText(text, delimiter)
-    if (!table.length) {
-      self.postMessage({ id, ok: true, result: { rows: [], unknownHeaders: [], delimiter } })
-      return
+    if (data.action === 'open') {
+      workbook = await openXlsxWorkbook(data.buffer)
+      self.postMessage({ sheetNames: workbook.sheetNames } satisfies WorkbookReply)
+    } else {
+      if (!workbook) throw new Error('Selecione um arquivo Excel primeiro.')
+      self.postMessage({ sheet: await workbook.readSheet(data.index) } satisfies WorkbookReply)
     }
-
-    const [header, ...dataRows] = table
-    const mapped = header.cells.map((cell) => resolveHeaderColumn(cell))
-    if (!mapped.some(Boolean)) throw new Error('Cabeçalho não reconhecido. Use o modelo de importação ou faça o mapeamento das colunas.')
-
-    const unknownHeaders = header.cells.filter((cell, index) => !mapped[index] && cell.trim())
-    const rows: LocalPreviewRow[] = dataRows.map(({ cells, sourceLine }, rowIndex) => {
-      const values = emptyImportValues()
-      mapped.forEach((column, index) => {
-        if (column) values[column] = (cells[index] || '').trim()
-      })
-      return {
-        rowIndex,
-        sourceLine,
-        values,
-        issues: validateRowShape(values, { requireActiveAssets: true }),
-        isDuplicate: false,
-        action: 'create',
-      }
-    })
-
-    self.postMessage({ id, ok: true, result: { rows, unknownHeaders, delimiter } })
   } catch (error) {
-    self.postMessage({ id, ok: false, error: error instanceof Error ? error.message : 'Falha ao ler a planilha.' })
+    self.postMessage({ error: error instanceof Error ? error.message : 'Não foi possível ler o arquivo Excel.' } satisfies WorkbookReply)
   }
 }
-
-export {}
