@@ -1,6 +1,6 @@
 import sharp from 'sharp'
 
-export const MEDIA_VARIANT_WIDTHS = [480, 800, 1200, 1600] as const
+export const MEDIA_VARIANT_WIDTHS = [480, 800, 1200, 1600, 2000] as const
 
 const MAX_SOURCE_BYTES = 30 * 1024 * 1024
 const CONVERTIBLE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'])
